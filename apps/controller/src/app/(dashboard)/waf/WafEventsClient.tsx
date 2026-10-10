@@ -857,10 +857,16 @@ export default function WafEventsClient({
     tuning.outboundThreshold,
   );
   const [wafLoadOwaspCrs, setWafLoadOwaspCrs] = useState(globalWaf?.load_owasp_crs ?? true);
+  const [wafStrictDirectives, setWafStrictDirectives] = useState(
+    globalWaf?.strict_directives ?? false,
+  );
   const [wafCustomDirectives, setWafCustomDirectives] = useState(
     globalWaf?.custom_directives ?? "",
   );
-  const wafDirectiveIssues = useSeclangIssues(wafCustomDirectives, { crsLoaded: wafLoadOwaspCrs });
+  const wafDirectiveIssues = useSeclangIssues(wafCustomDirectives, {
+    crsLoaded: wafLoadOwaspCrs,
+    strictDirectives: wafStrictDirectives,
+  });
   const [wafPresetIds, setWafPresetIds] = useState<number[]>(globalWaf?.preset_ids ?? []);
   const [wafPluginIds, setWafPluginIds] = useState<number[]>(globalWaf?.plugin_ids ?? []);
   const [wafBodyLimitMb, setWafBodyLimitMb] = useState(bodyLimitMib(globalWaf?.request_body_limit));
@@ -1298,7 +1304,9 @@ export default function WafEventsClient({
         />
       )}
 
-      {tab === "presets" && <WafPresetsPanel presets={presets} />}
+      {tab === "presets" && (
+        <WafPresetsPanel presets={presets} strictDirectives={wafStrictDirectives} />
+      )}
 
       {tab === "plugins" && <WafPluginsPanel plugins={plugins} storedUpdates={pluginUpdates} />}
 
@@ -1320,6 +1328,11 @@ export default function WafEventsClient({
                 value={logNextLevel ? "on" : ""}
               />
               <input type="hidden" name="wafLoadOwaspCrs" value={wafLoadOwaspCrs ? "on" : ""} />
+              <input
+                type="hidden"
+                name="wafStrictDirectives"
+                value={wafStrictDirectives ? "on" : ""}
+              />
               <input type="hidden" name="wafPresetIds" value={JSON.stringify(wafPresetIds)} />
               <input type="hidden" name="wafPluginIds" value={JSON.stringify(wafPluginIds)} />
               {wafState?.message && (
@@ -1360,6 +1373,12 @@ export default function WafEventsClient({
                 description={t("owaspCrsHelp")}
                 value={wafLoadOwaspCrs}
                 onChange={setWafLoadOwaspCrs}
+              />
+              <Switch
+                label={t("strictDirectivesLabel")}
+                description={t("strictDirectivesHelp")}
+                value={wafStrictDirectives}
+                onChange={setWafStrictDirectives}
               />
               {wafLoadOwaspCrs && (
                 <VStack gap={4}>

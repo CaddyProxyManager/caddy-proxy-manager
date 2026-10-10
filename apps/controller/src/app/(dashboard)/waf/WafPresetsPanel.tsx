@@ -35,7 +35,14 @@ export type WafPresetRow = {
   hostCount: number;
 };
 
-export function WafPresetsPanel({ presets }: { presets: WafPresetRow[] }) {
+export function WafPresetsPanel({
+  presets,
+  strictDirectives,
+}: {
+  presets: WafPresetRow[];
+  /** The global setting as the form shows it, so the editor's markers match what a save does. */
+  strictDirectives: boolean;
+}) {
   const t = useTranslations("waf");
   const tCommon = useTranslations("common");
   const tSettings = useTranslations("settings");
@@ -161,6 +168,7 @@ export function WafPresetsPanel({ presets }: { presets: WafPresetRow[] }) {
 
       <WafPresetDialog
         preset={editing}
+        strictDirectives={strictDirectives}
         onClose={() => setEditing(null)}
         onSaved={(message) => {
           setEditing(null);
@@ -193,10 +201,12 @@ export function WafPresetsPanel({ presets }: { presets: WafPresetRow[] }) {
 
 function WafPresetDialog({
   preset,
+  strictDirectives,
   onClose,
   onSaved,
 }: {
   preset: WafPresetRow | "new" | null;
+  strictDirectives: boolean;
   onClose: () => void;
   onSaved: (message: string) => void;
 }) {
@@ -206,7 +216,7 @@ function WafPresetDialog({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [directives, setDirectives] = useState("");
-  const directiveIssues = useSeclangIssues(directives);
+  const directiveIssues = useSeclangIssues(directives, { strictDirectives });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const formId = "waf-preset-form";

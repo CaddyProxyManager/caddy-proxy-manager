@@ -616,6 +616,8 @@ export type WafSettings = WafTuning & {
   mode: "Off" | "On" | "DetectionOnly";
   load_owasp_crs: boolean;
   custom_directives: string;
+  // Refuse the risky custom directives (file reads, engine changes, setenv) instead of warning.
+  strict_directives?: boolean;
   // Superseded by the waf_exclusions table, which startup moves these into; still honoured.
   excluded_rule_ids?: number[];
   // Never stored: the exclusions a built handler applies, attached by the config build.

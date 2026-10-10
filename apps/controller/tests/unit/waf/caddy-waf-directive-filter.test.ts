@@ -1,27 +1,55 @@
 /**
- * The custom-directive allowlist is the WAF's security boundary: a line that reads the container's
- * files, runs a program, changes Caddy's environment or turns the engine off must never reach
- * Coraza, however it is spelt, and a line Coraza refuses must not take every host's config down.
+ * With the strict setting the custom-directive allowlist is the WAF's security boundary: a line
+ * that reads the container's files, runs a program, changes Caddy's environment or turns the
+ * engine off must never reach Coraza, however it is spelt. Without it those lines are sent and
+ * flagged instead. Either way a line Coraza refuses must not take every host's config down.
  */
 import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 import {
   buildWafHandler,
-  customDirectivesError,
+  type CustomDirectiveFilterOptions,
+  customDirectivesError as customDirectivesErrorWith,
+  directivePolicyIssues,
   droppedWafDirectiveDetails,
-  filterCustomDirectives,
+  filterCustomDirectives as filterCustomDirectivesWith,
   findInvalidBodyLimitDirective,
   GLOBAL_WAF_SOURCE,
   listDroppedWafDirectives,
+  type PreviousCustomDirectives,
   resolveEffectiveWaf,
+  riskyDirectiveWarnings,
   wafDirectiveSource,
 } from '../../../src/lib/waf/caddy';
 
+// Strict throughout: these tests are the allowlist's. The lenient mode has its own block below.
 const baseWaf = {
   enabled: true,
   mode: 'On' as const,
   load_owasp_crs: false,
   custom_directives: '',
+  strict_directives: true,
 };
+
+const strict = (options: CustomDirectiveFilterOptions = {}) => ({
+  strictDirectives: true,
+  ...options,
+});
+
+const filterCustomDirectives = (raw: string, options?: CustomDirectiveFilterOptions) =>
+  filterCustomDirectivesWith(raw, strict(options));
+
+const customDirectivesError = (
+  raw: string,
+  options?: CustomDirectiveFilterOptions,
+  previous?: PreviousCustomDirectives,
+  subject?: Parameters<typeof customDirectivesErrorWith>[3],
+) =>
+  customDirectivesErrorWith(
+    raw,
+    strict(options),
+    previous && { ...previous, options: strict(previous.options) },
+    subject,
+  );
 
 const reasons = (raw: string, crsLoaded?: boolean) =>
   filterCustomDirectives(raw, { crsLoaded }).dropped.map((entry) => entry.reason);
@@ -43,7 +71,7 @@ describe('filterCustomDirectives - operators that read files or run programs', (
       lines.map(() => 'wafDirectiveDroppedFileOperator'),
     );
     expect(droppedWafDirectiveDetails(dropped)[0]).toContain(
-      '@inspectFile is not allowed (it reads files or runs programs inside the container)',
+      '@inspectFile reads files or runs programs inside the container',
     );
   });
 
@@ -483,7 +511,7 @@ describe('buildWafHandler - dropped directive warning', () => {
     );
     expect(fromGlobal).toContain(`"${starter}" -> part of a chained rule`);
     const fromHost = messages.find((m) => m.startsWith('[waf] proxy host "J":'));
-    expect(fromHost).toContain(`"${child}" -> @pmFromFile is not allowed`);
+    expect(fromHost).toContain(`"${child}" -> @pmFromFile reads files`);
     expect(fromHost).not.toContain('id:9408');
   });
 
@@ -557,7 +585,7 @@ describe('customDirectivesError - against the stored directives', () => {
   it('rejects a second copy of a stored dropped line', () => {
     expect(
       customDirectivesError(`${legacy}\n${legacy}`, {}, { directives: legacy })?.message,
-    ).toMatch(/ipMatchFromFile is not allowed/);
+    ).toMatch(/ipMatchFromFile reads files/);
   });
 
   it('rejects turning the CRS off under an unchanged rule that needs it', () => {
@@ -666,5 +694,125 @@ describe('listDroppedWafDirectives', () => {
       listDroppedWafDirectives({ ...baseWaf, mode: 'Off', custom_directives: fromFile }, []),
     ).toEqual([]);
     expect(listDroppedWafDirectives({ ...baseWaf, custom_directives: kept }, [])).toEqual([]);
+  });
+});
+
+// Without the strict setting the same lines are sent, and the author is told why they matter; only
+// what Coraza itself would refuse is still kept out.
+describe('filterCustomDirectives - without the strict setting', () => {
+  const fromFile = 'SecRule ARGS "@pmFromFile /etc/hosts" "id:9801,deny"';
+  const engine = 'SecRuleEngine DetectionOnly';
+  const audit = 'SecAuditEngine Off';
+  const setenv = 'SecAction "id:9802,phase:1,pass,nolog,setenv:GODEBUG=x509sha1=1"';
+  const include = 'Include /etc/caddy/extra.conf';
+  const bogus = 'SecBogus On';
+  const kept = 'SecRule ARGS "@contains x" "id:9803,deny"';
+
+  it('keeps the risky lines and lists each with its reason', () => {
+    const raw = [fromFile, engine, audit, setenv, include, kept].join('\n');
+    expect(filterCustomDirectivesWith(raw)).toEqual({
+      kept: [fromFile, engine, audit, setenv, include, kept],
+      dropped: [],
+    });
+    expect(riskyDirectiveWarnings(raw)).toEqual([
+      { line: fromFile, reason: 'wafDirectiveDroppedFileOperator', params: { name: 'pmFromFile' } },
+      { line: engine, reason: 'wafDirectiveDroppedRuleMutation' },
+      { line: audit, reason: 'wafDirectiveDroppedNotAllowed', params: { name: 'SecAuditEngine' } },
+      { line: setenv, reason: 'wafDirectiveDroppedSetenv' },
+      { line: include, reason: 'wafDirectiveDroppedInclude' },
+    ]);
+    expect(customDirectivesErrorWith(raw)).toBeNull();
+  });
+
+  it('still drops a directive Coraza does not know, in either mode', () => {
+    for (const strictDirectives of [false, true]) {
+      expect(filterCustomDirectivesWith(`${bogus}\n${kept}`, { strictDirectives })).toEqual({
+        kept: [kept],
+        dropped: [
+          {
+            line: bogus,
+            reason: 'wafDirectiveDroppedUnknownDirective',
+            params: { name: 'SecBogus' },
+          },
+        ],
+      });
+    }
+    expect(customDirectivesErrorWith(bogus)?.message).toMatch(
+      /SecBogus is not a directive Coraza knows/,
+    );
+  });
+
+  it('still drops what Coraza would refuse to parse, with its chain', () => {
+    const starter = 'SecRule REQUEST_URI "@beginsWith /admin" "id:9811,deny,chain"';
+    const child = 'SecRule ARGS "@contains x" \'t:none\'';
+    const { kept: left, dropped } = filterCustomDirectivesWith([starter, child, kept].join('\n'));
+    expect(left).toEqual([kept]);
+    expect(dropped.map((entry) => entry.reason)).toEqual([
+      'wafDirectiveDroppedChainPart',
+      'wafDirectiveDroppedUnparseable',
+    ]);
+  });
+
+  it('lets a risky line take part in a chain and hold a rule id', () => {
+    const starter = 'SecRule REQUEST_URI "@beginsWith /admin" "id:9821,deny,chain"';
+    const child = 'SecRule REMOTE_ADDR "!@ipMatchFromFile allow.txt"';
+    const again = 'SecAction "id:9821,phase:1,pass,nolog"';
+    const { kept: left, dropped } = filterCustomDirectivesWith([starter, child, again].join('\n'));
+    expect(left).toEqual([starter, child]);
+    expect(dropped.map((entry) => entry.reason)).toEqual(['wafDirectiveDroppedDuplicateId']);
+  });
+
+  it('sends the risky lines to Caddy only without the strict setting', () => {
+    const lenient = { ...baseWaf, strict_directives: false, custom_directives: fromFile };
+    expect(buildWafHandler(lenient).directives).toContain(fromFile);
+    expect(buildWafHandler({ ...lenient, strict_directives: true }).directives).not.toContain(
+      fromFile,
+    );
+    // A host follows the global setting, whatever its own mode.
+    const host = { enabled: true, waf_mode: 'override' as const, custom_directives: fromFile };
+    for (const strictDirectives of [false, true]) {
+      const global = { ...baseWaf, strict_directives: strictDirectives };
+      const effective = resolveEffectiveWaf(global, host);
+      const directives = buildWafHandler(
+        effective!,
+        new Map(),
+        new Map(),
+        wafDirectiveSource(global, host, 'proxy host "h"'),
+      ).directives;
+      expect(String(directives).includes(fromFile)).toBe(!strictDirectives);
+    }
+  });
+
+  it('marks the lines for the editor as warnings, or errors with the strict setting', () => {
+    const raw = `${kept}\n${fromFile}\n${bogus}`;
+    expect(directivePolicyIssues(raw)).toEqual([
+      {
+        line: 2,
+        severity: 'warning',
+        code: 'wafDirectiveDroppedFileOperator',
+        params: { name: 'pmFromFile' },
+      },
+      {
+        line: 3,
+        severity: 'error',
+        code: 'wafDirectiveDroppedUnknownDirective',
+        params: { name: 'SecBogus' },
+      },
+    ]);
+    expect(directivePolicyIssues(raw, { strictDirectives: true }).map((i) => i.severity)).toEqual([
+      'error',
+      'error',
+    ]);
+    // What Coraza refuses to parse is the linter's to report, not repeated here.
+    expect(directivePolicyIssues('SecRule ARGS "@contains x" \'id:1\'')).toEqual([]);
+  });
+
+  it('lists nothing as dropped for a risky stored line, so the WAF page stays quiet', () => {
+    expect(
+      listDroppedWafDirectives(
+        { ...baseWaf, strict_directives: false, custom_directives: fromFile },
+        [],
+      ),
+    ).toEqual([]);
   });
 });

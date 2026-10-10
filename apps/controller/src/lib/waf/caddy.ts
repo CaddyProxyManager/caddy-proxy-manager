@@ -107,7 +107,10 @@ export function findInvalidBodyLimitDirective(
   return null;
 }
 
-/** Why a custom SecLang line never reaches Caddy - a code, so the wording lives in the catalog. */
+/**
+ * Why a custom SecLang line never reaches Caddy, or (one of RISKY_REASONS, without the strict
+ * setting) why it is worth a warning - a code, so the wording lives in the catalog.
+ */
 export type DroppedWafDirectiveReason =
   | "wafDirectiveDroppedInclude"
   | "wafDirectiveDroppedRuleMutation"
@@ -122,7 +125,23 @@ export type DroppedWafDirectiveReason =
   | "wafDirectiveDroppedDuplicateId"
   | "wafDirectiveDroppedBodyLimit"
   | "wafDirectiveDroppedNotAllowed"
+  | "wafDirectiveDroppedUnknownDirective"
   | "wafDirectiveDroppedUnterminated";
+
+/**
+ * The lines the allowlist refused for what they can do, not for what Coraza makes of them: they
+ * read the container, change the engine or the process environment. `strict_directives` keeps
+ * refusing them; otherwise they are sent and flagged. The rest fail Coraza's load, and with it
+ * Caddy's whole config, so those are dropped either way.
+ */
+export const RISKY_DIRECTIVE_REASONS: ReadonlySet<DroppedWafDirectiveReason> = new Set([
+  "wafDirectiveDroppedInclude",
+  "wafDirectiveDroppedRuleMutation",
+  "wafDirectiveDroppedCtlRuleEngine",
+  "wafDirectiveDroppedSetenv",
+  "wafDirectiveDroppedFileOperator",
+  "wafDirectiveDroppedNotAllowed",
+]);
 
 export type DroppedWafDirective = {
   line: string;
@@ -142,9 +161,88 @@ export type CustomDirectiveFilterOptions = {
    * Never reported, but their rule ids are taken and a chain they leave open continues here.
    */
   precedingDirectives?: string | null;
+  /** The global `strict_directives` setting: refuse RISKY_DIRECTIVE_REASONS rather than warn. */
+  strictDirectives?: boolean;
 };
 
-/** Allowed on their own; anything else is dropped. */
+/**
+ * Every directive coraza v3.8.1 parses (internal/seclang/directivesmap.gen.go, plus Include, which
+ * the parser handles itself), lower-cased as its lookup is. One it lacks fails the config load.
+ */
+const CORAZA_DIRECTIVES: ReadonlySet<string> = new Set([
+  "include",
+  "secaction",
+  "secargumentseparator",
+  "secargumentslimit",
+  "secauditengine",
+  "secauditlog",
+  "secauditlogdirmode",
+  "secauditlogfilemode",
+  "secauditlogformat",
+  "secauditlogparts",
+  "secauditlogrelevantstatus",
+  "secauditlogstoragedir",
+  "secauditlogtype",
+  "seccollectiontimeout",
+  "seccomponentsignature",
+  "secconnengine",
+  "secconnreadstatelimit",
+  "secconnwritestatelimit",
+  "seccookieformat",
+  "secdatadir",
+  "secdataset",
+  "secdebuglog",
+  "secdebugloglevel",
+  "secdefaultaction",
+  "secgsblookupdb",
+  "sechashengine",
+  "sechashkey",
+  "sechashmethodpm",
+  "sechashmethodrx",
+  "sechashparam",
+  "sechttpblkey",
+  "secignorerulecompilationerrors",
+  "secmarker",
+  "secpcrematchlimit",
+  "secpcrematchlimitrecursion",
+  "secremoterules",
+  "secremoterulesfailaction",
+  "secrequestbodyaccess",
+  "secrequestbodyinmemorylimit",
+  "secrequestbodyjsondepthlimit",
+  "secrequestbodylimit",
+  "secrequestbodylimitaction",
+  "secrequestbodynofileslimit",
+  "secresponsebodyaccess",
+  "secresponsebodyjsondepthlimit",
+  "secresponsebodylimit",
+  "secresponsebodylimitaction",
+  "secresponsebodymimetype",
+  "secresponsebodymimetypesclear",
+  "secrule",
+  "secruleengine",
+  "secruleperftime",
+  "secruleremovebyid",
+  "secruleremovebymsg",
+  "secruleremovebytag",
+  "secrulescript",
+  "secruleupdateactionbyid",
+  "secruleupdatetargetbyid",
+  "secruleupdatetargetbymsg",
+  "secruleupdatetargetbytag",
+  "secrxprefilter",
+  "secsensorid",
+  "secserversignature",
+  "sectmpdir",
+  "secunicodemap",
+  "secuploaddir",
+  "secuploadfilelimit",
+  "secuploadfilemode",
+  "secuploadkeepfiles",
+  "secwebappid",
+]);
+
+/** Allowed without a word; anything else is risky, or unknown to Coraza. */
 const ALLOWED_DIRECTIVE_PREFIXES = [
   /^SecRule\s/,
   /^SecAction\s/,
@@ -282,7 +380,11 @@ function directiveDropReason(
     return { reason: "wafDirectiveDroppedRuleMutation" };
   }
   if (!ALLOWED_DIRECTIVE_PREFIXES.some((pattern) => pattern.test(text))) {
-    return { reason: "wafDirectiveDroppedNotAllowed" };
+    // Coraza cuts the name at the first space and lower-cases it (parser.go evaluateLine).
+    const name = text.split(/\s/, 1)[0];
+    return CORAZA_DIRECTIVES.has(name.toLowerCase())
+      ? { reason: "wafDirectiveDroppedNotAllowed", params: { name } }
+      : { reason: "wafDirectiveDroppedUnknownDirective", params: { name } };
   }
   // ctl:ruleEngine inside an allowed rule can conditionally disable the WAF.
   if (CTL_RULE_ENGINE_ACTION.test(text)) return { reason: "wafDirectiveDroppedCtlRuleEngine" };
@@ -321,14 +423,22 @@ function openDirectiveText(lines: readonly string[]): string {
 
 type IndexedDropped = DroppedWafDirective & { index: number };
 
-/** filterCustomDirectives, with each line's index in `raw.split("\n")`. */
+/**
+ * filterCustomDirectives, with each line's index in `raw.split("\n")`. `warned` are the risky
+ * lines kept without the strict setting: sent, and worth telling the author about.
+ */
 function filterDirectiveLines(
   raw: string | null | undefined,
   options: CustomDirectiveFilterOptions,
-): { kept: { line: string; index: number }[]; dropped: IndexedDropped[] } {
+): {
+  kept: { line: string; index: number }[];
+  dropped: IndexedDropped[];
+  warned: IndexedDropped[];
+} {
   const kept: { line: string; index: number }[] = [];
   const dropped: IndexedDropped[] = [];
-  if (!raw?.trim()) return { kept, dropped };
+  const warned: IndexedDropped[] = [];
+  if (!raw?.trim()) return { kept, dropped, warned };
 
   const offset = raw.slice(0, raw.length - raw.trimStart().length).split("\n").length - 1;
   const directives = seclangDirectives(raw.trim());
@@ -339,6 +449,16 @@ function filterDirectiveLines(
     if (text === null) return { reason: "wafDirectiveDroppedUnterminated" };
     return directiveDropReason(text, options);
   });
+  // Without the strict setting a risky line stays a rule, so it takes part in the chain and id
+  // checks below like any kept line.
+  if (!options.strictDirectives) {
+    for (const [index, reason] of reasons.entries()) {
+      if (reason && RISKY_DIRECTIVE_REASONS.has(reason.reason)) {
+        warned.push({ line: shown[index], ...reason, index: offset + directives[index].start });
+        reasons[index] = null;
+      }
+    }
+  }
 
   // A chain is one rule to Coraza: keeping part of it hands Coraza a different rule, or a child
   // with a disruptive action, which fails the whole config.
@@ -399,13 +519,14 @@ function filterDirectiveLines(
       dropped.push({ line: shown[i], ...reason, index: offset + start });
     }
   });
-  return { kept, dropped };
+  return { kept, dropped, warned };
 }
 
 /**
- * Splits custom directives into kept and dropped lines. The allowlist is the security boundary; a
- * silently dropped line reads as "the WAF ignores my rule", so validators name each one (#146).
- * A directive goes with its whole chain, and a rule reusing a kept rule's id goes too.
+ * Splits custom directives into kept and dropped lines. A silently dropped line reads as "the WAF
+ * ignores my rule", so validators name each one (#146). A directive goes with its whole chain,
+ * and a rule reusing a kept rule's id goes too. Risky lines are kept unless `strictDirectives`;
+ * riskyDirectiveWarnings lists them.
  */
 export function filterCustomDirectives(
   raw: string | null | undefined,
@@ -424,6 +545,58 @@ export function filterCustomDirectives(
       .filter(({ index }) => index >= firstOwnLine)
       .map(({ index: _index, ...entry }) => entry),
   };
+}
+
+/** The risky lines a non-strict filter sends anyway, for the author to see. */
+export function riskyDirectiveWarnings(
+  raw: string | null | undefined,
+  options: CustomDirectiveFilterOptions = {},
+): DroppedWafDirective[] {
+  const preceding = options.precedingDirectives;
+  const firstOwnLine = preceding && raw ? preceding.split("\n").length : 0;
+  return filterDirectiveLines(firstOwnLine > 0 ? `${preceding}\n${raw}` : raw, options)
+    .warned.filter(({ index }) => index >= firstOwnLine)
+    .map(({ index: _index, ...entry }) => entry);
+}
+
+/**
+ * What the editor shows beside the SecLang linter: the risky lines as warnings, or as errors with
+ * the strict setting, and a directive Coraza does not know. The other reasons a line is dropped
+ * (an unparseable rule, a duplicate id) are the linter's, or the save's, to report.
+ */
+export type DirectivePolicyIssue = Omit<SeclangIssue, "code"> & {
+  code: DroppedWafDirectiveReason;
+};
+
+export function directivePolicyIssues(
+  raw: string,
+  options: CustomDirectiveFilterOptions = {},
+): DirectivePolicyIssue[] {
+  const { dropped, warned } = filterDirectiveLines(raw, options);
+  const issues: DirectivePolicyIssue[] = [];
+  for (const entry of warned) {
+    issues.push({
+      line: entry.index + 1,
+      severity: "warning",
+      code: entry.reason,
+      params: entry.params ?? {},
+    });
+  }
+  for (const entry of dropped) {
+    if (
+      !RISKY_DIRECTIVE_REASONS.has(entry.reason) &&
+      entry.reason !== "wafDirectiveDroppedUnknownDirective"
+    ) {
+      continue;
+    }
+    issues.push({
+      line: entry.index + 1,
+      severity: "error",
+      code: entry.reason,
+      params: entry.params ?? {},
+    });
+  }
+  return issues.sort((a, b) => a.line - b.line);
 }
 
 function droppedReasonText(entry: DroppedWafDirective): string {
@@ -653,6 +826,8 @@ export type WafDirectiveSource = {
   globalDirectives: string | null;
   /** The global settings' own CRS state, which decides what they drop on their own. */
   globalCrsLoaded: boolean;
+  /** The global `strict_directives` setting, which every host's filter follows. */
+  globalStrictDirectives: boolean;
 };
 
 /**
@@ -672,6 +847,7 @@ function droppedByOrigin(
   const droppedByGlobal = new Set(
     filterDirectiveLines(source.globalDirectives, {
       crsLoaded: source.globalCrsLoaded,
+      strictDirectives: source.globalStrictDirectives,
     }).dropped.map(({ index }) => index),
   );
   const groups: [DroppedOrigin, IndexedDropped[]][] = [
@@ -724,6 +900,7 @@ export function wafDirectiveSource(
     label,
     globalDirectives: inheritedGlobalDirectives(global, host),
     globalCrsLoaded: Boolean(global?.load_owasp_crs),
+    globalStrictDirectives: Boolean(global?.strict_directives),
   };
 }
 
@@ -750,6 +927,7 @@ export function listDroppedWafDirectives(
     if (!waf?.enabled || waf.mode === "Off") return;
     const { dropped } = filterDirectiveLines(waf.custom_directives, {
       crsLoaded: Boolean(waf.load_owasp_crs),
+      strictDirectives: Boolean(global?.strict_directives),
     });
     for (const [origin, entries] of droppedByOrigin(source, dropped)) {
       for (const entry of entries) {
@@ -904,8 +1082,14 @@ export function buildWafHandler(
 
   // Ahead of the rules, since ctl:ruleRemove* only affects rules that have not run yet. An unknown
   // id is a stale selection and emits nothing.
+  // The global setting, which a host's effective config carries only in merge mode.
+  const strictDirectives =
+    typeof source === "object" ? source.globalStrictDirectives : waf.strict_directives === true;
   for (const id of new Set(waf.preset_ids ?? [])) {
-    const { kept } = filterCustomDirectives(presets.get(id), { crsLoaded: waf.load_owasp_crs });
+    const { kept } = filterCustomDirectives(presets.get(id), {
+      crsLoaded: waf.load_owasp_crs,
+      strictDirectives,
+    });
     if (kept.length > 0) parts.push(kept.join("\n"));
   }
 
@@ -955,6 +1139,7 @@ export function buildWafHandler(
   // Validators refuse writes that would drop a line; this is the net for older rows.
   const { kept, dropped } = filterDirectiveLines(waf.custom_directives, {
     crsLoaded: waf.load_owasp_crs,
+    strictDirectives,
   });
   if (source !== undefined) {
     for (const [origin, entries] of droppedByOrigin(source, dropped)) {

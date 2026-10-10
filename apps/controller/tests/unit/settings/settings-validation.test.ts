@@ -144,6 +144,7 @@ describe('REST settings runtime validation', () => {
     expect(() =>
       validateSettingsGroup('waf', {
         ...validGroups.waf,
+        strict_directives: true,
         custom_directives: 'SecRuleUpdateActionById 9001 "deny"',
       }),
     ).toThrow(/would be dropped and never sent to Caddy/);
@@ -151,14 +152,19 @@ describe('REST settings runtime validation', () => {
 
   it('only rejects WAF directive lines an update newly drops', () => {
     const legacy = 'SecRule ARGS "@pmFromFile /etc/hosts" "id:1,deny"';
-    const previousWaf = { custom_directives: legacy, load_owasp_crs: true };
-    expect(() =>
-      validateSettingsGroup('waf', { ...validGroups.waf, custom_directives: legacy }),
-    ).toThrow(/would be dropped/);
+    const strict = { ...validGroups.waf, strict_directives: true };
+    const previousWaf = {
+      custom_directives: legacy,
+      load_owasp_crs: true,
+      strict_directives: true,
+    };
+    expect(() => validateSettingsGroup('waf', { ...strict, custom_directives: legacy })).toThrow(
+      /would be dropped/,
+    );
     expect(() =>
       validateSettingsGroup(
         'waf',
-        { ...validGroups.waf, mode: 'DetectionOnly', custom_directives: legacy },
+        { ...strict, mode: 'DetectionOnly', custom_directives: legacy },
         { previousWaf },
       ),
     ).not.toThrow();
@@ -166,12 +172,32 @@ describe('REST settings runtime validation', () => {
       validateSettingsGroup(
         'waf',
         {
-          ...validGroups.waf,
+          ...strict,
           custom_directives: `${legacy}\nSecRuleUpdateActionById 930130 "block"`,
         },
         { previousWaf },
       ),
     ).toThrow(/SecRuleUpdateActionById/);
+  });
+
+  it('sends risky WAF directives without the strict setting, but never one Coraza lacks', () => {
+    const risky = 'SecRule ARGS "@pmFromFile /etc/hosts" "id:1,deny"\nSecAuditEngine Off';
+    expect(() =>
+      validateSettingsGroup('waf', { ...validGroups.waf, custom_directives: risky }),
+    ).not.toThrow();
+    expect(() =>
+      validateSettingsGroup('waf', {
+        ...validGroups.waf,
+        strict_directives: false,
+        custom_directives: risky,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      validateSettingsGroup('waf', { ...validGroups.waf, custom_directives: 'SecBogus On' }),
+    ).toThrow(/SecBogus is not a directive Coraza knows/);
+    expect(() =>
+      validateSettingsGroup('waf', { ...validGroups.waf, strict_directives: 'yes' }),
+    ).toThrow(/waf\.strict_directives/);
   });
 
   it("accepts WAF body limits inside Coraza's range", () => {

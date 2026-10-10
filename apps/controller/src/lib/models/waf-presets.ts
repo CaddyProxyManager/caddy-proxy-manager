@@ -57,12 +57,14 @@ export function toWafPresetOption(preset: WafPreset): {
 
 // ── Validation ───────────────────────────────────────────────────────
 
-/** The custom-directive allowlist, at write time so nothing is dropped later. */
-function validateDirectives(directives: string): string {
+/** The custom-directive filter, at write time so nothing is dropped later. */
+async function validateDirectives(directives: string): Promise<string> {
   // A browser submits textarea and hidden-input values with CRLF line breaks.
   const trimmed = directives.replace(/\r\n?/g, "\n").trim();
   if (!trimmed) throw domainError("wafPresetDirectivesRequired", {}, { status: 400 });
-  const directiveError = customDirectivesError(trimmed, {}, undefined, "preset");
+  // A preset is emitted wherever it is selected, so the global strictness is the one that applies.
+  const strictDirectives = (await getWafSettings())?.strict_directives === true;
+  const directiveError = customDirectivesError(trimmed, { strictDirectives }, undefined, "preset");
   if (directiveError) throw directiveError;
   const lintErrors = seclangErrors(trimmed);
   if (lintErrors.length > 0) {
@@ -182,7 +184,7 @@ export async function createWafPreset(
   actorUserId: number,
 ): Promise<WafPreset> {
   const name = await validateName(input.name, null);
-  const directives = validateDirectives(input.directives ?? "");
+  const directives = await validateDirectives(input.directives ?? "");
   await assertPresetLoads(null, directives);
   const now = nowIso();
   const [record] = await db
@@ -218,7 +220,9 @@ export async function updateWafPreset(
 
   const name = input.name !== undefined ? await validateName(input.name, id) : existing.name;
   const directives =
-    input.directives !== undefined ? validateDirectives(input.directives) : existing.directives;
+    input.directives !== undefined
+      ? await validateDirectives(input.directives)
+      : existing.directives;
   if (directives !== existing.directives) await assertPresetLoads(id, directives);
   const description =
     input.description !== undefined ? input.description?.trim() || null : existing.description;

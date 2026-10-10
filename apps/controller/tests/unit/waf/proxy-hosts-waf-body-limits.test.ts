@@ -33,6 +33,7 @@ import {
   type WafHostConfig,
 } from '../../../src/lib/models/proxy-hosts';
 import * as schema from '../../../src/lib/db/schema';
+import { setSetting } from '../../../src/lib/settings';
 
 beforeEach(async () => {
   await ctx.db.delete(schema.proxyHosts);
@@ -108,6 +109,14 @@ describe('per-host WAF body limits', () => {
   });
 
   it('refuses a custom directive the allowlist would silently drop', async () => {
+    // Only the strict global setting drops an engine directive.
+    await setSetting('waf', {
+      enabled: true,
+      mode: 'On',
+      load_owasp_crs: false,
+      custom_directives: '',
+      strict_directives: true,
+    });
     await expect(
       createProxyHost(
         hostInput(

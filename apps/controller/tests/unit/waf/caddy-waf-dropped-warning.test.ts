@@ -38,7 +38,18 @@ const SHARED_ID_RULE =
 
 /** Stored directly, as a row from before a filter rule: the validators refuse them on save. */
 async function storeGlobalWaf(waf: WafSettings) {
-  await setSetting('waf', waf);
+  // Strict: only the strict setting drops a file-reading rule.
+  await setSetting('waf', { strict_directives: true, ...waf });
+}
+
+/** The strict setting alone, for a host whose own rules are the subject. */
+async function storeStrictGlobalWaf() {
+  await storeGlobalWaf({
+    enabled: false,
+    mode: 'Off',
+    load_owasp_crs: false,
+    custom_directives: '',
+  });
 }
 
 async function storeHostDirectives(hostId: number, waf: WafHostConfig, customDirectives: string) {
@@ -85,6 +96,7 @@ afterEach(() => {
 
 describe('dropped per-host WAF directives', () => {
   it('leaves the rule out of the config and names the host in the warning', async () => {
+    await storeStrictGlobalWaf();
     const waf: WafHostConfig = {
       enabled: true,
       waf_mode: 'override',

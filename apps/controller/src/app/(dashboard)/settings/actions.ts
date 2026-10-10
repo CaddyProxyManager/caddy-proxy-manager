@@ -2432,6 +2432,7 @@ async function updateWafSettingsActionUnlocked(
     const enabled = mode !== "Off";
     const tuning = parseWafTuning(formData);
     const loadOwasp = formData.get("wafLoadOwaspCrs") === "on";
+    const strictDirectives = formData.get("wafStrictDirectives") === "on";
     const customDirectives =
       typeof formData.get("wafCustomDirectives") === "string"
         ? (formData.get("wafCustomDirectives") as string).trim()
@@ -2441,10 +2442,13 @@ async function updateWafSettingsActionUnlocked(
     // block unrelated fields, and buildWafHandler still leaves it out and says so.
     const directiveError = customDirectivesError(
       customDirectives,
-      { crsLoaded: loadOwasp },
+      { crsLoaded: loadOwasp, strictDirectives },
       {
         directives: existing?.custom_directives,
-        options: { crsLoaded: Boolean(existing?.load_owasp_crs) },
+        options: {
+          crsLoaded: Boolean(existing?.load_owasp_crs),
+          strictDirectives: Boolean(existing?.strict_directives),
+        },
       },
     );
     if (directiveError) throw directiveError;
@@ -2497,6 +2501,7 @@ async function updateWafSettingsActionUnlocked(
       mode,
       load_owasp_crs: loadOwasp,
       custom_directives: customDirectives,
+      ...(strictDirectives ? { strict_directives: true } : {}),
       ...(excluded_rule_ids.length > 0 ? { excluded_rule_ids } : {}),
       ...tuning,
       ...(preset_ids.length > 0 ? { preset_ids } : {}),

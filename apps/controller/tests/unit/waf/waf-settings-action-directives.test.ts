@@ -61,12 +61,21 @@ function wafForm(customDirectives: string, extra: Record<string, string> = {}): 
   form.set('wafEnabled', 'on');
   form.set('wafCustomDirectives', customDirectives);
   form.set('wafExcludedRuleIds', '[]');
+  // Strict unless a test says otherwise: these are the allowlist's tests.
+  form.set('wafStrictDirectives', 'on');
   for (const [key, value] of Object.entries(extra)) form.set(key, value);
   return form;
 }
 
 function stored(custom_directives: string, load_owasp_crs = false): WafSettings {
-  return { enabled: true, mode: 'On', load_owasp_crs, custom_directives, excluded_rule_ids: [] };
+  return {
+    enabled: true,
+    mode: 'On',
+    load_owasp_crs,
+    custom_directives,
+    excluded_rule_ids: [],
+    strict_directives: true,
+  };
 }
 
 beforeEach(() => {
@@ -82,7 +91,7 @@ describe('updateWafSettingsAction custom directives', () => {
     expect(result.success).toBe(false);
     expect(result.message).toMatch(/would be dropped and never sent to Caddy/);
     expect(result.message).toContain(DROPPED_RULE);
-    expect(result.message).toMatch(/pmFromFile is not allowed/);
+    expect(result.message).toMatch(/pmFromFile reads files/);
     expect(saveWafSettingsMock).not.toHaveBeenCalled();
   });
 
@@ -165,4 +174,33 @@ describe('updateWafSettingsAction id lists', () => {
       expect(saveWafSettingsMock).not.toHaveBeenCalled();
     },
   );
+});
+
+describe('updateWafSettingsAction without the strict setting', () => {
+  it('saves a risky directive and the setting itself, but not one Coraza lacks', async () => {
+    const result = await updateWafSettingsAction(
+      null,
+      wafForm(DROPPED_RULE, { wafStrictDirectives: '' }),
+    );
+
+    expect(result.success).toBe(true);
+    const saved = saveWafSettingsMock.mock.calls[0]?.[0];
+    expect(saved).toMatchObject({ custom_directives: DROPPED_RULE });
+    expect(saved?.strict_directives).toBeUndefined();
+
+    saveWafSettingsMock.mockClear();
+    const refused = await updateWafSettingsAction(
+      null,
+      wafForm('SecBogus On', { wafStrictDirectives: '' }),
+    );
+    expect(refused.success).toBe(false);
+    expect(refused.message).toMatch(/SecBogus is not a directive Coraza knows/);
+    expect(saveWafSettingsMock).not.toHaveBeenCalled();
+  });
+
+  it('stores the setting when it is switched on', async () => {
+    const result = await updateWafSettingsAction(null, wafForm(''));
+    expect(result.success).toBe(true);
+    expect(saveWafSettingsMock.mock.calls[0]?.[0]).toMatchObject({ strict_directives: true });
+  });
 });

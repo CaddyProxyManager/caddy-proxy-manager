@@ -7,7 +7,7 @@ import {
   buildWafHandler,
   CORAZA_MAX_BODY_LIMIT,
   droppedWafDirectiveDetails,
-  filterCustomDirectives,
+  filterCustomDirectives as filterCustomDirectivesWith,
   findCrsPluginRejections,
   findInvalidBodyLimitDirective,
   parseBodyLimitMib,
@@ -15,11 +15,16 @@ import {
 } from '../../../src/lib/waf/caddy';
 import { DomainError } from '../../../src/lib/errors/domain-error';
 
+// Strict: this file holds the allowlist's expectations; the lenient mode is tested with the filter.
+const filterCustomDirectives = (raw: string | null | undefined) =>
+  filterCustomDirectivesWith(raw, { strictDirectives: true });
+
 const baseWaf = {
   enabled: true,
   mode: 'On' as const,
   load_owasp_crs: false,
   custom_directives: '',
+  strict_directives: true,
 };
 
 // Mode is interpolated into SecLang and stored unvalidated, so an unknown one would smuggle
@@ -253,6 +258,7 @@ const globalWaf = {
   enabled: true,
   mode: 'On' as const,
   load_owasp_crs: false,
+  strict_directives: true,
   custom_directives:
     'SecRule REQUEST_HEADERS:User-Agent "@contains leakix.net" "id:9002,phase:1,deny,status:403,log"',
 };
@@ -520,7 +526,11 @@ describe('filterCustomDirectives', () => {
       { line: 'SecRuleUpdateActionById 9001 "deny"', reason: 'wafDirectiveDroppedRuleMutation' },
       { line: 'SecRuleEngine Off', reason: 'wafDirectiveDroppedRuleMutation' },
       { line: 'SecRequestBodyLimit 10737418240', reason: 'wafDirectiveDroppedBodyLimit' },
-      { line: 'SecRequestBodyAccess Off', reason: 'wafDirectiveDroppedNotAllowed' },
+      {
+        line: 'SecRequestBodyAccess Off',
+        reason: 'wafDirectiveDroppedNotAllowed',
+        params: { name: 'SecRequestBodyAccess' },
+      },
       {
         line: 'SecRule ARGS "@rx x" "id:9003,ctl:ruleEngine=Off"',
         reason: 'wafDirectiveDroppedCtlRuleEngine',
@@ -537,7 +547,7 @@ describe('filterCustomDirectives', () => {
   it('renders each reason as a sentence naming the line', () => {
     const { dropped } = filterCustomDirectives('Include /etc/passwd');
     expect(droppedWafDirectiveDetails(dropped)).toEqual([
-      '"Include /etc/passwd" - Include is not allowed (it would read arbitrary files from the container filesystem)',
+      '"Include /etc/passwd" - Include reads arbitrary files from the container filesystem',
     ]);
     const outOfRange = filterCustomDirectives('SecRequestBodyLimit 10737418240').dropped;
     expect(droppedWafDirectiveDetails(outOfRange)[0]).toContain('between 1024 and 1073741824');

@@ -4668,6 +4668,11 @@ const spec = {
           mode: { type: "string", enum: ["Off", "On", "DetectionOnly"] },
           load_owasp_crs: { type: "boolean" },
           custom_directives: { type: "string" },
+          strict_directives: {
+            type: "boolean",
+            description:
+              "Refuse custom directives that read files, change the engine or set environment variables, instead of sending them with a warning. Directives Coraza cannot load are refused either way.",
+          },
           excluded_rule_ids: {
             type: "array",
             items: { type: "integer" },

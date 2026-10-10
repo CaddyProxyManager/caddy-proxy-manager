@@ -587,9 +587,10 @@ describe('WAF settings', () => {
   });
 
   it('refuses a directive that would switch the engine off, and stages nothing', async () => {
+    // Only the strict setting refuses it; otherwise it is sent with a warning.
     const result = await actions.updateWafSettingsAction(
       null,
-      form({ wafEnabled: 'on', wafCustomDirectives: 'SecRuleEngine Off' }),
+      form({ wafEnabled: 'on', wafStrictDirectives: 'on', wafCustomDirectives: 'SecRuleEngine Off' }),
     );
 
     expect(result.success).toBe(false);

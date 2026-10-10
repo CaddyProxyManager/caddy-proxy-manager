@@ -34,6 +34,14 @@ const LEGACY_RULE =
 beforeEach(async () => {
   await ctx.db.delete(schema.proxyHosts);
   await ctx.db.delete(schema.settings);
+  // The legacy rule reads a file, which only the strict setting refuses.
+  await setSetting('waf', {
+    enabled: true,
+    mode: 'On',
+    load_owasp_crs: false,
+    custom_directives: '',
+    strict_directives: true,
+  });
   await ctx.db.delete(schema.users).catch(() => {});
   await ctx.db.insert(schema.users).values({
     id: 1,
@@ -82,7 +90,7 @@ describe('stored WAF custom directives on update', () => {
         },
         1,
       ),
-    ).rejects.toThrow(/ipMatchFromFile is not allowed/);
+    ).rejects.toThrow(/ipMatchFromFile reads files/);
   });
 
   it('lets the host be toggled and renamed without touching the WAF', async () => {
@@ -120,7 +128,7 @@ describe('stored WAF custom directives on update', () => {
       { waf: { ...host.waf, custom_directives: `${withKeptRule}\n${added}` } },
       1,
     );
-    await expect(update).rejects.toThrow(/pmFromFile is not allowed/);
+    await expect(update).rejects.toThrow(/pmFromFile reads files/);
     await expect(update).rejects.toThrow(/has 1 line\(s\)/);
     expect((await getProxyHost(host.id))?.waf?.custom_directives).toBe(withKeptRule);
   });

@@ -11,7 +11,7 @@ import type { DomainError } from '../../../src/lib/errors/domain-error';
 import { type CaddyValidator, setCaddyValidator } from '../../../src/lib/waf/dry-run';
 
 let db: TestDb;
-let globalWaf: { preset_ids?: number[] } | null = null;
+let globalWaf: { preset_ids?: number[]; strict_directives?: boolean } | null = null;
 let dashboardMeta: string | null = null;
 
 vi.mock('../../../src/lib/db', () => dbModuleMock(() => db));
@@ -94,9 +94,15 @@ describe('createWafPreset', () => {
   });
 
   it('refuses directives the allowlist would drop, naming them', async () => {
+    // Only the strict global setting refuses them; a preset follows it wherever it is selected.
+    globalWaf = { strict_directives: true };
     await expect(
       createWafPreset({ name: 'Bad', directives: `${RULE}\nSecRuleEngine Off` }, userId),
     ).rejects.toThrow('SecRuleEngine Off');
+    globalWaf = null;
+    await expect(
+      createWafPreset({ name: 'Risky', directives: `${RULE}\nSecRuleEngine Off` }, userId),
+    ).resolves.toMatchObject({ name: 'Risky' });
   });
 
   it('refuses an empty preset', async () => {

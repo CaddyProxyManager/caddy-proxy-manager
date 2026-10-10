@@ -5,12 +5,13 @@ import { isDemoMode } from "@/src/lib/demo/mode";
 import { SQLITE_NOTICE_COOKIE, sqliteNoticeApplies } from "@/src/lib/db/sqlite-notice";
 import { cookies } from "next/headers";
 import { resolveAvatar } from "@/src/lib/users/avatar";
-import { isGravatarEnabled } from "@/src/lib/settings";
+import { getWafSettings, isGravatarEnabled } from "@/src/lib/settings";
 import { getTranslations } from "next-intl/server";
 import { getModuleGateState } from "@/src/lib/caddy/image-build";
 import { caddyModuleName } from "@/src/lib/caddy/image-build/module-messages";
 import { getUpdateStatus } from "@/src/lib/runtime/updates";
 import { ModuleGateProvider } from "@/components/caddy-modules/ModuleGate";
+import { WafPolicyProvider } from "@/components/proxy-hosts/waf/waf-policy";
 import { requiresLegacyPasswordChange } from "@/src/lib/services/legacy-password";
 import { redirect } from "next/navigation";
 import DashboardLayoutClient from "./DashboardLayoutClient";
@@ -55,6 +56,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     mfaStanding,
     pendingReviews,
     awaitingApprovals,
+    globalWaf,
   ] = await Promise.all([
     requiresLegacyPasswordChange(userId),
     isGravatarEnabled(),
@@ -74,6 +76,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     pendingReviewsFor(userId).catch(() => ({ count: 0, dueOn: null })),
     // An approver is named by the policy and may hold no capability; this is how they hear.
     countAwaiting({ access }).catch(() => 0),
+    // A host's WAF editor marks a risky directive as the global setting says, from any page.
+    getWafSettings(),
   ]);
 
   // Here, not per page: a bcrypt-hash user must reach the reset screen from any URL. The reset
@@ -90,33 +94,35 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const sqliteNotice = sqliteNoticeApplies() && !(await cookies()).get(SQLITE_NOTICE_COOKIE);
   return (
     <ModuleGateProvider value={moduleGate}>
-      <TableDensityProvider initial={tableDensity}>
-        <DashboardLayoutClient
-          user={session.user}
-          avatar={avatar}
-          appName={await getAppName()}
-          demoMode={isDemoMode()}
-          sqliteNotice={sqliteNotice}
-          updateAvailable={updates.updateAvailable}
-          staged={staged}
-          morePins={morePins}
-          capabilities={access.capabilities}
-          mfaDeadline={mfaStanding.status === "grace" ? mfaStanding.deadline : null}
-          pendingReviews={pendingReviews.count > 0 ? pendingReviews : null}
-          awaitingApprovals={awaitingApprovals}
-          viewAs={
-            session.viewAs
-              ? {
-                  role: session.viewAs.role,
-                  roleName: (await getRole(session.viewAs.role))?.name ?? null,
-                  groupNames: await groupNames(session.viewAs.groupIds),
-                }
-              : null
-          }
-        >
-          {children}
-        </DashboardLayoutClient>
-      </TableDensityProvider>
+      <WafPolicyProvider value={{ strictDirectives: globalWaf?.strict_directives === true }}>
+        <TableDensityProvider initial={tableDensity}>
+          <DashboardLayoutClient
+            user={session.user}
+            avatar={avatar}
+            appName={await getAppName()}
+            demoMode={isDemoMode()}
+            sqliteNotice={sqliteNotice}
+            updateAvailable={updates.updateAvailable}
+            staged={staged}
+            morePins={morePins}
+            capabilities={access.capabilities}
+            mfaDeadline={mfaStanding.status === "grace" ? mfaStanding.deadline : null}
+            pendingReviews={pendingReviews.count > 0 ? pendingReviews : null}
+            awaitingApprovals={awaitingApprovals}
+            viewAs={
+              session.viewAs
+                ? {
+                    role: session.viewAs.role,
+                    roleName: (await getRole(session.viewAs.role))?.name ?? null,
+                    groupNames: await groupNames(session.viewAs.groupIds),
+                  }
+                : null
+            }
+          >
+            {children}
+          </DashboardLayoutClient>
+        </TableDensityProvider>
+      </WafPolicyProvider>
     </ModuleGateProvider>
   );
 }

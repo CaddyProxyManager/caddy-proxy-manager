@@ -513,17 +513,20 @@ function validateWafMeta(
   }
   // Only lines the allowlist is about to discard are echoed, and a discarded line that says nothing
   // is what makes a WAF rule look like it does nothing. A merge-mode host follows the global lines.
+  const strictDirectives = globalWaf?.strict_directives === true;
   const directiveError = customDirectivesError(
     waf.custom_directives,
     {
       crsLoaded: hostCrsLoaded(waf, globalWaf),
       precedingDirectives: wafDirectiveSource(globalWaf, waf, "").globalDirectives,
+      strictDirectives,
     },
     previous && {
       directives: previous.custom_directives,
       options: {
         crsLoaded: hostCrsLoaded(previous, globalWaf),
         precedingDirectives: wafDirectiveSource(globalWaf, previous, "").globalDirectives,
+        strictDirectives,
       },
     },
     "host",

@@ -580,6 +580,7 @@ export function validateHostGeoBlock(input: unknown): void {
 export type PreviousWafSettings = {
   custom_directives?: string | null;
   load_owasp_crs?: boolean;
+  strict_directives?: boolean;
 } | null;
 
 function validateWaf(value: Record<string, unknown>, previous: PreviousWafSettings): void {
@@ -590,6 +591,7 @@ function validateWaf(value: Record<string, unknown>, previous: PreviousWafSettin
       "mode",
       "load_owasp_crs",
       "custom_directives",
+      "strict_directives",
       "excluded_rule_ids",
       "preset_ids",
       "plugin_ids",
@@ -609,6 +611,10 @@ function validateWaf(value: Record<string, unknown>, previous: PreviousWafSettin
     invalid("waf.mode must be Off, On, or DetectionOnly");
   }
   booleanValue(required(value, "load_owasp_crs", "WAF settings"), "waf.load_owasp_crs");
+  if (value.strict_directives !== undefined) {
+    booleanValue(value.strict_directives, "waf.strict_directives");
+  }
+  const strictDirectives = value.strict_directives === true;
   const directives = stringValue(
     required(value, "custom_directives", "WAF settings"),
     "waf.custom_directives",
@@ -618,11 +624,14 @@ function validateWaf(value: Record<string, unknown>, previous: PreviousWafSettin
   // what this update newly drops, or a rule a later release started dropping blocks every save.
   const directiveError = customDirectivesError(
     directives,
-    { crsLoaded: value.load_owasp_crs === true },
+    { crsLoaded: value.load_owasp_crs === true, strictDirectives },
     previous
       ? {
           directives: previous.custom_directives,
-          options: { crsLoaded: Boolean(previous.load_owasp_crs) },
+          options: {
+            crsLoaded: Boolean(previous.load_owasp_crs),
+            strictDirectives: Boolean(previous.strict_directives),
+          },
         }
       : undefined,
   );
