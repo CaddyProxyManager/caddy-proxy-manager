@@ -469,7 +469,8 @@ it win even then.
 | SMTP encryption: `starttls`, `tls` (implicit) or `none` | `SMTP_SECURITY` | `starttls` |
 | SMTP username. Empty for a relay that needs no sign-in | `SMTP_USERNAME` | None |
 | SMTP password. Encrypted at rest | `SMTP_PASSWORD` | None |
-| Sender address; the application name is the sender's name | `SMTP_FROM` | None |
+| Sender address | `SMTP_FROM` | None |
+| Sender name shown beside the address. If left empty, the application name | `SMTP_FROM_NAME` | None |
 | Comma-separated recipients of certificate alerts (empty: every active administrator), and extra recipients of every notification | `EMAIL_ALERT_RECIPIENTS` | None |
 | Email once a certificate has fewer days than this left, 0-90. `0` turns alerts off | `CERTIFICATE_EXPIRY_ALERT_DAYS` | `14` |
 | Notify: An account disabled after failed sign-ins, or the last administrator kept enabled | `NOTIFY_ACCOUNT_DISABLED` | `true` |

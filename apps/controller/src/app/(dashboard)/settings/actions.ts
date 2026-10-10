@@ -1197,6 +1197,7 @@ async function updateEmailSettingsActionUnlocked(
       [registry.smtpSecurity.key]: String(formData.get("smtpSecurity") ?? ""),
       [registry.smtpUsername.key]: String(formData.get("smtpUsername") ?? ""),
       [registry.smtpFrom.key]: String(formData.get("smtpFrom") ?? ""),
+      [registry.smtpFromName.key]: String(formData.get("smtpFromName") ?? ""),
     };
     const password = String(formData.get("smtpPassword") ?? "");
     if (password.length > 0) values[registry.smtpPassword.key] = password;
@@ -2829,14 +2830,12 @@ export async function sendTestEmailAction(recipient: string): Promise<SettingsRe
     const to = recipient.trim() || session.user.email;
     if (!isEmailAddress(to)) return { success: false, message: t("email.testInvalidRecipient") };
 
-    const [{ readSmtpConfig }, { testEmail }, { sendEmail }] = await Promise.all([
-      import("@/src/lib/email/config"),
+    const [{ testEmail }, { sendEmail }] = await Promise.all([
       import("@/src/lib/email/messages"),
       import("@/src/lib/email/transport"),
     ]);
-    const { config: smtp } = await readSmtpConfig();
     const { getLocale } = await import("next-intl/server");
-    await sendEmail(await testEmail(to, smtp.host, await getLocale()));
+    await sendEmail(await testEmail(to, await getLocale()));
     return { success: true, message: t("email.testSent", { email: to }) };
   } catch (error) {
     unstable_rethrow(error);

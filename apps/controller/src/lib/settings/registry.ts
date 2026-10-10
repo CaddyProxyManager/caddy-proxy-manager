@@ -717,12 +717,23 @@ export const smtpFrom = stringSetting({
   group: "email",
   label: "Sender address",
   description:
-    "The From address on every message, shown under the application name. Many servers refuse " +
+    "The From address on every message. Many servers refuse " +
     "one the account is not allowed to send as.",
   default: "",
   pattern: EMAIL_ADDRESS,
   patternHint: "must be an email address",
   maxLength: 320,
+});
+
+export const smtpFromName = stringSetting({
+  name: "smtp_from_name",
+  env: "SMTP_FROM_NAME",
+  group: "email",
+  label: "Sender name",
+  description:
+    "The name shown beside the sender address. If left empty, the application name is used.",
+  default: "",
+  maxLength: 100,
 });
 
 export const emailAlertRecipients = stringSetting({
@@ -1146,6 +1157,7 @@ export const SETTING_DEFINITIONS = [
   smtpUsername,
   smtpPassword,
   smtpFrom,
+  smtpFromName,
   emailAlertRecipients,
   certificateExpiryAlertDays,
   notifyAccountDisabled,

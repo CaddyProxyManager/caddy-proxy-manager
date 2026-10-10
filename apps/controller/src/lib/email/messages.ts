@@ -95,16 +95,16 @@ export async function emailContext(locale: Locale) {
   return { t, tRoot, appName, url, footer: t("footer", { appName, url }) };
 }
 
+/** Names no server: the recipient may be someone else, and the host is not theirs to learn. */
 export async function testEmail(
   to: string,
-  host: string,
   locale: Locale = DEFAULT_LOCALE,
 ): Promise<EmailMessage> {
   const { t, appName, footer } = await emailContext(locale);
   return {
     to,
     subject: t("test.subject", { appName }),
-    ...renderBody({ paragraphs: [t("test.body", { appName, host })], footer }),
+    ...renderBody({ paragraphs: [t("test.body", { appName })], footer }),
   };
 }
 

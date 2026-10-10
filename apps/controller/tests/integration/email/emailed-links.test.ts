@@ -48,6 +48,7 @@ const TOUCHED_ENV = [
   'SMTP_USERNAME',
   'SMTP_PASSWORD',
   'SMTP_FROM',
+  'SMTP_FROM_NAME',
   'APP_NAME',
 ];
 
@@ -96,6 +97,17 @@ beforeEach(async () => {
 afterAll(() => {
   setEmailDeliveryForTests(null);
   for (const name of TOUCHED_ENV) delete process.env[name];
+});
+
+describe('sender name', () => {
+  it('uses SMTP_FROM_NAME in place of the application name', async () => {
+    configureEmail({ ...SMTP_ENV, SMTP_FROM_NAME: 'Acme Proxy' });
+    await localUser();
+
+    await requestPasswordReset('alice@example.com', 'en');
+
+    expect(sent[0].from).toEqual({ name: 'Acme Proxy', address: 'proxy@example.com' });
+  });
 });
 
 describe('requestPasswordReset', () => {

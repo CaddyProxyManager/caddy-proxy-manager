@@ -4161,8 +4161,12 @@
         "label": "SMTP password"
       },
       "smtp_from": {
-        "description": "The From address on every message, shown under the application name. Many servers refuse one the account is not allowed to send as.",
+        "description": "The From address on every message. Many servers refuse one the account is not allowed to send as.",
         "label": "Sender address"
+      },
+      "smtp_from_name": {
+        "description": "The name shown beside the sender address. If left empty, the application name is used.",
+        "label": "Sender name"
       },
       "email_alert_recipients": {
         "description": "Comma-separated addresses for certificate alerts, and extra recipients of every notification. If left empty, certificate alerts go to every active administrator.",
@@ -6579,7 +6583,7 @@
     "footer": "Sent by {appName} at {url}",
     "test": {
       "subject": "{appName}: test message",
-      "body": "This message confirms that {appName} can send email through {host}."
+      "body": "This message confirms that {appName} can send email."
     },
     "passwordReset": {
       "subject": "Reset your {appName} password",

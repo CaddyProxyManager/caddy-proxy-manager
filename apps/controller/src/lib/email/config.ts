@@ -12,6 +12,8 @@ export type SmtpConfig = {
   username: string;
   password: string;
   from: string;
+  /** Empty means the application name. */
+  fromName: string;
 };
 
 /** `off`: switched off. `incomplete`: on, but with no server or no sender to send as. */
@@ -22,7 +24,7 @@ export async function readSmtpConfig(): Promise<{ status: EmailStatus; config: S
     import("../settings/registry"),
     import("../settings/resolve"),
   ]);
-  const [enabled, host, port, security, username, password, from] = await Promise.all([
+  const [enabled, host, port, security, username, password, from, fromName] = await Promise.all([
     getSetting(registry.smtpEnabled),
     getSetting(registry.smtpHost),
     getSetting(registry.smtpPort),
@@ -30,6 +32,7 @@ export async function readSmtpConfig(): Promise<{ status: EmailStatus; config: S
     getSetting(registry.smtpUsername),
     getSetting(registry.smtpPassword),
     getSetting(registry.smtpFrom),
+    getSetting(registry.smtpFromName),
   ]);
   const config: SmtpConfig = {
     host,
@@ -38,6 +41,7 @@ export async function readSmtpConfig(): Promise<{ status: EmailStatus; config: S
     username,
     password,
     from,
+    fromName,
   };
   // Unset infers from the host, so SMTP_HOST alone switches it on.
   const on = enabled ?? host !== "";

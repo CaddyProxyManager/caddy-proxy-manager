@@ -721,6 +721,13 @@ export const SETTING_FIELDS: Array<{
     value: "",
   },
   {
+    key: "config:smtp_from_name",
+    env: "SMTP_FROM_NAME",
+    group: "email",
+    kind: "string",
+    value: "",
+  },
+  {
     key: "config:email_alert_recipients",
     env: "EMAIL_ALERT_RECIPIENTS",
     group: "email",

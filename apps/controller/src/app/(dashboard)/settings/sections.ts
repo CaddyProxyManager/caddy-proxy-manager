@@ -210,6 +210,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
               "SMTP_USERNAME",
               "SMTP_PASSWORD",
               "SMTP_FROM",
+              "SMTP_FROM_NAME",
             ],
           },
           {

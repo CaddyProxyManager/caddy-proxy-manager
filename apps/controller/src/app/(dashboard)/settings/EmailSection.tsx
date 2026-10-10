@@ -45,6 +45,7 @@ export function EmailServerSection({
   const [username, setUsername] = useState(email.username);
   const [password, setPassword] = useState("");
   const [from, setFrom] = useState(email.from);
+  const [fromName, setFromName] = useState(email.fromName);
 
   return (
     <FormCard>
@@ -146,6 +147,20 @@ export function EmailServerSection({
               onChange={setFrom}
               domain="public"
               placeholder="proxy@example.com"
+            />
+          </EnvLabelledField>
+          <EnvLabelledField
+            label={tSettings("registry.smtp_from_name.label")}
+            env={["SMTP_FROM_NAME"]}
+          >
+            <TextInput
+              {...AUTOFILL_OFF}
+              label={tSettings("registry.smtp_from_name.label")}
+              description={tSettings("registry.smtp_from_name.description")}
+              htmlName="smtpFromName"
+              value={fromName}
+              onChange={setFromName}
+              isOptional
             />
           </EnvLabelledField>
         </VStack>

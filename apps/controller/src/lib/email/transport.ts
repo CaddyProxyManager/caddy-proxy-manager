@@ -49,7 +49,7 @@ export async function sendEmail(message: EmailMessage): Promise<void> {
   const { status, config } = await readSmtpConfig();
   if (status !== "ready") throw domainError("emailNotConfigured");
 
-  const from = { name: await getAppName(), address: config.from };
+  const from = { name: config.fromName.trim() || (await getAppName()), address: config.from };
   try {
     await deliver(config, { ...message, from });
   } catch (error) {

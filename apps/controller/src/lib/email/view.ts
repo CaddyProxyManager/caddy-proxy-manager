@@ -14,6 +14,7 @@ export type EmailSettingsView = {
   username: string;
   hasPassword: boolean;
   from: string;
+  fromName: string;
   alertRecipients: string;
   alertDays: number;
   alertsCheckedAt: string | null;
@@ -56,6 +57,7 @@ export async function emailSettingsView(): Promise<EmailSettingsView> {
     username: config.username,
     hasPassword: config.password.length > 0,
     from: config.from,
+    fromName: config.fromName,
     alertRecipients,
     alertDays,
     alertsCheckedAt: alerts.checkedAt,
