@@ -8,6 +8,7 @@ import { X509Certificate } from "node:crypto";
 import { isIP } from "node:net";
 import { asc, eq } from "drizzle-orm";
 import { logAuditEvent } from "../audit";
+import { announce } from "../cluster/announcements";
 import db, { nowIso } from "../db";
 import { auditChain, auditSecurityHead, auditSinks } from "../db/schema";
 import { domainError, type StoredErrorCode } from "../errors/domain-error";
@@ -398,6 +399,8 @@ export async function createSink(input: SinkInput, userId: number | null): Promi
       updatedAt: at,
     })
     .returning();
+  // Whether ingest keeps security records follows the sinks.
+  announce("audit-sinks");
   await logAuditEvent({
     userId,
     action: "create",
@@ -431,6 +434,7 @@ export async function updateSink(
       updatedAt: nowIso(),
     })
     .where(eq(auditSinks.id, id));
+  announce("audit-sinks");
   await logAuditEvent({
     userId,
     action: "update",
@@ -444,6 +448,7 @@ export async function updateSink(
 export async function deleteSink(id: number, userId: number | null): Promise<void> {
   const sink = await requireSink(id);
   await db.delete(auditSinks).where(eq(auditSinks.id, id));
+  announce("audit-sinks");
   // Closed quietly: nobody needs telling that a sink they removed stopped failing.
   const { resolveProblem } = await import("../notifications");
   await resolveProblem(`${PROBLEM_PREFIX}${id}`, null);

@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import type { TrafficOutcome } from "@cpm/shared";
 import { userAgentFamily } from "../analytics/user-agent";
+import { onAnnouncement } from "../cluster/announcements";
 import { isDemoMode } from "../demo/mode";
 import * as sqliteStore from "./sqlite-store";
 import { wafEventKey } from "../waf/event-key";
@@ -29,6 +30,13 @@ type ClickHouseConfig = {
  * queries one analytics page fires share a single settings read.
  */
 let configPromise: Promise<ClickHouseConfig> | null = null;
+
+// The saving replica calls invalidateClickHouseConfig; the others hear of the save this way, or
+// they would keep inserting under the old URL, password or retention until a restart.
+onAnnouncement("settings", () => {
+  configPromise = null;
+  schemaPromise = null;
+});
 
 async function resolveConfig(): Promise<ClickHouseConfig> {
   // Imported lazily: this module is pulled in by the agent fleet configuration, which the settings

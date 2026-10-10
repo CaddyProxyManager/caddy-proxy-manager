@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, lt } from "drizzle-orm";
 import { forgetPushForRevokedSessions } from "./push-subscriptions";
 import db from "../db";
 import { sessions } from "../db/schema";
@@ -12,6 +12,11 @@ export interface UserSession {
   expiresAt: string;
   ipAddress: string | null;
   userAgent: string | null;
+}
+
+/** better-auth deletes an expired session only when its cookie comes back, which many never do. */
+export async function pruneExpiredSessions(now = new Date()): Promise<void> {
+  await db.delete(sessions).where(lt(sessions.expiresAt, now.toISOString()));
 }
 
 /** Non-expired, newest first. */

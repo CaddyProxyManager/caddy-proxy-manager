@@ -11,6 +11,8 @@ import { and, asc, desc, eq, gt, lt, lte } from "drizzle-orm";
 import db, { nowIso, runInTransaction } from "../db";
 import { type Step, readingStep } from "../db/reading-step";
 import { auditSecurityHead, auditSecurityRecords, auditSinks, schemaDialect } from "../db/schema";
+import { onAnnouncement } from "../cluster/announcements";
+import { dropProcessMemo, processMemo } from "../settings/process-memo";
 import { type SecurityRecord, type SecurityRecordBody, securityRecord } from "./records";
 
 const HEAD_ID = 1;
@@ -76,14 +78,21 @@ export function trafficSecurityBody(row: TrafficEventRow): SecurityRecordBody | 
   };
 }
 
-export async function securityWanted(): Promise<boolean> {
-  const [row] = await db
-    .select({ id: auditSinks.id })
-    .from(auditSinks)
-    .where(and(eq(auditSinks.enabled, true), eq(auditSinks.includeSecurity, true)))
-    .limit(1);
-  return row !== undefined;
+export const SECURITY_WANTED_MEMO = "audit-sinks:security-wanted";
+
+/** Held per process: every analytics batch asks. Sink writes announce `audit-sinks` to drop it. */
+export function securityWanted(): Promise<boolean> {
+  return processMemo(SECURITY_WANTED_MEMO, async () => {
+    const [row] = await db
+      .select({ id: auditSinks.id })
+      .from(auditSinks)
+      .where(and(eq(auditSinks.enabled, true), eq(auditSinks.includeSecurity, true)))
+      .limit(1);
+    return row !== undefined;
+  });
 }
+
+onAnnouncement("audit-sinks", () => dropProcessMemo(SECURITY_WANTED_MEMO));
 
 /** At ingest. Nothing is kept unless some enabled sink includes security records. */
 export async function queueSecurityRecords(bodies: SecurityRecordBody[]): Promise<void> {

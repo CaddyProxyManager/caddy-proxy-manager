@@ -6,8 +6,12 @@ import type { LogSource } from "@/src/lib/analytics/log-view";
 
 const SOURCES: readonly LogSource[] = ["access", "waf", "caddy"];
 
-/** Between reads of a log with nothing new. The agent answers from a file, so this is cheap. */
+/**
+ * Between reads of a log with nothing new, doubling while it stays quiet. Caddy's own log is a
+ * `docker compose logs` spawn on the agent, not a file read, so a quiet tab backs off.
+ */
 const IDLE_MS = 750;
+const MAX_IDLE_MS = 6000;
 /** After a failed read, so a stopped agent is not asked every tick. */
 const RETRY_MS = 3000;
 const PAGE_LINES = 500;
@@ -60,10 +64,11 @@ export async function GET(request: NextRequest) {
       const heartbeat = setInterval(() => send(": ping\n\n"), HEARTBEAT_MS);
       send("retry: 3000\n\n");
       let reported = false;
+      let idle = IDLE_MS;
 
       try {
         while (!signal.aborted) {
-          let wait = IDLE_MS;
+          let wait = idle;
           try {
             const page = await readAgentLog(agentId, { source, cursor, limit: PAGE_LINES });
             if (page === null) {
@@ -87,6 +92,7 @@ export async function GET(request: NextRequest) {
               }
               // A full page means more is waiting.
               if (page.lines.length >= PAGE_LINES) wait = 0;
+              idle = page.lines.length > 0 ? IDLE_MS : Math.min(idle * 2, MAX_IDLE_MS);
             }
           } catch {
             send(`event: problem\ndata: ${JSON.stringify({ error: t("readFailed") })}\n\n`);

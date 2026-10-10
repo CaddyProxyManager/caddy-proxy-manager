@@ -9,7 +9,7 @@ import {
   groupMembers,
   proxyHosts,
 } from "../db/schema";
-import { and, asc, eq, gt, inArray, lt } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, lt, or } from "drizzle-orm";
 import { onAnnouncement } from "../cluster/announcements";
 import { dropProcessMemo, processMemo } from "../settings/process-memo";
 import { hostMatchesPattern } from "../proxy-hosts/pattern-priority";
@@ -298,6 +298,16 @@ export async function createForwardAuthSession(
   };
 }
 
+/**
+ * Rows only a presented token would otherwise remove: a browser that never comes back, or a
+ * sign-in abandoned before its exchange code was redeemed. ISO strings compare in time order.
+ */
+export async function pruneExpiredForwardAuthRows(now = new Date()): Promise<void> {
+  const at = now.toISOString();
+  await db.delete(forwardAuthSessions).where(lt(forwardAuthSessions.expiresAt, at));
+  await db.delete(forwardAuthExchanges).where(lt(forwardAuthExchanges.expiresAt, at));
+}
+
 export async function validateForwardAuthSession(
   rawToken: string,
   audience: ForwardAuthAudience,
@@ -450,35 +460,26 @@ export type ForwardAuthAccessEntry = {
   createdAt: string;
 };
 
+/**
+ * One round trip: forward auth's verify runs this on every proxied request. No user lookup, since
+ * deleting a user or a membership cascades to the rows matched here.
+ */
 export async function checkHostAccess(userId: number, proxyHostId: number): Promise<boolean> {
-  const user = await db.query.users.findFirst({
-    where: (table, operators) => operators.eq(table.id, userId),
-  });
-  if (!user) return false;
-
-  const directAccess = await db.query.forwardAuthAccess.findFirst({
-    where: (table, operators) =>
-      operators.and(
-        operators.eq(table.proxyHostId, proxyHostId),
-        operators.eq(table.userId, userId),
-      ),
-  });
-  if (directAccess) return true;
-
-  const userGroupIds = await db
+  const memberships = db
     .select({ groupId: groupMembers.groupId })
     .from(groupMembers)
     .where(eq(groupMembers.userId, userId));
-
-  if (userGroupIds.length === 0) return false;
-
-  const groupIds = userGroupIds.map((r) => r.groupId);
-  const groupAccess = await db.query.forwardAuthAccess.findFirst({
-    where: (table, operators) =>
-      operators.and(operators.eq(table.proxyHostId, proxyHostId), inArray(table.groupId, groupIds)),
-  });
-
-  return !!groupAccess;
+  const [row] = await db
+    .select({ id: forwardAuthAccess.id })
+    .from(forwardAuthAccess)
+    .where(
+      and(
+        eq(forwardAuthAccess.proxyHostId, proxyHostId),
+        or(eq(forwardAuthAccess.userId, userId), inArray(forwardAuthAccess.groupId, memberships)),
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
 }
 
 export async function getForwardAuthAccessForHost(
