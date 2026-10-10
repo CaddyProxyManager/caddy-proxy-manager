@@ -10,6 +10,9 @@ services:
         PUID: ${PUID:-10001}
         PGID: ${PGID:-10001}
     restart: unless-stopped
+    # Every interface, so first-run setup can be reached. Once a dashboard host serves the UI over
+    # Caddy, an override file can narrow this to "127.0.0.1:3000:3000": the REST, GraphQL and
+    # agent APIs answer here too, in plain HTTP.
     ports:
       - "3000:3000"
     environment:
