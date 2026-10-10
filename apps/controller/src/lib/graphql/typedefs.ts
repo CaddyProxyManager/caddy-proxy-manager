@@ -129,25 +129,55 @@ export const typeDefs = /* GraphQL */ `
     sourceError: String
   }
 
+  """A CA that issues client certificates. Its private key, when stored, is never answered."""
   type CaCertificate {
     id: Int!
     name: String!
+    hasPrivateKey: Boolean!
     createdAt: DateTime!
+    updatedAt: DateTime!
   }
 
+  """A client certificate a CA issued. The PEM is absent, as on Certificate."""
   type ClientCertificate {
     id: Int!
-    name: String!
     caCertificateId: Int!
+    commonName: String!
+    serialNumber: String!
+    fingerprintSha256: String!
+    validFrom: DateTime!
+    validTo: DateTime!
     revokedAt: DateTime
     createdAt: DateTime!
+    updatedAt: DateTime!
   }
 
   type MtlsRole {
     id: Int!
     name: String!
     description: String
+    certificateCount: Int!
+    """The client certificates holding the role."""
+    certificateIds: [Int!]!
     createdAt: DateTime!
+    updatedAt: DateTime!
+  }
+
+  """
+  Who may reach a path on a proxy host with mTLS on: certificates holding one of the roles or named
+  outright, or nobody with denyAll. Checked by priority, highest first.
+  """
+  type MtlsAccessRule {
+    id: Int!
+    proxyHostId: Int!
+    pathPattern: String!
+    allowedRoleIds: [Int!]!
+    allowedCertIds: [Int!]!
+    denyAll: Boolean!
+    priority: Int!
+    description: String
+    createdAt: DateTime!
+    updatedAt: DateTime!
   }
 
   type AccessList {
@@ -1452,7 +1482,11 @@ export const typeDefs = /* GraphQL */ `
     certificate(id: Int!): Certificate
     caCertificates: [CaCertificate!]!
     clientCertificates: [ClientCertificate!]!
+    """The mTLS roles a client certificate holds, by name."""
+    clientCertificateRoles(id: Int!): [MtlsRole!]!
     mtlsRoles: [MtlsRole!]!
+    """A proxy host's mTLS access rules, as GET /api/v1/proxy-hosts/{id}/mtls-access-rules."""
+    mtlsAccessRules(proxyHostId: Int!): [MtlsAccessRule!]!
     accessLists: [AccessList!]!
     accessList(id: Int!): AccessList
     accessListStats(id: Int!): AccessListStats!
@@ -1616,6 +1650,44 @@ export const typeDefs = /* GraphQL */ `
     deleteAccessList(id: Int!): Boolean!
     """As PUT /api/v1/access-lists/{id}/ip-rules: the whole ordered set, replacing what was there."""
     setAccessListRules(id: Int!, rules: JSON!): AccessList!
+
+    """
+    As POST /api/v1/certificates: { name, type, domainNames, autoRenew?, providerOptions?,
+    certificatePem?, privateKeyPem? }, or { source: "agent-file", name, sourceAgentId,
+    sourceCertPath, sourceKeyPath } to read the pair from files on an agent's host.
+    """
+    createCertificate(input: JSON!): Certificate!
+    updateCertificate(id: Int!, input: JSON!): Certificate!
+    """Refused while a host still uses it."""
+    deleteCertificate(id: Int!): Boolean!
+    """Reads an agent-file certificate from its files again now; a failure is stored on the row."""
+    rereadCertificate(id: Int!): Certificate!
+
+    """input: { name, certificatePem, privateKeyPem? }. With the key, the CA can issue client certificates."""
+    createCaCertificate(input: JSON!): CaCertificate!
+    """Deletes the certificates it issued too. Refused while a host trusts any of them."""
+    deleteCaCertificate(id: Int!): Boolean!
+
+    """
+    Records a client certificate already issued under a CA, as POST /api/v1/client-certificates:
+    { caCertificateId, commonName, serialNumber, fingerprintSha256, certificatePem, validFrom, validTo }.
+    """
+    issueClientCertificate(input: JSON!): ClientCertificate!
+    """Hosts stop accepting it on the next apply. Refused once already revoked."""
+    revokeClientCertificate(id: Int!): ClientCertificate!
+
+    """input: { name, description? }."""
+    createMtlsRole(input: JSON!): MtlsRole!
+    updateMtlsRole(id: Int!, input: JSON!): MtlsRole!
+    deleteMtlsRole(id: Int!): Boolean!
+    """Gives a client certificate the role."""
+    addMtlsRoleCertificate(roleId: Int!, certificateId: Int!): MtlsRole!
+    removeMtlsRoleCertificate(roleId: Int!, certificateId: Int!): Boolean!
+
+    """input: { pathPattern, allowedRoleIds?, allowedCertIds?, denyAll?, priority?, description? }."""
+    createMtlsAccessRule(proxyHostId: Int!, input: JSON!): MtlsAccessRule!
+    updateMtlsAccessRule(id: Int!, input: JSON!): MtlsAccessRule!
+    deleteMtlsAccessRule(id: Int!): Boolean!
 
     createGroup(input: JSON!): Group!
     updateGroup(id: Int!, input: JSON!): Group!

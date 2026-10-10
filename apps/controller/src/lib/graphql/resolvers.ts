@@ -1,7 +1,8 @@
 /**
  * Every resolver calls the model function its `/api/v1/` route calls, so GraphQL and REST cannot
- * disagree - the parity tests assert it. Users and certificates are projected to named fields, so a
- * future secret column cannot leak; the rest is returned whole, extras gathered into `config`.
+ * disagree - the parity tests assert it. Users and certificates (`./certificates.ts`) are projected
+ * to named fields, so a future secret column cannot leak; the rest is returned whole, extras
+ * gathered into `config`.
  */
 
 import { applyCaddyConfig as applyCaddy } from "../caddy";
@@ -14,8 +15,6 @@ import { type PairedAgent, listAgents } from "../models/agents";
 import { createApiToken, deleteApiToken, listApiTokens } from "../models/api-tokens";
 import { parseTokenScope } from "../api-tokens/scope";
 import { countAuditEvents, listAuditEvents } from "../models/audit";
-import { listCaCertificates } from "../models/ca-certificates";
-import { listCertificates, getCertificate } from "../models/certificates";
 import {
   addGroupMember,
   assertMayAddToGroup,
@@ -26,9 +25,7 @@ import {
   removeGroupMember,
   updateGroup,
 } from "../models/groups";
-import { listIssuedClientCertificates } from "../models/issued-client-certificates";
 import { getL4ProxyHost, listL4ProxyHosts } from "../models/l4-proxy-hosts";
-import { listMtlsRoles } from "../models/mtls-roles";
 import { listOAuthProviders } from "../models/oauth-providers";
 import { getProxyHost, listProxyHosts } from "../models/proxy-hosts";
 import { parseL4HostBulkRequest, parseProxyHostBulkRequest } from "../models/bulk-hosts";
@@ -46,6 +43,11 @@ import { securityMutationResolvers, securityQueryResolvers } from "./security";
 import { auditMutationResolvers } from "./audit";
 import { alertMutationResolvers, alertQueryResolvers } from "./alerts";
 import { roleMutationResolvers, roleQueryResolvers } from "./roles";
+import {
+  certificateMutationResolvers,
+  certificateQueryResolvers,
+  certificateTypeResolvers,
+} from "./certificates";
 import { auditStreamMutationResolvers, auditStreamQueryResolvers } from "./audit-stream";
 import { scimMutationResolvers, scimQueryResolvers } from "./scim";
 import { accessReviewMutationResolvers, accessReviewQueryResolvers } from "./access-reviews";
@@ -102,27 +104,7 @@ function remainder(row: Record<string, unknown>, promoted: Set<string>): Record<
   return Object.fromEntries(Object.entries(row).filter(([key]) => !promoted.has(key)));
 }
 
-type CertificateRow = Awaited<ReturnType<typeof listCertificates>>[number];
 type UserRow = Awaited<ReturnType<typeof listUsers>>[number];
-
-/** The row carries a private key. */
-function projectCertificate(row: CertificateRow) {
-  return {
-    id: row.id,
-    name: row.name,
-    type: row.type,
-    domainNames: row.domainNames,
-    autoRenew: row.autoRenew,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-    source: row.source,
-    sourceAgentId: row.sourceAgentId,
-    sourceCertPath: row.sourceCertPath,
-    sourceKeyPath: row.sourceKeyPath,
-    sourceReadAt: row.sourceReadAt,
-    sourceError: row.sourceError,
-  };
-}
 
 /** The row carries a password hash and the OAuth subject. */
 function projectUser(row: UserRow) {
@@ -154,6 +136,7 @@ export const resolvers = {
   AccessList: {
     rules: (list: { ipRules: unknown[] }) => list.ipRules,
   },
+  ...certificateTypeResolvers,
   Agent: {
     // Not a column: whether this process holds the agent's stream (lib/agent/registry.ts).
     connected: (agent: PairedAgent) => isConnected(agent.agentId),
@@ -179,22 +162,6 @@ export const resolvers = {
     },
     l4ProxyHost: async (_: unknown, args: { id: number }, _context: GraphQLContext) => {
       return await getL4ProxyHost(args.id);
-    },
-    certificates: async (_: unknown, __: unknown, _context: GraphQLContext) => {
-      return (await listCertificates()).map(projectCertificate);
-    },
-    certificate: async (_: unknown, args: { id: number }, _context: GraphQLContext) => {
-      const row = await getCertificate(args.id);
-      return row ? projectCertificate(row) : null;
-    },
-    caCertificates: async (_: unknown, __: unknown, _context: GraphQLContext) => {
-      return await listCaCertificates();
-    },
-    clientCertificates: async (_: unknown, __: unknown, _context: GraphQLContext) => {
-      return await listIssuedClientCertificates();
-    },
-    mtlsRoles: async (_: unknown, __: unknown, _context: GraphQLContext) => {
-      return await listMtlsRoles();
     },
     accessLists: async (_: unknown, __: unknown, _context: GraphQLContext) => {
       return await listAccessLists();
@@ -275,6 +242,7 @@ export const resolvers = {
     ...backupQueryResolvers,
     ...alertQueryResolvers,
     ...roleQueryResolvers,
+    ...certificateQueryResolvers,
     ...auditStreamQueryResolvers,
     ...scimQueryResolvers,
     ...accessReviewQueryResolvers,
@@ -532,6 +500,7 @@ export const resolvers = {
     ...backupMutationResolvers,
     ...alertMutationResolvers,
     ...roleMutationResolvers,
+    ...certificateMutationResolvers,
     ...auditStreamMutationResolvers,
     ...scimMutationResolvers,
     ...accessReviewMutationResolvers,

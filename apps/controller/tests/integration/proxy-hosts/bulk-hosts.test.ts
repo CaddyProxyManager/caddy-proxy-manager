@@ -14,7 +14,8 @@ let db: TestDb;
 
 vi.mock('../../../src/lib/db', () => dbModuleMock(() => db));
 const applyCaddyConfig = vi.fn(async () => {});
-vi.mock('../../../src/lib/caddy', () => ({ applyCaddyConfig }));
+// The GraphQL resolvers reach certificate-files, which needs the per-agent apply too.
+vi.mock('../../../src/lib/caddy', () => ({ applyCaddyConfig, applyCaddyConfigToAgent: vi.fn() }));
 vi.mock('next-intl/server', () => nextIntlServerMock());
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
