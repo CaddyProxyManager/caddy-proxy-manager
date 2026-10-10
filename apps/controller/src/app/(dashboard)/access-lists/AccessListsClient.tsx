@@ -370,7 +370,7 @@ function MembersTab({
               size="sm"
               value={draft.username}
               onChange={(v) => setDraft({ ...draft, username: v })}
-              placeholder="alice.chen"
+              placeholder={t("usernamePlaceholder")}
               hasAutoFocus
             />
             <VStack gap={1}>

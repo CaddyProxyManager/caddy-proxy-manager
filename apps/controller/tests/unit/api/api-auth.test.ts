@@ -394,7 +394,7 @@ describe('apiErrorResponse', () => {
   it('preserves legacy model 404 semantics without reflecting model details', async () => {
     const response = apiErrorResponse(new Error('Sensitive tenant record not found'));
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ error: 'Resource not found' });
+    expect(await response.json()).toEqual({ error: 'Resource not found', code: 'NOT_FOUND' });
   });
 
   it('handles unknown error', async () => {

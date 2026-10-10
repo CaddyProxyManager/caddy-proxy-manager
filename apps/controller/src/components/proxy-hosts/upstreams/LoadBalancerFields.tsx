@@ -198,7 +198,7 @@ export function LoadBalancerFields({
               <TextInput
                 label={t("lbQueryKey")}
                 htmlName="lbPolicyQueryKey"
-                placeholder="session"
+                placeholder={t("lbQueryKeyPlaceholder")}
                 value={text.policyQueryKey}
                 onChange={setTextField("policyQueryKey")}
                 description={t("lbQueryKeyHelp")}

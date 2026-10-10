@@ -151,10 +151,14 @@ export function apiErrorResponse(error: unknown): NextResponse {
   }
   // Older models throw a plain "<resource> not found": keep the 404 without echoing the message.
   if (error instanceof Error && error.message.trim().toLowerCase().endsWith("not found")) {
-    return NextResponse.json({ error: "Resource not found" }, { status: 404 });
+    return NextResponse.json({ error: "Resource not found", code: "NOT_FOUND" }, { status: 404 });
   }
   const errorId = logUnexpectedApiError("Unhandled API error", error);
-  return NextResponse.json({ error: "Internal server error", errorId }, { status: 500 });
+  // The code is for a dashboard caller, which words it in the reader's language.
+  return NextResponse.json(
+    { error: "Internal server error", code: "INTERNAL_ERROR", errorId },
+    { status: 500 },
+  );
 }
 
 /** Correlatable metadata only - never raw messages, bodies, URLs or stacks into shared logs. */

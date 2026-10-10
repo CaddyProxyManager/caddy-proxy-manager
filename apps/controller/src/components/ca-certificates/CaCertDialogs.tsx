@@ -205,7 +205,7 @@ export function IssueClientCertDialog({
               onChange={setCommonName}
               isRequired
               hasAutoFocus
-              placeholder="alice"
+              placeholder={t("commonNamePlaceholder")}
               description={t("commonNameHelp")}
             />
             <NumberInput

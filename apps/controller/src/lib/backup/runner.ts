@@ -4,7 +4,7 @@
  * taking over runs the latest slot each schedule owes. Every run claims its slot first.
  */
 import { onAnnouncement, replicaId } from "../cluster";
-import { storedErrorCode } from "../errors/domain-error";
+import { domainError, storedErrorCode } from "../errors/domain-error";
 import { raiseProblem, resolveProblem } from "../notifications";
 import { type CronJob, cronHandler, latestSlot, missedSlot, scheduleJobs } from "../cron";
 
@@ -44,7 +44,7 @@ export async function runBackupSchedule(
   try {
     schedule = await requireSchedule(scheduleId);
     const destination = await getDestination(schedule.destinationId);
-    if (!destination) throw new Error("The destination no longer exists");
+    if (!destination) throw domainError("backupDestinationMissing");
     const file = await createBackup(schedule.passphrase, {
       auditLog: schedule.includeAuditLog,
       settingsHistory: schedule.includeSettingsHistory,

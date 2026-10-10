@@ -11,6 +11,7 @@ import { resetSharedWindows, sharedWindowSpent, takeFromSharedWindow } from "../
 import db from "../db";
 import { agentPairingSecrets } from "../db/schema";
 import { decryptSecret, encryptSecret } from "../secrets";
+import { domainError } from "../errors/domain-error";
 
 export type PairingCode = { code: string; expiresAt: number };
 
@@ -83,7 +84,7 @@ export async function ensurePairingCode(now = Date.now()): Promise<PairingCode> 
       setWhere: lte(table.expiresAt, now),
     });
   const stored = await read(LIVE_SLOT);
-  if (!stored) throw new Error("The pairing code could not be stored.");
+  if (!stored) throw domainError("pairingCodeNotStored");
   return { code: stored.code, expiresAt: stored.expiresAt };
 }
 

@@ -122,6 +122,22 @@ class UnexplainedStatusError extends Error {
 /** ClickHouse is not up yet after a restart: a wait, shown as a warning rather than an error. */
 class AnalyticsStartingError extends Error {}
 
+/** An answer that named its failure, so the banner can say it in the reader's language. */
+class ApiCodedError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+const CODED_ERROR_KEYS = {
+  NOT_FOUND: "requestNotFound",
+  INTERNAL_ERROR: "requestServerError",
+  ANALYTICS_UNKNOWN_DIMENSION: "requestUnknownDimension",
+} as const;
+
 /** An unchecked `{ error }` body lands in state, and the first `.map()` blanks the page. */
 async function fetchJson(url: string, signal?: AbortSignal): Promise<unknown> {
   const response = await fetch(url, { signal });
@@ -134,6 +150,11 @@ async function fetchJson(url: string, signal?: AbortSignal): Promise<unknown> {
       body && typeof body === "object" && "error" in body
         ? String((body as { error: unknown }).error).trim()
         : "";
+    const code =
+      body && typeof body === "object" && "code" in body && typeof body.code === "string"
+        ? body.code
+        : null;
+    if (code && code in CODED_ERROR_KEYS) throw new ApiCodedError(code, reported);
     // ClickHouse errors often carry an empty message, which would leave the banner invisible.
     throw reported
       ? new Error(reported)
@@ -388,9 +409,11 @@ export default function AnalyticsClient() {
           setLoadError(
             err instanceof UnexplainedStatusError
               ? t("requestFailedWithStatus", { path: err.path, status: err.status })
-              : err instanceof Error && err.message
-                ? err.message
-                : t("loadErrorTitle"),
+              : err instanceof ApiCodedError
+                ? t(CODED_ERROR_KEYS[err.code as keyof typeof CODED_ERROR_KEYS])
+                : err instanceof Error && err.message
+                  ? err.message
+                  : t("loadErrorTitle"),
           );
           if (!quiet) toast.error(t("loadErrorTitle"));
         })

@@ -160,7 +160,7 @@ export function LocationLoadBalancerFields({ value, onChange }: Props) {
                 label={t("lbQueryKey")}
                 description={t("lbQueryKeyHelp")}
                 size="sm"
-                placeholder="session"
+                placeholder={t("lbQueryKeyPlaceholder")}
                 value={lb?.policyQueryKey ?? ""}
                 onChange={(next) => patch({ policyQueryKey: str(next) })}
               />

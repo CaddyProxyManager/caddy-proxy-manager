@@ -391,6 +391,9 @@
     "rule": "Rule",
     "accessLoggingDisabledDescription": "No traffic data is being collected. <link>Enable logging in Settings</link>.",
     "requestFailedWithStatus": "{path} failed with status {status}",
+    "requestNotFound": "The analytics data asked for does not exist.",
+    "requestServerError": "The server could not answer the analytics request. Try again in a moment.",
+    "requestUnknownDimension": "That breakdown is not one the analytics know.",
     "territory": "Territory",
     "autoRefreshing": "Refreshing every 30 seconds",
     "liveUpdating": "Updating as requests arrive",
@@ -923,6 +926,7 @@
     }
   },
   "caCertificates": {
+    "commonNamePlaceholder": "alice",
     "certificateDownloadWarning": "Download the .p12 bundle now. It contains the client certificate, private key and CA chain. The private key is not stored.",
     "certificateImportHelp": "Import it with the export password you set when issuing it.",
     "clientCertificateIssued": "Client certificate issued",
@@ -3137,6 +3141,7 @@
     "overrideUpstreamPort": "Override upstream port",
     "owaspCrsHelp": "Covers SQLi, XSS, LFI, RCE and hundreds of other attack patterns",
     "owaspCrsLabel": "Load OWASP Core Rule Set",
+    "lbQueryKeyPlaceholder": "session",
     "continentOption": "{emoji} {name} ({code})",
     "partial": "Partial",
     "passiveHealthChecks": "Passive health checks",

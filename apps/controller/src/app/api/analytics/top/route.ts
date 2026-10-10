@@ -15,7 +15,10 @@ export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl;
     const dimension = searchParams.get("dimension");
     if (!(TOP_DIMENSIONS as readonly (string | null)[]).includes(dimension)) {
-      return NextResponse.json({ error: "Unknown dimension" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Unknown dimension", code: "ANALYTICS_UNKNOWN_DIMENSION" },
+        { status: 400 },
+      );
     }
     const rows = await getAnalyticsTopList(
       parseExploreState(searchParams),
