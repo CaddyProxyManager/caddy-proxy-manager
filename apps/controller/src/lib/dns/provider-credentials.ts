@@ -145,9 +145,10 @@ export function buildDnsChallengeConfig(
     // With `config` set the module ignores the single-account fields.
     providerConfig.config = decryptAcmeDnsConfig(delegation.acmeDnsConfig);
   } else {
+    const caddyKeys = new Map(def.fields.map((field) => [field.key, field.caddyKey ?? field.key]));
     for (const [key, value] of Object.entries(decrypted)) {
       if (value && !(CHALLENGE_OPTION_KEYS as readonly string[]).includes(key)) {
-        providerConfig[key] = value;
+        providerConfig[caddyKeys.get(key) ?? key] = value;
       }
     }
   }

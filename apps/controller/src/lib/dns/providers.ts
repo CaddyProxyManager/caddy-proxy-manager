@@ -6,8 +6,10 @@ import type { AcmeDnsAccount, DnsChallengeDelegation } from "./challenge-delegat
 export type DnsProviderFieldType = "string" | "password" | "duration";
 
 export type DnsProviderField = {
-  /** Key sent to Caddy config (e.g. "api_token") */
+  /** The stored and REST field name, and the Caddy config key unless `caddyKey` says otherwise. */
   key: string;
+  /** Caddy's name for the field where it differs from the one credentials are stored under. */
+  caddyKey?: string;
   label: string;
   /** "password" fields are encrypted at rest; "duration" fields are validated as Caddy durations */
   type: DnsProviderFieldType;
@@ -144,7 +146,16 @@ const BASE_DNS_PROVIDERS: DnsProviderDefinition[] = [
     description: "DigitalOcean DNS API",
     docsUrl: "https://github.com/caddy-dns/digitalocean",
     modulePath: "github.com/caddy-dns/digitalocean",
-    fields: [{ key: "api_token", label: "API token", type: "password", required: true }],
+    // Stored as api_token since the first release; libdns/digitalocean reads `auth_token`.
+    fields: [
+      {
+        key: "api_token",
+        caddyKey: "auth_token",
+        label: "API token",
+        type: "password",
+        required: true,
+      },
+    ],
   },
   {
     name: "duckdns",

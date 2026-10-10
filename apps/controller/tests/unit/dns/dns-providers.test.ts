@@ -584,6 +584,14 @@ describe('DNS provider registry', () => {
     });
   });
 
+  it('emits the DigitalOcean token under the key libdns/digitalocean reads', () => {
+    // Stored as api_token, which the module never read: its field is tagged auth_token.
+    const encrypted = encryptProviderCredentials('digitalocean', { api_token: 'do-token' });
+    expect(buildDnsChallengeConfig('digitalocean', encrypted, [])).toEqual({
+      provider: { name: 'digitalocean', auth_token: 'do-token' },
+    });
+  });
+
   it('validates Caddy duration strings for the challenge option fields', () => {
     expect(isValidDnsDuration('600s')).toBe(true);
     expect(isValidDnsDuration('2m')).toBe(true);
