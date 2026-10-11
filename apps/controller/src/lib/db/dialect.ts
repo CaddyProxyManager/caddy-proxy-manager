@@ -51,10 +51,10 @@ function schemeOf(rawUrl: string): string | null {
 
 const MISSING_MESSAGE =
   "No database is configured. Set POSTGRES_PASSWORD (with POSTGRES_HOST, POSTGRES_PORT, " +
-  "POSTGRES_USER and POSTGRES_DB as needed), or DATABASE_URL for a full connection string - " +
-  "postgres://user:pass@host:5432/db, or file:/app/data/cpm.db for SQLite.";
+  "POSTGRES_USER and POSTGRES_DB as needed), or DATABASE_URL to a PostgreSQL connection string " +
+  "such as postgres://user:pass@host:5432/db.";
 
-const EXAMPLES = "(postgres://user:pass@host:5432/db, or file:/app/data/cpm.db for SQLite)";
+const EXAMPLES = "(postgres://user:pass@host:5432/db)";
 
 /**
  * A `file:` URL's Windows path arrives as "/C:/data/app.db". Not `fileURLToPath`, which rejects
@@ -114,8 +114,8 @@ function targetFromUrl(url: string): DatabaseTarget {
   const unsupported = UNSUPPORTED_SCHEMES.get(scheme);
   throw new Error(
     unsupported
-      ? `DATABASE_URL names ${unsupported}, which is not supported. Use PostgreSQL or SQLite ${EXAMPLES}.`
-      : `DATABASE_URL has an unrecognized scheme "${scheme}". Use PostgreSQL or SQLite ${EXAMPLES}.`,
+      ? `DATABASE_URL names ${unsupported}, which is not supported. Use PostgreSQL ${EXAMPLES}.`
+      : `DATABASE_URL has an unrecognized scheme "${scheme}". Use PostgreSQL ${EXAMPLES}.`,
   );
 }
 
@@ -155,7 +155,15 @@ export function resolveDatabaseTarget(
   env: Record<string, string | undefined> = process.env,
 ): DatabaseTarget {
   const url = read(env, "DATABASE_URL");
-  if (url) return targetFromUrl(url);
+  if (url) {
+    const target = targetFromUrl(url);
+    if (target.kind === "sqlite" && env.NODE_ENV === "production") {
+      throw new Error(
+        "SQLite is not supported in production. Configure DATABASE_URL with a PostgreSQL connection string.",
+      );
+    }
+    return target;
+  }
 
   // The rest default to the bundled stack, so without a password nothing is configured.
   const password = read(env, "POSTGRES_PASSWORD");

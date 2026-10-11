@@ -154,6 +154,22 @@ describe('resolveDatabaseTarget', () => {
         resolveDatabaseTarget(env({ DATABASE_URL: ':memory:', POSTGRES_PASSWORD: 'pw' })).kind,
       ).toBe('sqlite');
     });
+
+    it('is rejected in production but remains available outside production', () => {
+      expect(() =>
+        resolveDatabaseTarget(
+          env({ NODE_ENV: 'production', DATABASE_URL: 'file:/app/data/cpm.db' }),
+        ),
+      ).toThrow(/SQLite is not supported in production/);
+      expect(
+        resolveDatabaseTarget(env({ NODE_ENV: 'development', DATABASE_URL: 'file:./data/cpm.db' }))
+          .kind,
+      ).toBe('sqlite');
+      expect(
+        resolveDatabaseTarget(env({ NODE_ENV: 'production', DATABASE_URL: 'postgres://db/cpm' }))
+          .kind,
+      ).toBe('url');
+    });
   });
 
   describe('databaseDialect', () => {

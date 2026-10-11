@@ -50,10 +50,11 @@ The load script checks them again on the target host.
 
 <ThirdPartyImages />
 
-PostgreSQL is not needed when the controller keeps its data in [SQLite](../database/). ClickHouse
-and CrowdSec are needed only if you turn on [analytics](../../features/analytics/) or
-[managed CrowdSec](../../features/crowdsec/#managed); the agent starts them, and it runs them from
-images already on the host.
+The standard `main` and `next` deployment bundles include PostgreSQL. The `nodb` channels omit its
+container but still require an external PostgreSQL server; [SQLite](../database/) is only for
+development, tests, and demos. ClickHouse and CrowdSec are needed only if you turn on
+[analytics](../../features/analytics/) or [managed CrowdSec](../../features/crowdsec/#managed); the
+agent starts them, and it runs them from images already on the host.
 
 Pick one way to bring them in.
 

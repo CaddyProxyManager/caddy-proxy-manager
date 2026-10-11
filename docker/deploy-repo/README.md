@@ -16,7 +16,27 @@ directory, and the volumes after the project, so the name is what keeps your dat
 git clone https://github.com/CaddyProxyManager/deploy.git caddy-proxy-manager
 cd caddy-proxy-manager
 echo "SESSION_SECRET=$(openssl rand -base64 32)" >> .env
+```
+
+On `main` and `next`, add a PostgreSQL password before starting:
+
+```bash
 echo "POSTGRES_PASSWORD=$(openssl rand -base64 32)" >> .env
+```
+
+The `nodb` and `nodb-next` branches omit the bundled PostgreSQL server. Configure an external
+PostgreSQL connection before starting:
+
+```bash
+echo 'DATABASE_URL=postgres://cpm:URL_ENCODED_PASSWORD@db.example.com:5432/cpm?sslmode=require' >> .env
+```
+
+Percent-encode reserved characters in the password. SQLite URLs are rejected when the app runs in
+production.
+
+Then start the stack:
+
+```bash
 chmod 600 .env
 docker compose up -d
 ```
@@ -53,5 +73,7 @@ services:
 
 - `main` - stable releases only.
 - `next` - every release, prereleases included: `git checkout next`.
+- `nodb` - stable releases without a bundled database; requires external PostgreSQL.
+- `nodb-next` - every release without a bundled database; requires external PostgreSQL, prereleases included: `git checkout nodb-next`.
 
 Every release is also a tag, so `git checkout v3.6.1` pins one.

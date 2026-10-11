@@ -1,20 +1,24 @@
 ---
 title: Database
-description: PostgreSQL by default, SQLite when DATABASE_URL names a file, and how to move an install from SQLite to PostgreSQL.
+description: PostgreSQL for production, SQLite for development and demos, and how to move an install from SQLite to PostgreSQL.
 ---
 
-The controller keeps everything it knows in one database. **PostgreSQL** is the default: the
-bundled `docker-compose.yml` starts a `postgres` service and hands the app its `POSTGRES_*` values,
-so an install needs nothing but `POSTGRES_PASSWORD`. **SQLite** is used instead when `DATABASE_URL`
-names a file, such as `file:/app/data/cpm.db`, with no database server at all. It suits a demo or a
-small install; PostgreSQL is what a busy one wants, since SQLite serializes writes.
+The controller keeps everything it knows in one database. **PostgreSQL is required in production.**
+The standard `main` and `next` deploy channels start a bundled `postgres` service. The `nodb` and
+`nodb-next` channels omit that container and require `DATABASE_URL` to point to an external
+PostgreSQL server. See [install](../install/) for channel setup.
+
+**SQLite is for development, tests, and demos only.** Set `DATABASE_URL` to a file such as
+`file:/app/data/cpm.db` to use it outside production; the controller rejects SQLite when
+`NODE_ENV=production`.
 
 Both run the same code and the same migrations, which run on every start. The
 [README](https://source.caddyproxy.com#the-database) has every connection option.
 
 ## Moving from SQLite to PostgreSQL
 
-The server copies a SQLite install into an empty PostgreSQL database itself, row for row. Ids,
+For a demo or development install, the server copies a SQLite database into an empty PostgreSQL
+database itself, row for row. Ids,
 encrypted secrets (still sealed under the same `SESSION_SECRET`), sessions, API tokens and the
 audit log's hash chain all arrive as they were, and each sequence is moved past the ids copied, so
 nothing has to be set up again.

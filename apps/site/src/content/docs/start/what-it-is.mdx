@@ -16,13 +16,15 @@ Caddy JSON configuration and applies it over Caddy's admin API.
 | **Controller** | The web app and API. Holds the database and decides what the configuration should be |
 | **Agent** | Runs beside Caddy on each host. Applies configuration, recreates the container, and reports back |
 | **Caddy** | The server that handles the traffic |
-| **PostgreSQL** | Where everything is stored. SQLite instead, when `DATABASE_URL` names a file |
+| **PostgreSQL** | Where everything is stored in production; bundled by default or supplied externally |
 | **Socket proxy** | The only thing that touches the Docker socket; the agent reaches Docker through it |
 | **ClickHouse** | Optional. Only for [analytics](../../features/analytics/) |
 | **CrowdSec** | Optional. The security engine behind [CrowdSec](../../features/crowdsec/) in managed mode |
 
 The controller never dials the agent. The agent connects out and holds an event stream open, which
 is what lets a Caddy host sit behind NAT with no inbound port.
+
+SQLite is available for development, tests, and demos, but is rejected in production.
 
 ## What it stores
 
