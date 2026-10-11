@@ -7,7 +7,7 @@
 import { and, eq, inArray, isNotNull, isNull, like, lt, ne, or, sql } from "drizzle-orm";
 import db from "../db";
 import { alertDeliveries, alertEvents, alertKeys, notificationChannels } from "../db/schema";
-import { type Builtins, builtins } from "./builtins";
+import { type AlertSeverity, type Builtins, builtins } from "./builtins";
 import { categoryOf, type NotificationEvent } from "./events";
 import {
   type AlertRule,
@@ -97,6 +97,77 @@ export async function routesFor(
 
 function ruleQuietKey(ruleId: number, key: string): string {
   return `rule-quiet:${ruleId}:${key}`;
+}
+
+const PROBLEM_COOLDOWN_MS = 60 * 60_000;
+const SEVERITY_ESCALATION_COOLDOWN_MS = 15 * 60_000;
+
+function severityRank(severity: AlertSeverity): number {
+  return severity === "critical" ? 2 : severity === "warning" ? 1 : 0;
+}
+
+function highestSeverity(routes: readonly Route[]): AlertSeverity {
+  return routes.reduce<AlertSeverity>(
+    (highest, route) =>
+      severityRank(route.rule.severity) > severityRank(highest) ? route.rule.severity : highest,
+    "info",
+  );
+}
+
+async function claimProblemCooldown(
+  key: string,
+  severity: AlertSeverity,
+  now: number,
+  alreadyOpen: boolean,
+): Promise<boolean> {
+  const cooldownKey = `problem-cooldown:${key}`;
+  const row = await readKey(cooldownKey);
+  const until = row?.quietUntil ?? null;
+  let previousSeverity: AlertSeverity | null = null;
+  try {
+    const stored = row?.openEvent ? (JSON.parse(row.openEvent) as { severity?: unknown }) : null;
+    if (
+      stored?.severity === "critical" ||
+      stored?.severity === "warning" ||
+      stored?.severity === "info"
+    ) {
+      previousSeverity = stored.severity;
+    }
+  } catch {}
+
+  const escalation =
+    previousSeverity !== null && severityRank(severity) > severityRank(previousSeverity);
+  const lastAlertAt = row ? Date.parse(row.updatedAt) : Number.NEGATIVE_INFINITY;
+  if (escalation && now - lastAlertAt >= SEVERITY_ESCALATION_COOLDOWN_MS) {
+    // A severity increase may pass the hourly window, but not its own 15-minute limit.
+  } else if (alreadyOpen || until === "never" || (until && Date.parse(until) > now)) {
+    return false;
+  }
+
+  const at = iso(now);
+  const quietUntil = iso(now + PROBLEM_COOLDOWN_MS);
+  const won = row
+    ? await db
+        .update(alertKeys)
+        .set({ quietUntil, openEvent: JSON.stringify({ severity }), updatedAt: at })
+        .where(
+          and(
+            eq(alertKeys.key, cooldownKey),
+            until === null ? isNull(alertKeys.quietUntil) : eq(alertKeys.quietUntil, until),
+          ),
+        )
+        .returning({ key: alertKeys.key })
+    : await db
+        .insert(alertKeys)
+        .values({
+          key: cooldownKey,
+          quietUntil,
+          openEvent: JSON.stringify({ severity }),
+          updatedAt: at,
+        })
+        .onConflictDoNothing()
+        .returning({ key: alertKeys.key });
+  return won.length > 0;
 }
 
 /**
@@ -195,9 +266,29 @@ export async function raiseOpen(
   only?: AlertRule,
 ): Promise<void> {
   const row = await readKey(key);
-  if (row?.openAt) return;
   const routes = await routesFor(event, key, now, only);
   if (routes.length === 0) return;
+  const severity = highestSeverity(routes);
+  if (!(await claimProblemCooldown(key, severity, now, Boolean(row?.openAt)))) return;
+  if (row?.openAt) {
+    const { eventIds, ruleIds } = await recordEvent(key, event, "problem", routes, now);
+    await db
+      .update(alertKeys)
+      .set({
+        openEvent: JSON.stringify(event),
+        openEventIds: JSON.stringify([...new Set([...numbers(row.openEventIds), ...eventIds])]),
+        openRuleIds: JSON.stringify([...new Set([...numbers(row.openRuleIds), ...ruleIds])]),
+        updatedAt: iso(now),
+      })
+      .where(
+        and(
+          eq(alertKeys.key, key),
+          eq(alertKeys.openAt, row.openAt),
+          eq(alertKeys.openEventIds, row.openEventIds),
+        ),
+      );
+    return;
+  }
   const at = iso(now);
   const open = { openAt: at, openEvent: JSON.stringify(event), updatedAt: at };
   const won = row
@@ -268,7 +359,7 @@ export async function resolveOpen(key: string, recovery: Recovery, now: number):
       );
     for (const { ruleId, channelId } of rows) {
       if (ruleId === null) continue;
-      picked.set(ruleId, [...(picked.get(ruleId) ?? []), channelId]);
+      picked.set(ruleId, [...new Set([...(picked.get(ruleId) ?? []), channelId])]);
     }
   }
 

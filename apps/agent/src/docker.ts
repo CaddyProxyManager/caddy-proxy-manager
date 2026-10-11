@@ -70,6 +70,20 @@ export function tail(output: string, lines: number): string {
   return output.split("\n").slice(-lines).join("\n").trim();
 }
 
+/** Adds a host-side permission fix only for Compose's unreadable override file. */
+export function composeFailureDetail(output: string, lines: number): string {
+  const detail = tail(output, lines);
+  if (!/open \/compose\/docker-compose\.override\.yml: permission denied/i.test(output)) {
+    return detail;
+  }
+
+  const uid = process.getuid?.() ?? 10002;
+  return (
+    `${detail}\nGrant agent UID ${uid} directory traversal and read access on the host with: ` +
+    `setfacl -m u:${uid}:--x . && setfacl -m u:${uid}:r docker-compose.yml docker-compose.override.yml`
+  );
+}
+
 /** A drive-letter path from a Windows compose CLI. No UNC: Docker Desktop mounts no drive then. */
 const WINDOWS_DRIVE_PATH = /^([A-Za-z]):[\\/](.*)$/;
 

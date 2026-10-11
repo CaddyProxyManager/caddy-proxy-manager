@@ -59,6 +59,20 @@ group. If a log turns out unreadable, the WAF audit log cannot be truncated, or 
 its log directory to prune old files, the agent's card on the **Agents** page shows a warning with
 the command that fixes it.
 
+If managed services or a Caddy build fail with `permission denied` for
+`/compose/docker-compose.override.yml`, the agent cannot read the override from the host directory.
+It runs as `AGENT_PUID` (default `10002`), and needs read access to the Compose files and permission
+to traverse their directory. On Linux, from the directory containing the files, grant access to
+the agent's UID:
+
+```bash
+setfacl -m u:10002:--x .
+setfacl -m u:10002:r docker-compose.yml docker-compose.override.yml
+```
+
+Replace `10002` if `AGENT_PUID` is different. Keep `.env` private; do not make the whole directory
+world-readable. After fixing access, restart the agent or retry the failed operation.
+
 ## A different host
 
 An agent elsewhere cannot read that volume, so it pairs with a code you carry. Generate one under

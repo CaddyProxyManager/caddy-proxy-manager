@@ -753,6 +753,22 @@ describe("optional services", () => {
     expect(store.appliedManagedServices()).toEqual({ clickhouse: false, crowdsec: false });
   });
 
+  it("adds the setfacl fix when Compose cannot read its override", async () => {
+    results.push({ exitCode: 0, stdout: "proj" }); // project detection
+    results.push({
+      exitCode: 1,
+      stdout: "open /compose/docker-compose.override.yml: permission denied",
+    });
+
+    operations.applyManagedServices({ services: { clickhouse: true }, env: {} });
+    await settle();
+
+    const message = store.managedServicesStatus().message;
+    expect(message).toContain("permission denied");
+    expect(message).toContain("setfacl -m u:");
+    expect(message).toContain("docker-compose.override.yml");
+  });
+
   it("starts crowdsec under its own profile, with the bouncer key in the child's environment", async () => {
     const calls: Array<{ argv: string[]; env?: Record<string, string> }> = [];
     (Bun as { spawn: unknown }).spawn = ((

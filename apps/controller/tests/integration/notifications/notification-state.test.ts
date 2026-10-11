@@ -13,7 +13,13 @@ ctx.db = await createTestDb();
 vi.mock('../../../src/lib/db', () => dbModuleMock(() => ctx.db));
 
 import { eq } from 'drizzle-orm';
-import { alertDeliveries, alertEvents, settings, users } from '../../../src/lib/db/schema';
+import {
+  alertDeliveries,
+  alertEvents,
+  alertRules,
+  settings,
+  users,
+} from '../../../src/lib/db/schema';
 import { type OutgoingEmail, setEmailDeliveryForTests } from '../../../src/lib/email/transport';
 import { createUser } from '../../../src/lib/models/user';
 import {
@@ -108,6 +114,39 @@ describe('problems', () => {
     await flushNotifications(T0 + 3 * BATCH_MS);
     expect(sent).toHaveLength(2);
     expect(sent[1].subject).toContain('back online');
+  });
+
+  it('allows severity escalation after 15 minutes, but limits ordinary repeats to an hour', async () => {
+    await getNotificationStatus();
+    const [rule] = await ctx.db
+      .select({ id: alertRules.id })
+      .from(alertRules)
+      .where(eq(alertRules.builtin, 'agentOffline'));
+    await ctx.db.update(alertRules).set({ severity: 'info' }).where(eq(alertRules.id, rule.id));
+
+    await raiseProblem('agent:1', OFFLINE, T0);
+    await flushNotifications(T0 + BATCH_MS);
+    await ctx.db.update(alertRules).set({ severity: 'warning' }).where(eq(alertRules.id, rule.id));
+
+    await raiseProblem('agent:1', OFFLINE, T0 + 14 * 60_000);
+    await flushNotifications(T0 + 14 * 60_000 + BATCH_MS);
+    expect(sent).toHaveLength(1);
+
+    await raiseProblem('agent:1', OFFLINE, T0 + 15 * 60_000);
+    await flushNotifications(T0 + 15 * 60_000 + BATCH_MS);
+    expect(sent).toHaveLength(2);
+    expect(sent[1].subject).toContain('Agent edge is offline');
+
+    await resolveProblem('agent:1', ONLINE, T0 + 16 * 60_000);
+    await flushNotifications(T0 + 17 * 60_000);
+    expect(sent).toHaveLength(3);
+    await raiseProblem('agent:1', OFFLINE, T0 + 20 * 60_000);
+    await flushNotifications(T0 + 21 * 60_000);
+    expect(sent).toHaveLength(3);
+
+    await raiseProblem('agent:1', OFFLINE, T0 + 75 * 60_000);
+    await flushNotifications(T0 + 75 * 60_000 + BATCH_MS);
+    expect(sent).toHaveLength(4);
   });
 
   it('raises a job failure only once the streak reaches the threshold, and clears it on success', async () => {

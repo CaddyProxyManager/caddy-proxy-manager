@@ -53,7 +53,13 @@ import {
   normalizePairingCode,
 } from "./controller-url";
 import type { AgentStore } from "./db";
-import { composeEnv, type DockerHost, managedServicesEnvFingerprint, tail } from "./docker";
+import {
+  composeEnv,
+  composeFailureDetail,
+  type DockerHost,
+  managedServicesEnvFingerprint,
+  tail,
+} from "./docker";
 import { listCaddyCertificates, readCaddyCertificate } from "./certificates";
 import {
   CertificateFilePoller,
@@ -352,7 +358,10 @@ export class AgentLifecycle {
         running.map(async (name) => {
           const result = await this.deps.docker.stopService(name, env, timeoutSeconds);
           if (result.ok) stopped.push(name);
-          else console.error(`[agent] could not stop ${name}: ${tail(result.output, 3)}`);
+          else
+            console.error(
+              `[agent] could not stop ${name}: ${composeFailureDetail(result.output, 3)}`,
+            );
         }),
       );
       this.deps.store.setServicesStoppedForShutdown(stopped);
@@ -377,7 +386,7 @@ export class AgentLifecycle {
           output: String(error),
         }));
         if (result.ok) return null;
-        console.error(`[agent] could not start ${name}: ${tail(result.output, 3)}`);
+        console.error(`[agent] could not start ${name}: ${composeFailureDetail(result.output, 3)}`);
         return name;
       }),
     );
@@ -948,7 +957,9 @@ export class AgentLifecycle {
     if (!(await this.deps.docker.caddyRunning())) {
       console.log("[agent] starting Caddy");
       const result = await this.deps.docker.startCaddy();
-      if (!result.ok) console.error("[agent] could not start Caddy:", result.output);
+      if (!result.ok) {
+        console.error("[agent] could not start Caddy:", composeFailureDetail(result.output, 10));
+      }
     }
     // Also when already running: the operator may have swapped the image while the agent was down.
     if (effectiveBuildMode(this.deps.config, this.deps.store) === "external") {

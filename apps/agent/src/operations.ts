@@ -16,6 +16,7 @@ import {
   BUILD_OVERRIDE_FILE,
   CADDY_MODULE_LIST_PATH,
   type CaddyModuleList,
+  composeFailureDetail,
   composeEnv,
   type DockerHost,
   invalidCaddyModule,
@@ -415,7 +416,7 @@ export class Operations {
         // Say the old image still serves: the operator's first question is whether the proxy died.
         const detail = build.timedOut
           ? `The build was abandoned after ${this.config.buildTimeoutSeconds}s.`
-          : tail(build.output, 10);
+          : composeFailureDetail(build.output, 10);
         const message = `Caddy image build failed; the running container was left untouched. ${detail}`;
         this.store.setCaddyBuildStatus({
           state: "failed",
@@ -430,7 +431,7 @@ export class Operations {
 
       const up = await this.docker.recreateCaddy();
       if (!up.ok) {
-        const detail = tail(up.output, 5);
+        const detail = composeFailureDetail(up.output, 5);
         this.store.setCaddyBuildStatus({
           state: "failed",
           ...said(
@@ -530,7 +531,7 @@ export class Operations {
         }
         const detail = result.timedOut
           ? `abandoned after ${this.config.serviceTimeoutSeconds}s`
-          : tail(result.output, 4);
+          : composeFailureDetail(result.output, 4);
         failures.push(`${name}: ${detail}`);
       }
 
