@@ -77,9 +77,12 @@ make_nodb() {
     /^  postgres:$/ { dropping_postgres = 1; next }
     dropping_postgres && /^  [[:alnum:]_-]+:$/ { dropping_postgres = 0 }
     dropping_postgres { next }
-    /^      POSTGRES_(HOST|PORT|USER|PASSWORD|DB|SSL):/ { next }
-    /^      DATABASE_URL: \$\{DATABASE_URL:-\}$/ {
-      print "      DATABASE_URL: ${DATABASE_URL:?ERROR - DATABASE_URL must be an external PostgreSQL URL}"
+    /^      POSTGRES_HOST:/ {
+      print "      POSTGRES_HOST: ${POSTGRES_HOST:?ERROR - POSTGRES_HOST must name an external PostgreSQL server}"
+      next
+    }
+    /^      POSTGRES_PASSWORD:/ {
+      print "      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?ERROR - POSTGRES_PASSWORD is required}"
       next
     }
     /^      postgres:$/ { dropping_postgres_dependency = 1; next }
@@ -93,14 +96,16 @@ make_nodb() {
   ' "$staging/docker-compose.yml" > "$staging/docker-compose.yml.nodb"
   mv "$staging/docker-compose.yml.nodb" "$staging/docker-compose.yml"
 
-  if grep -qE 'postgres:|POSTGRES_|postgres-data|database:' "$staging/docker-compose.yml"; then
+  if grep -qE '^(  postgres:|      postgres:|  postgres-data:|  database:)' "$staging/docker-compose.yml"; then
     echo "::error::nodb docker-compose.yml still references PostgreSQL" >&2
     return 1
   fi
-  if ! grep -Fq 'DATABASE_URL: ${DATABASE_URL:?ERROR - DATABASE_URL must be an external PostgreSQL URL}' "$staging/docker-compose.yml"; then
-    echo "::error::nodb docker-compose.yml does not require an external PostgreSQL URL" >&2
-    return 1
-  fi
+  for variable in POSTGRES_HOST POSTGRES_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB POSTGRES_SSL; do
+    if ! grep -q "^      ${variable}:" "$staging/docker-compose.yml"; then
+      echo "::error::nodb docker-compose.yml is missing web.${variable}" >&2
+      return 1
+    fi
+  done
 }
 
 ensure_branch() {

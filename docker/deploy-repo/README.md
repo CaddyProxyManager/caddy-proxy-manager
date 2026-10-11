@@ -25,13 +25,15 @@ echo "POSTGRES_PASSWORD=$(openssl rand -base64 32)" >> .env
 ```
 
 The `nodb` and `nodb-next` branches omit the bundled PostgreSQL server. Configure an external
-PostgreSQL connection before starting:
+PostgreSQL server before starting:
 
 ```bash
-echo 'DATABASE_URL=postgres://cpm:URL_ENCODED_PASSWORD@db.example.com:5432/cpm?sslmode=require' >> .env
+echo 'POSTGRES_HOST=db.example.com' >> .env
+echo "POSTGRES_PASSWORD=$(openssl rand -base64 32)" >> .env
 ```
 
-Percent-encode reserved characters in the password. SQLite URLs are rejected when the app runs in
+The default port, user, and database are `5432`, `cpm`, and `cpm`. Set `POSTGRES_PORT`,
+`POSTGRES_USER`, `POSTGRES_DB`, or `POSTGRES_SSL` in `.env` to change them. SQLite is rejected in
 production.
 
 Then start the stack:

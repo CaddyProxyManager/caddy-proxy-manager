@@ -62,12 +62,14 @@ no route to the internet installs from the release's air-gap bundle instead: see
    On `nodb` and `nodb-next`, configure an external PostgreSQL server instead:
 
    ```bash
-   echo 'DATABASE_URL=postgres://cpm:URL_ENCODED_PASSWORD@db.example.com:5432/cpm?sslmode=require' >> .env
+   echo 'POSTGRES_HOST=db.example.com' >> .env
+   echo "POSTGRES_PASSWORD=$(openssl rand -base64 32)" >> .env
    ```
 
-   Replace the example with your server details and percent-encode reserved characters in the
-   password. These branches require a PostgreSQL URL and do not support SQLite in production.
-   Compose refuses to start without the database setting required by the selected branch.
+   Replace the host with your server address. The default port, user, and database are `5432`,
+   `cpm`, and `cpm`; set `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_DB`, and `POSTGRES_SSL` to
+   override them. These branches require an external PostgreSQL server; SQLite is not supported in
+   production. Compose refuses to start without the host and password.
    Finish with `chmod 600 .env` to keep credentials private.
 
    `SESSION_SECRET` is also the key every secret in the database is encrypted under: DNS provider

@@ -5,8 +5,8 @@ description: PostgreSQL for production, SQLite for development and demos, and ho
 
 The controller keeps everything it knows in one database. **PostgreSQL is required in production.**
 The standard `main` and `next` deploy channels start a bundled `postgres` service. The `nodb` and
-`nodb-next` channels omit that container and require `DATABASE_URL` to point to an external
-PostgreSQL server. See [install](../install/) for channel setup.
+`nodb-next` channels omit that container and require `POSTGRES_HOST` and `POSTGRES_PASSWORD` for an
+external PostgreSQL server. See [install](../install/) for channel setup.
 
 **SQLite is for development, tests, and demos only.** Set `DATABASE_URL` to a file such as
 `file:/app/data/cpm.db` to use it outside production; the controller rejects SQLite when
