@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Publishes releases to the deploy repository: one commit per release holding exactly its
-# -deploy.tar.gz, plus docker/deploy-repo/* and LICENSE. A stable release lands on main and on
-# next, a prerelease on next alone, so both branches only fast-forward. Already-tagged releases
+# -deploy.tar.gz, plus docker/deploy-repo/* and LICENSE. Stable releases land on main, next, nodb
+# and nodb-next; prereleases land on next and nodb-next. The nodb branches omit the bundled
+# PostgreSQL service and require an external PostgreSQL URL. Already-tagged releases
 # are skipped, which makes a re-run and the backfill safe.
 #
 #   publish-deploy-repo.sh v3.6.1 [v3.7.0 ...]     oldest first
@@ -69,6 +70,46 @@ commit() {
   gh api graphql --input "$work/request.json" --jq .data.createCommitOnBranch.commit.oid
 }
 
+# Keep the same deployment, but require an external PostgreSQL server on nodb channels.
+make_nodb() {
+  local staging="$1"
+  awk '
+    /^  postgres:$/ { dropping_postgres = 1; next }
+    dropping_postgres && /^  [[:alnum:]_-]+:$/ { dropping_postgres = 0 }
+    dropping_postgres { next }
+    /^      POSTGRES_(HOST|PORT|USER|PASSWORD|DB|SSL):/ { next }
+    /^      DATABASE_URL: \$\{DATABASE_URL:-\}$/ {
+      print "      DATABASE_URL: ${DATABASE_URL:?ERROR - DATABASE_URL must be an external PostgreSQL URL}"
+      next
+    }
+    /^      postgres:$/ { dropping_postgres_dependency = 1; next }
+    dropping_postgres_dependency && /^        condition: service_healthy$/ { dropping_postgres_dependency = 0; next }
+    /^      - database$/ { next }
+    /^  database:$/ { dropping_database_network = 1; next }
+    dropping_database_network && /^  [[:alnum:]_-]+:$/ { dropping_database_network = 0 }
+    dropping_database_network { next }
+    /^  postgres-data:$/ { next }
+    { print }
+  ' "$staging/docker-compose.yml" > "$staging/docker-compose.yml.nodb"
+  mv "$staging/docker-compose.yml.nodb" "$staging/docker-compose.yml"
+
+  if grep -qE 'postgres:|POSTGRES_|postgres-data|database:' "$staging/docker-compose.yml"; then
+    echo "::error::nodb docker-compose.yml still references PostgreSQL" >&2
+    return 1
+  fi
+  if ! grep -Fq 'DATABASE_URL: ${DATABASE_URL:?ERROR - DATABASE_URL must be an external PostgreSQL URL}' "$staging/docker-compose.yml"; then
+    echo "::error::nodb docker-compose.yml does not require an external PostgreSQL URL" >&2
+    return 1
+  fi
+}
+
+ensure_branch() {
+  local branch="$1" base="$2"
+  if [ -z "$(head_of "$branch")" ]; then
+    gh api "repos/${DEPLOY_REPO}/git/refs" -f "ref=refs/heads/${branch}" -f "sha=$(head_of "$base")" >/dev/null
+  fi
+}
+
 for tag in "$@"; do
   if gh api "repos/${DEPLOY_REPO}/git/ref/tags/${tag}" >/dev/null 2>&1; then
     echo "${tag}: already published"
@@ -95,17 +136,26 @@ for tag in "$@"; do
   message="${tag}"$'\n'"https://github.com/${SOURCE_REPO}/releases/tag/${tag}"
 
   # The first prerelease has no next yet: it starts from main.
-  if [ -z "$(head_of next)" ]; then
-    gh api "repos/${DEPLOY_REPO}/git/refs" -f ref=refs/heads/next -f sha="$(head_of main)" >/dev/null
-  fi
+  ensure_branch next main
+  ensure_branch nodb main
+  ensure_branch nodb-next nodb
 
   case "$tag" in
     *-*)
       at="$(commit next "$staging" "$message")"
+      nodb_staging="$work/${tag}-nodb"
+      cp -a "$staging" "$nodb_staging"
+      make_nodb "$nodb_staging"
+      commit nodb-next "$nodb_staging" "$message" >/dev/null
       ;;
     *)
       at="$(commit main "$staging" "$message")"
       commit next "$staging" "$message" >/dev/null
+      nodb_staging="$work/${tag}-nodb"
+      cp -a "$staging" "$nodb_staging"
+      make_nodb "$nodb_staging"
+      commit nodb "$nodb_staging" "$message" >/dev/null
+      commit nodb-next "$nodb_staging" "$message" >/dev/null
       ;;
   esac
 

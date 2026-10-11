@@ -35,17 +35,40 @@ no route to the internet installs from the release's air-gap bundle instead: see
    [latest release](https://source.caddyproxy.com/releases/latest) instead and unpack it into
    that directory: it holds the same files.
 
-2. Generate the two values Compose has no default for, straight into `.env`:
+   The deploy repository has four release channels:
+
+   | Branch | Releases | Database |
+   | ------ | -------- | -------- |
+   | `main` | Stable | Bundled PostgreSQL |
+   | `next` | Stable and prereleases | Bundled PostgreSQL |
+   | `nodb` | Stable | External PostgreSQL; no bundled server |
+   | `nodb-next` | Stable and prereleases | External PostgreSQL; no bundled server |
+
+   The clone starts on `main`. To choose another channel, switch branches before continuing, for
+   example `git switch nodb` or `git switch nodb-next`.
+
+2. Generate `SESSION_SECRET` in `.env`:
 
    ```bash
    echo "SESSION_SECRET=$(openssl rand -base64 32)" >> .env
-   echo "POSTGRES_PASSWORD=$(openssl rand -base64 32)" >> .env
-   chmod 600 .env
    ```
 
-   That is the whole file. Compose declares the two as `${SESSION_SECRET:?}` and
-   `${POSTGRES_PASSWORD:?}` and refuses to start without them rather than come up on something
-   guessable. Generating them means you never have to think up a value for the file.
+   On `main` and `next`, also generate the bundled database password:
+
+   ```bash
+   echo "POSTGRES_PASSWORD=$(openssl rand -base64 32)" >> .env
+   ```
+
+   On `nodb` and `nodb-next`, configure an external PostgreSQL server instead:
+
+   ```bash
+   echo 'DATABASE_URL=postgres://cpm:URL_ENCODED_PASSWORD@db.example.com:5432/cpm?sslmode=require' >> .env
+   ```
+
+   Replace the example with your server details and percent-encode reserved characters in the
+   password. These branches require a PostgreSQL URL and do not support SQLite in production.
+   Compose refuses to start without the database setting required by the selected branch.
+   Finish with `chmod 600 .env` to keep credentials private.
 
    `SESSION_SECRET` is also the key every secret in the database is encrypted under: DNS provider
    credentials, imported private keys, agent secrets. It cannot live in the thing it encrypts, so
@@ -61,8 +84,8 @@ no route to the internet installs from the release's air-gap bundle instead: see
    docker compose up -d
    ```
 
-   That also starts the `postgres` service the app keeps its data in, so there is no database
-   server to install or run yourself.
+   On `main` and `next`, this also starts the `postgres` service the app keeps its data in. On
+   `nodb` and `nodb-next`, the app connects to the external PostgreSQL server you configured.
 
    Caddy itself does not start yet. It sits behind a compose profile, and the agent starts it once
    the two are paired. An unpaired host answering 80 and 443 with a default page would be worse
@@ -110,8 +133,8 @@ docker compose pull
 docker compose up -d
 ```
 
-`main` carries stable releases only. To follow prereleases as well, `git checkout next` once; every
-release is also a tag, so `git checkout v3.6.1` pins one.
+`main` and `nodb` carry stable releases only. Use `next` or `nodb-next` to follow prereleases too;
+every release is also a tag, so `git checkout v3.6.1` pins one.
 
 Settings reports when a newer release is published to the registry you pull from. It can be switched
 off; the only other requests the app makes to the internet on its own are the CRS plugin registry
