@@ -42,7 +42,7 @@ require (
 	github.com/caddy-dns/vultr v0.0.0-20250723121531-55bf3e9768be
 	github.com/caddyserver/cache-handler v0.17.0
 	github.com/caddyserver/caddy/v2 v2.11.7
-	github.com/corazawaf/coraza-caddy/v2 v2.6.1
+	github.com/corazawaf/coraza-caddy/v2 v2.6.2
 	github.com/darkweak/storages/badger/caddy v0.0.20
 	github.com/darkweak/storages/etcd/caddy v0.0.20
 	github.com/darkweak/storages/otter/caddy v0.0.20
