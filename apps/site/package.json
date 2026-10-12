@@ -19,7 +19,7 @@
     "@astryxdesign/theme-neutral": "^0.6.8",
     "@catppuccin/starlight": "^2.1.0",
     "@cpm/controller": "workspace:*",
-    "apexcharts": "^8.0.0",
+    "apexcharts": "^8.1.0",
     "astro": "^7.3.8",
     "lucide-react": "^1.55.0",
     "react": "^19.3.0",

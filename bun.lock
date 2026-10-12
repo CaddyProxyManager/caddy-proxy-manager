@@ -13,7 +13,7 @@
     },
     "apps/agent": {
       "name": "@cpm/agent",
-      "version": "4.0.0-rc.5",
+      "version": "4.0.0-rc.6",
       "dependencies": {
         "@cpm/shared": "workspace:*",
         "maxmind": "^5.0.7",
@@ -25,7 +25,7 @@
     },
     "apps/controller": {
       "name": "@cpm/controller",
-      "version": "4.0.0-rc.5",
+      "version": "4.0.0-rc.6",
       "dependencies": {
         "@astryxdesign/core": "^0.6.8",
         "@astryxdesign/theme-neutral": "^0.6.8",
@@ -36,7 +36,7 @@
         "@clickhouse/client": "^1.24.1",
         "@cpm/shared": "workspace:*",
         "@xmldom/xmldom": "^0.9.12",
-        "apexcharts": "^8.0.0",
+        "apexcharts": "^8.1.0",
         "better-auth": "^1.7.7",
         "country-flag-icons": "^1.6.20",
         "dayjs": "^1.11.23",
@@ -46,7 +46,7 @@
         "jose": "^6.2.12",
         "ldapts": "^9.2.0",
         "lucide-react": "^1.55.0",
-        "maplibre-gl": "^6.13.0",
+        "maplibre-gl": "^6.14.0",
         "maxmind": "^5.0.7",
         "next": "^16.4.0",
         "next-intl": "^4.14.9",
@@ -103,7 +103,7 @@
         "@astryxdesign/theme-neutral": "^0.6.8",
         "@catppuccin/starlight": "^2.1.0",
         "@cpm/controller": "workspace:*",
-        "apexcharts": "^8.0.0",
+        "apexcharts": "^8.1.0",
         "astro": "^7.3.8",
         "lucide-react": "^1.55.0",
         "react": "^19.3.0",
@@ -122,7 +122,7 @@
     },
     "packages/shared": {
       "name": "@cpm/shared",
-      "version": "4.0.0-rc.5",
+      "version": "4.0.0-rc.6",
     },
   },
   "trustedDependencies": [
@@ -1002,7 +1002,7 @@
 
     "apex-commons": ["apex-commons@0.8.1", "", {}, "sha512-F7fqJVh0smeTu1d86uuRSNNZvaM/l11GNQMbu6oAiSvuXp+K8KCufg0oZTy2VQBEEipRLAdFqkHnphlVpTG0Gw=="],
 
-    "apexcharts": ["apexcharts@8.0.0", "", { "dependencies": { "apex-commons": "^0.8.0" } }, "sha512-VA9l6lVKWNzwvnG1mh94SwnBJ+t0m+AlEKpL4wwIBFyn69j9zEyBKdOlQvtk4q1BWyP0SUJtVvgq9Dj8mvYLOw=="],
+    "apexcharts": ["apexcharts@8.1.0", "", { "dependencies": { "apex-commons": "^0.8.0" } }, "sha512-njSdgBkxt89iCyAQPv1F26tcioEHWPcYQ5CwoERWdlL9qKQA/YLm7OGyoNERskQim/kvSA/U9im7dMmTnjcIYQ=="],
 
     "apg-lite": ["apg-lite@1.0.5", "", {}, "sha512-SlI+nLMQDzCZfS39ihzjGp3JNBQfJXyMi6cg9tkLOCPVErgFsUIAEdO9IezR7kbP5Xd0ozcPNQBkf9TO5cHgWw=="],
 
@@ -1542,7 +1542,7 @@
 
     "magicast": ["magicast@0.5.5", "", { "dependencies": { "@babel/parser": "^7.29.7", "@babel/types": "^7.29.7", "source-map-js": "^1.2.1" } }, "sha512-UicdXN8zQ3JHlxVq+28afMXPr1z7WNY6+7EJnzTdQWkTAlMLF5fNCCKxJHBQwGaNGR11581EiQmQzx73+MvszA=="],
 
-    "maplibre-gl": ["maplibre-gl@6.13.0", "", { "dependencies": { "@mapbox/point-geometry": "^1.1.0", "@mapbox/tiny-sdf": "^2.2.0", "@mapbox/unitbezier": "^1.0.0", "@mapbox/vector-tile": "^3.0.0", "@maplibre/geojson-vt": "^6.1.2", "@maplibre/maplibre-gl-style-spec": "^26.4.4", "@maplibre/mlt": "^1.3.0", "@maplibre/vt-pbf": "^4.3.2", "@types/geojson": "^7946.0.16", "bidi-js": "^1.1.0", "earcut": "^3.2.4", "gl-matrix": "^3.4.4", "kdbush": "^4.1.0", "murmurhash-js": "^1.0.0", "pbf": "^5.1.2", "potpack": "^2.1.0", "quickselect": "^3.0.0", "tinyqueue": "^3.0.0" } }, "sha512-ELXk4h+xl0URFQEnVbAN6MGn61P6jq4amUWHiskLVsvHCaKdf1Zq6G8UNOD0AQ3UaXoL5ECc8ovz8yqYEBGPKw=="],
+    "maplibre-gl": ["maplibre-gl@6.14.0", "", { "dependencies": { "@mapbox/point-geometry": "^1.1.0", "@mapbox/tiny-sdf": "^2.2.0", "@mapbox/unitbezier": "^1.0.0", "@mapbox/vector-tile": "^3.0.0", "@maplibre/geojson-vt": "^6.1.2", "@maplibre/maplibre-gl-style-spec": "^26.4.4", "@maplibre/mlt": "^1.3.0", "@maplibre/vt-pbf": "^4.3.2", "@types/geojson": "^7946.0.16", "bidi-js": "^1.1.0", "earcut": "^3.2.4", "gl-matrix": "^3.4.4", "kdbush": "^4.1.0", "murmurhash-js": "^1.0.0", "pbf": "^5.1.2", "potpack": "^2.1.0", "quickselect": "^3.0.0", "tinyqueue": "^3.0.0" } }, "sha512-L7U9y9TyPJ3P/JJbW+eH+A3FzdPq+3fnZFqqeCwf/S6cRGganHwVI5b/C8/zOYzreUzsloDPZVVaMQA94wOt4A=="],
 
     "math-intrinsics": ["math-intrinsics@1.1.0", "", {}, "sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g=="],
 
