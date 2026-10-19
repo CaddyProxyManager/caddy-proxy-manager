@@ -2,7 +2,7 @@
 
 # $BUILDPLATFORM: emulated, `vite build` deadlocks until the runner's 6-hour cap, so the binary
 # is cross-compiled instead. Keep the tag in step with bun-version in the workflows and db-seed.
-FROM --platform=$BUILDPLATFORM oven/bun:1.4.2-slim@sha256:cb3bbbb08e13a4a2ff400f24c7a2a1d5efa83f6ef8544d52d95a519631e2fc61 AS base
+FROM --platform=$BUILDPLATFORM oven/bun:1.4.3-slim@sha256:14a223fa35747ec728bce300ef85888bc5f7958164d15bbba6a54b22b52a3288 AS base
 WORKDIR /app
 
 FROM base AS deps
