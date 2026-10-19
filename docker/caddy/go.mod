@@ -45,7 +45,7 @@ require (
 	github.com/corazawaf/coraza-caddy/v2 v2.6.1
 	github.com/darkweak/storages/badger/caddy v0.0.20
 	github.com/darkweak/storages/etcd/caddy v0.0.20
-	github.com/darkweak/storages/otter/caddy v0.0.20
+	github.com/darkweak/storages/otter/caddy v0.0.22
 	github.com/darkweak/storages/redis/caddy v0.0.20
 	github.com/darkweak/storages/simplefs/caddy v0.0.20
 	github.com/fuomag9/caddy-blocker-plugin v0.0.0-20260910060514-71474a863f65
@@ -113,9 +113,9 @@ require (
 	github.com/crowdsecurity/go-cs-lib v0.0.25 // indirect
 	github.com/darkweak/souin v1.7.9 // indirect
 	github.com/darkweak/storages/badger v0.0.19 // indirect
-	github.com/darkweak/storages/core v0.0.20 // indirect
+	github.com/darkweak/storages/core v0.0.21 // indirect
 	github.com/darkweak/storages/etcd v0.0.19 // indirect
-	github.com/darkweak/storages/otter v0.0.19 // indirect
+	github.com/darkweak/storages/otter v0.0.21 // indirect
 	github.com/darkweak/storages/redis v0.0.19 // indirect
 	github.com/darkweak/storages/simplefs v0.0.19 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
