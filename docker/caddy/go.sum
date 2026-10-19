@@ -226,8 +226,8 @@ github.com/darkweak/storages/badger v0.0.19 h1:azvvARDBA4cCNv1dvxTyesMy5ndJOETcj
 github.com/darkweak/storages/badger v0.0.19/go.mod h1:paT6IwviITiRjgxU8DNJOOnZU7WLOhNs/mx3YwPuRrc=
 github.com/darkweak/storages/badger/caddy v0.0.20 h1:gFKHMrJDRb9Ar1Kej9hLeG+ybW0x9vawAIcCVzBXhoU=
 github.com/darkweak/storages/badger/caddy v0.0.20/go.mod h1:tZsTUpu8NQ0UIB5+He3RsM9cfGCr/93ZxcQZrao7ZIU=
-github.com/darkweak/storages/core v0.0.20 h1:Aj8HIbZpuBuyvoOVXXAu8EY03oDh1ZC5d85LxAOkY9A=
-github.com/darkweak/storages/core v0.0.20/go.mod h1:h36sNSwQ36fdHFMUIqD3j403kv29R4FVJJDaLbyvofM=
+github.com/darkweak/storages/core v0.0.21 h1:zfa0Bqzdm9/oPQiG6pEKHhfP1jAj6cfUvByb8tnwrZE=
+github.com/darkweak/storages/core v0.0.21/go.mod h1:bY5dNtTpdIinbM78nmiPIZ1WgwADIOXOW7JiXTuPSfY=
 github.com/darkweak/storages/etcd v0.0.19 h1:Lf90HmzupYZu17zumjbX3xo3oWZDdQBDa8BWCkBYZcs=
 github.com/darkweak/storages/etcd v0.0.19/go.mod h1:bZeA/2gSOwVzkfAo/5fIBaRyQ5o+EkHaLzFP66l7Gxs=
 github.com/darkweak/storages/etcd/caddy v0.0.20 h1:LMJc1cbMoh1dznPPxPN6dutJRFCp5F0BQoZnYp4uRS8=
@@ -240,10 +240,10 @@ github.com/darkweak/storages/redis v0.0.19 h1:aOYHkUCuCmdEBVujqZrL+M+JAz4qzpBcH4
 github.com/darkweak/storages/redis v0.0.19/go.mod h1:LcYKzob1jacNyKYmWEata4MLfC56WlS+7c617UHkbYk=
 github.com/darkweak/storages/redis/caddy v0.0.20 h1:gA34ZxO4pkpNQ1NW8x7BwU1nl9W+whY1hQiQnJwdHKI=
 github.com/darkweak/storages/redis/caddy v0.0.20/go.mod h1:9HPZPEzC9b7W8eC8i1lobDipBoYg/uRs+DZ9/3thknM=
-github.com/darkweak/storages/simplefs v0.0.19 h1:1e4lFpa9/gL3QCPKan7cviadmZoNZAeAoquCKEKPuic=
-github.com/darkweak/storages/simplefs v0.0.19/go.mod h1:hsCWJZNAnGdu7ZYXTR1j1etKhjozB6Mm+waej8iFg7E=
-github.com/darkweak/storages/simplefs/caddy v0.0.20 h1:xAEAlR1XWU/tXxrwemFAVKOugtDjTVB74yaP9goR75A=
-github.com/darkweak/storages/simplefs/caddy v0.0.20/go.mod h1:DMHqmGbKE1Dw8VScPMf9jIBbH0SfWYBznpjPE6fwaYI=
+github.com/darkweak/storages/simplefs v0.0.21 h1:A5iF3jv5IQK35AMusr5aeOrHUgtlIns1JRdO2gSxi/M=
+github.com/darkweak/storages/simplefs v0.0.21/go.mod h1:oHmy2mCddeCFvRnkXimI6W8YSXIuxdMiSe4ySZ/XBxI=
+github.com/darkweak/storages/simplefs/caddy v0.0.22 h1:+paSOE2/y+Bx1do/sluNFuHUP38NAwE7d+MgyhgmJ1Q=
+github.com/darkweak/storages/simplefs/caddy v0.0.22/go.mod h1:wkABifFbzsSWl8Hn0X1vOqmU9U/kevq7z69vN/lBJ9c=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
