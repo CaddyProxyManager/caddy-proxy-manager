@@ -44,7 +44,7 @@ require (
 	github.com/caddyserver/caddy/v2 v2.11.7
 	github.com/corazawaf/coraza-caddy/v2 v2.6.1
 	github.com/darkweak/storages/badger/caddy v0.0.20
-	github.com/darkweak/storages/etcd/caddy v0.0.20
+	github.com/darkweak/storages/etcd/caddy v0.0.22
 	github.com/darkweak/storages/otter/caddy v0.0.20
 	github.com/darkweak/storages/redis/caddy v0.0.20
 	github.com/darkweak/storages/simplefs/caddy v0.0.20
@@ -113,8 +113,8 @@ require (
 	github.com/crowdsecurity/go-cs-lib v0.0.25 // indirect
 	github.com/darkweak/souin v1.7.9 // indirect
 	github.com/darkweak/storages/badger v0.0.19 // indirect
-	github.com/darkweak/storages/core v0.0.20 // indirect
-	github.com/darkweak/storages/etcd v0.0.19 // indirect
+	github.com/darkweak/storages/core v0.0.21 // indirect
+	github.com/darkweak/storages/etcd v0.0.21 // indirect
 	github.com/darkweak/storages/otter v0.0.19 // indirect
 	github.com/darkweak/storages/redis v0.0.19 // indirect
 	github.com/darkweak/storages/simplefs v0.0.19 // indirect
