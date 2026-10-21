@@ -159,7 +159,7 @@ describe('requireApiUser', () => {
   });
 });
 
-describe('requireApiUser', () => {
+describe('requireApiUser - a session', () => {
   it('returns auth result for valid user', async () => {
     mockAuth.mockResolvedValue({
       user: { id: '5', role: 'viewer', name: 'V', email: 'v@test.com' },

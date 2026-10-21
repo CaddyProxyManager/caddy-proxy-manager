@@ -23,7 +23,9 @@ export async function readLines(
         resolve({ lines: [], newOffset: startOffset });
       else reject(err);
     });
-    stream.on("data", (chunk: Buffer) => {
+    // No encoding is set, so chunks are always Buffers; Bun 1.4.3's types widen it to string too.
+    stream.on("data", (data: string | Buffer) => {
+      const chunk = data as Buffer;
       totalBytes += chunk.length;
       const buf = pending.length ? Buffer.concat([pending, chunk]) : chunk;
       let start = 0;

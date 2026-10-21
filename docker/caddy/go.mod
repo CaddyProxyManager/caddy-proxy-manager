@@ -29,7 +29,7 @@ require (
 	github.com/caddy-dns/hetzner/v2 v2.0.1
 	github.com/caddy-dns/infomaniak v1.0.2
 	github.com/caddy-dns/inwx v0.4.1
-	github.com/caddy-dns/ionos v1.2.0
+	github.com/caddy-dns/ionos v1.3.0
 	github.com/caddy-dns/linode v0.8.0
 	github.com/caddy-dns/namecheap v1.0.0
 	github.com/caddy-dns/netcup v1.0.0
@@ -42,13 +42,13 @@ require (
 	github.com/caddy-dns/vultr v0.0.0-20250723121531-55bf3e9768be
 	github.com/caddyserver/cache-handler v0.17.0
 	github.com/caddyserver/caddy/v2 v2.11.7
-	github.com/corazawaf/coraza-caddy/v2 v2.6.1
-	github.com/darkweak/storages/badger/caddy v0.0.20
-	github.com/darkweak/storages/etcd/caddy v0.0.20
-	github.com/darkweak/storages/otter/caddy v0.0.20
-	github.com/darkweak/storages/redis/caddy v0.0.20
-	github.com/darkweak/storages/simplefs/caddy v0.0.20
-	github.com/fuomag9/caddy-blocker-plugin v0.0.0-20260910060514-71474a863f65
+	github.com/corazawaf/coraza-caddy/v2 v2.6.2
+	github.com/darkweak/storages/badger/caddy v0.0.22
+	github.com/darkweak/storages/etcd/caddy v0.0.22
+	github.com/darkweak/storages/otter/caddy v0.0.22
+	github.com/darkweak/storages/redis/caddy v0.0.22
+	github.com/darkweak/storages/simplefs/caddy v0.0.22
+	github.com/fuomag9/caddy-blocker-plugin v0.0.0-20261021185730-79c008222209
 	github.com/hslatman/caddy-crowdsec-bouncer v0.14.1
 	github.com/mholt/caddy-l4 v0.1.2
 	github.com/mholt/caddy-ratelimit v0.1.1-0.20260612195517-5625512f24f6
@@ -112,12 +112,12 @@ require (
 	github.com/crowdsecurity/crowdsec v1.7.8 // indirect
 	github.com/crowdsecurity/go-cs-lib v0.0.25 // indirect
 	github.com/darkweak/souin v1.7.9 // indirect
-	github.com/darkweak/storages/badger v0.0.19 // indirect
-	github.com/darkweak/storages/core v0.0.20 // indirect
-	github.com/darkweak/storages/etcd v0.0.19 // indirect
-	github.com/darkweak/storages/otter v0.0.19 // indirect
-	github.com/darkweak/storages/redis v0.0.19 // indirect
-	github.com/darkweak/storages/simplefs v0.0.19 // indirect
+	github.com/darkweak/storages/badger v0.0.21 // indirect
+	github.com/darkweak/storages/core v0.0.21 // indirect
+	github.com/darkweak/storages/etcd v0.0.21 // indirect
+	github.com/darkweak/storages/otter v0.0.21 // indirect
+	github.com/darkweak/storages/redis v0.0.21 // indirect
+	github.com/darkweak/storages/simplefs v0.0.21 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dblohm7/wingoes v0.0.0-20260526185140-fb298caac7ca // indirect
 	github.com/dgraph-io/badger v1.6.2 // indirect
@@ -215,7 +215,7 @@ require (
 	github.com/libdns/hetzner/v2 v2.0.1 // indirect
 	github.com/libdns/infomaniak v0.2.0 // indirect
 	github.com/libdns/inwx v0.3.1 // indirect
-	github.com/libdns/ionos v1.2.0 // indirect
+	github.com/libdns/ionos v1.3.0 // indirect
 	github.com/libdns/libdns v1.1.1 // indirect
 	github.com/libdns/linode v0.5.0 // indirect
 	github.com/libdns/namecheap v1.0.0 // indirect
@@ -263,7 +263,7 @@ require (
 	github.com/prometheus/procfs v0.22.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.63.0 // indirect
-	github.com/redis/rueidis v1.0.54 // indirect
+	github.com/redis/rueidis v1.0.73 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/safchain/ethtool v0.3.0 // indirect

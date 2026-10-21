@@ -217,8 +217,9 @@ describe('metric rules', () => {
     expect(texts()).toHaveLength(before);
 
     await silenceRule(rule.id, null, 1);
-    await tick(t0 + 42 * MIN);
-    await tick(t0 + 43 * MIN);
+    // Past the hour-long problem cooldown that started with the first alert.
+    await tick(t0 + 70 * MIN);
+    await tick(t0 + 71 * MIN);
     expect(texts().at(-1)).toContain('were answered with 5xx');
   });
 });

@@ -330,8 +330,8 @@ describe('passkey sign-in', () => {
 
     const { jar: browser, response } = await signInWithPasskey(credential as SoftwareCredential);
 
-    // The session hook's refusal, which the plugin reports as a failed authentication.
-    expect(response.status).toBe(400);
+    // The session hook's own refusal, which better-auth 1.7.12 passes through unwrapped.
+    expect(response.status).toBe(401);
     expect(browser.has('session_token')).toBe(false);
     expect(await sessionsOf()).toHaveLength(before);
   });
@@ -369,7 +369,7 @@ describe('passkey sign-in', () => {
       .set({ enabled: false })
       .where(eq(schema.oauthProviders.id, 'directory-1'));
     const refused = await signInWithPasskey(credential as SoftwareCredential, { counter: 2 });
-    expect(refused.response.status).toBe(400);
+    expect(refused.response.status).toBe(401);
     expect(refused.jar.has('session_token')).toBe(false);
   });
 

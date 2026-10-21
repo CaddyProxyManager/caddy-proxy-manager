@@ -82,7 +82,7 @@
    * off it. Dialogs and sheets reuse LayoutContent inside the shell and keep their own surface.
    */
   .astryx-app-shell
-  .astryx-layout-content:not(:is(dialog, [role="dialog"], [role="alertdialog"]) *) {
+    .astryx-layout-content:not(:is(dialog, [role="dialog"], [role="alertdialog"]) *) {
     background-color: var(--color-background-body);
   }
 

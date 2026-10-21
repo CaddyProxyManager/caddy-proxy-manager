@@ -71,6 +71,10 @@
     "parser": { "tailwindDirectives": true }
   },
 
+  // Biome 2.6 began formatting these; the docs' tables and the workflows' quoting stay hand-kept.
+  "yaml": { "formatter": { "enabled": false } },
+  "markdown": { "formatter": { "enabled": false } },
+
   "assist": {
     "enabled": true,
     "actions": {
@@ -86,6 +90,16 @@
 
   "overrides": [
     {
+      // Biome 2.6's preset matches any call named describe(), and the app has its own.
+      "includes": ["**", "!apps/controller/tests/e2e/**"],
+      "linter": { "rules": { "correctness": { "usePlaywrightValidDescribeCallback": "off" } } }
+    },
+    {
+      // Grouped by what each rule overrides in Swagger UI's sheet, not by selector specificity.
+      "includes": ["**/swagger-ui-overrides.css"],
+      "linter": { "rules": { "style": { "noDescendingSpecificity": "off" } } }
+    },
+    {
       // Biome reads only an .astro file's frontmatter, never the template below it,
       // so every prop a component destructures and then renders reads as unused.
       "includes": ["**/*.astro"],
@@ -100,7 +114,9 @@
         "domains": { "test": "recommended", "playwright": "recommended" },
         "rules": {
           "suspicious": { "noExplicitAny": "off" },
-          "style": { "noCommonJs": "off" }
+          "style": { "noCommonJs": "off" },
+          // Matches Playwright's Locator.innerText(), which is not the DOM property.
+          "performance": { "useDomNodeTextContent": "off" }
         }
       }
     }
