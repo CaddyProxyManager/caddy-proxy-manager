@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { openCreateHostDialog } from '../../helpers/proxy-api';
 import { waitForHydration } from '../../helpers/hydration';
+import { saveThroughReview } from '../../helpers/host-editor';
 
 // Forced even under the desktop project, so these run instead of self-skipping.
 test.use({ viewport: { width: 393, height: 852 } });
@@ -113,8 +114,8 @@ test.describe('Mobile layout', () => {
     await page.getByLabel('Name').fill('Mobile Test Host');
     await page.getByLabel(/^domains/i).fill('mobile-test.local');
     await page.getByPlaceholder('10.0.0.5:8080').fill('localhost:9999');
-    await page.getByRole('button', { name: /^create$/i }).click();
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
+    await saveThroughReview(page, page.getByRole('dialog'));
+    await expect(page.locator('dialog[open]')).toHaveCount(0, { timeout: 10_000 });
     // MoreMenu's icon-only trigger is labelled "Actions for <host name>".
     const moreButton = page.getByRole('button', { name: /^Actions for / }).first();
     await expect(moreButton).toBeVisible();

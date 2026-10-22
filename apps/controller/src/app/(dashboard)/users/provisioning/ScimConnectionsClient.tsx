@@ -211,7 +211,9 @@ export default function ScimConnectionsClient({
         <Banner status="warning" title={t("postgresOnlyTitle")} description={t("postgresOnly")} />
       ) : (
         <>
-          {error && <Banner status="error" title={t("actionFailed")} description={error} />}
+          {error && (
+            <Banner role="alert" status="error" title={t("actionFailed")} description={error} />
+          )}
           {token && (
             <Card padding={3}>
               <VStack gap={2}>
@@ -378,7 +380,9 @@ function ConnectionDialog({
           })}
     >
       <VStack gap={3}>
-        {error && <Banner status="error" title={t("saveFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("saveFailed")} description={error} />
+        )}
         <TextInput
           label={tCommon("name")}
           isRequired

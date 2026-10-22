@@ -93,7 +93,7 @@ export function WafPluginRegistrySettings({
         <Text type="body" size="sm" color="secondary">
           {t("pluginRegistrySettingsDescription")}
         </Text>
-        {error && <Banner status="error" title={error} />}
+        {error && <Banner role="alert" status="error" title={error} />}
 
         <VStack gap={3}>
           {drafts.length === 0 && (

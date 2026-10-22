@@ -204,7 +204,7 @@ export function PasskeySection({
       )}
 
       {error && dialog.kind === "closed" && (
-        <Banner status="error" title={t("title")} description={error} />
+        <Banner role="alert" status="error" title={t("title")} description={error} />
       )}
 
       {blocker === null && (
@@ -245,7 +245,7 @@ export function PasskeySection({
               {t("addHelp")}
             </Text>
           )}
-          {error && <Banner status="error" title={t("title")} description={error} />}
+          {error && <Banner role="alert" status="error" title={t("title")} description={error} />}
           <TextInput
             {...AUTOFILL_OFF}
             {...nativeAttrs({ maxLength: PASSKEY_NAME_MAX_LENGTH })}

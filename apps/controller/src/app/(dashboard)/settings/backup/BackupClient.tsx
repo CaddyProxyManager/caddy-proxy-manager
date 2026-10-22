@@ -98,7 +98,9 @@ function DownloadCard() {
         <Text type="body" size="sm" color="secondary">
           {t("downloadHelp")}
         </Text>
-        {error && <Banner status="error" title={t("downloadFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("downloadFailed")} description={error} />
+        )}
         <TextInput
           startIcon={KeyRound}
           {...AUTOFILL_NEW_PASSWORD}
@@ -245,7 +247,9 @@ function RestoreCard({ destinations }: { destinations: BackupOverview["destinati
         <Text type="body" size="sm" color="secondary">
           {t("restoreHelp")}
         </Text>
-        {error && <Banner status="error" title={t("restoreFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("restoreFailed")} description={error} />
+        )}
         {destinations.length > 0 && (
           <SegmentedControl
             label={t("restoreFrom")}
@@ -303,7 +307,12 @@ function RestoreCard({ destinations }: { destinations: BackupOverview["destinati
         {preview && (
           <VStack gap={3}>
             {preview.newerThanThis && (
-              <Banner status="error" title={t("newerTitle")} description={t("newerHelp")} />
+              <Banner
+                role="alert"
+                status="error"
+                title={t("newerTitle")}
+                description={t("newerHelp")}
+              />
             )}
             <MetadataList>
               <MetadataListItem label={t("madeAt")}>

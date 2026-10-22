@@ -210,7 +210,9 @@ export default function RolesClient({
           {t("description")}
         </Text>
       </VStack>
-      {error && <Banner status="error" title={t("deleteFailed")} description={error} />}
+      {error && (
+        <Banner role="alert" status="error" title={t("deleteFailed")} description={error} />
+      )}
       <Card padding={0}>
         <Table
           density={density}
@@ -356,7 +358,9 @@ function RoleDialog({
           })}
     >
       <VStack gap={3}>
-        {error && <Banner status="error" title={t("saveFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("saveFailed")} description={error} />
+        )}
         {role?.builtIn && <Banner status="info" title={t("builtInLocked")} />}
         {!role?.builtIn && (
           <>

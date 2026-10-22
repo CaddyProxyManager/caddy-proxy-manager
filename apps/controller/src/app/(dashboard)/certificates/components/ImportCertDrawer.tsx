@@ -397,7 +397,7 @@ export function ImportCertDrawer({ open, cert, fileAgents, dnsProviders, onClose
             </SegmentedControl>
           )}
 
-          {error && <Banner status="error" title={error} />}
+          {error && <Banner role="alert" status="error" title={error} />}
 
           {fromFiles && fileFields}
 

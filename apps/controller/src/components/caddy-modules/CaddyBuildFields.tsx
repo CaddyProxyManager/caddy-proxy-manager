@@ -365,7 +365,12 @@ export function CaddyBuildFields({
       )}
 
       {rebuildError && (
-        <Banner status="error" title={t("rebuildFailedToStart")} description={rebuildError} />
+        <Banner
+          role="alert"
+          status="error"
+          title={t("rebuildFailedToStart")}
+          description={rebuildError}
+        />
       )}
 
       <RebuildBanner
@@ -557,6 +562,7 @@ function RebuildBanner({
   if (!diff.needsRebuild && !inFlight && status.state !== "failed") {
     return (
       <Banner
+        role="status"
         status="success"
         title={t("modulesCurrentStatus")}
         description={t("modulesCompiledIn", { count: diff.appliedSpecs.length })}
@@ -568,6 +574,7 @@ function RebuildBanner({
 
   return (
     <Banner
+      role={bannerStatus === "error" ? "alert" : "status"}
       status={bannerStatus}
       icon={inFlight ? <Spinner size="sm" /> : undefined}
       title={

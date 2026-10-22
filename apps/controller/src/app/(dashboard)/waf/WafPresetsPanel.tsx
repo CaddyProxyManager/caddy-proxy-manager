@@ -255,7 +255,7 @@ function WafPresetDialog({
       >
         {existing && <input type="hidden" name="id" value={existing.id} />}
         <VStack gap={3}>
-          {error && <Banner status="error" title={error} />}
+          {error && <Banner role="alert" status="error" title={error} />}
           {existing &&
             (existing.usedGlobally || existing.usedByDashboard || existing.hostCount > 0) && (
               <Banner status="info" title={t("presetEditAppliesEverywhere")} />

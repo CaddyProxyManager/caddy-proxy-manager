@@ -87,6 +87,7 @@ export function TailscaleFields({
 
         {usesTailscale && noAuthKey && (
           <Banner
+            role="alert"
             status="error"
             title={t("tailscaleAuthKeyMissingTitle")}
             description={t("tailscaleAuthKeyMissingDescription")}

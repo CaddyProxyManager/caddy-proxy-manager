@@ -104,13 +104,16 @@ function TestResult({ result }: { result: ChannelTestOutcome }) {
   const t = useTranslations("alerts.channels");
   const format = useFormatter();
   if (!result.ok) {
-    return <Banner status="error" title={t("testFailed")} description={result.error} />;
+    return (
+      <Banner role="alert" status="error" title={t("testFailed")} description={result.error} />
+    );
   }
   if (result.data.outcome === "accepted") {
     return <Banner status="info" title={t("testAccepted")} description={t("testAcceptedHelp")} />;
   }
   return (
     <Banner
+      role="status"
       status="success"
       title={t("testDelivered")}
       description={
@@ -191,7 +194,9 @@ function ChannelDialog({
       isSubmitDisabled={!form.name.trim()}
     >
       <VStack gap={3}>
-        {error && <Banner status="error" title={t("saveFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("saveFailed")} description={error} />
+        )}
         <Grid columns={{ minWidth: 220, max: 2 }} gap={2}>
           <TextInput
             label={tCommon("name")}
@@ -562,7 +567,9 @@ export function ChannelsTab({
         <Text type="body" size="sm" color="secondary">
           {t("help")}
         </Text>
-        {error && <Banner status="error" title={t("deleteFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("deleteFailed")} description={error} />
+        )}
         {testing !== null && <Banner status="info" title={tCommon("testing")} />}
         {tested && (
           <VStack gap={1}>

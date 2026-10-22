@@ -300,7 +300,7 @@ function ViewAllDialog({
       }
     >
       {failed ? (
-        <Banner status="error" title={t("viewAllLoadError")} />
+        <Banner role="alert" status="error" title={t("viewAllLoadError")} />
       ) : rows === null ? (
         <HStack justify="center" padding={6}>
           <Spinner label={t("loadingAnalytics")} />
@@ -640,7 +640,11 @@ export default function AnalyticsClient() {
           <FilterChip
             className="cpm-mobile-flex"
             label={rangeLabel(state.range)}
-            aria-label={t("timeInterval")}
+            // Starts with what the chip shows, so speech input can name it by what it says.
+            aria-label={tCommon("chosenValue", {
+              value: rangeLabel(state.range),
+              field: t("timeInterval"),
+            })}
             onClick={() => setRangeSheetOpen(true)}
           />
           <OptionSheet
@@ -699,7 +703,7 @@ export default function AnalyticsClient() {
 
       {loadError && (
         <div data-testid="analytics-load-error">
-          <Banner status="error" title={t("loadErrorTitle")} description={loadError} />
+          <Banner role="alert" status="error" title={t("loadErrorTitle")} description={loadError} />
         </div>
       )}
 

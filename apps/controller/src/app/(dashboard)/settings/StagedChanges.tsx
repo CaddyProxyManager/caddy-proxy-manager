@@ -204,7 +204,7 @@ function ReviewSheet({
           {t("reviewSubtitle", { from: view.currentRevision ?? 0, to: next })}
         </Text>
 
-        {error && <Banner status="error" title={error} />}
+        {error && <Banner role="alert" status="error" title={error} />}
         {view.approvalRequired && <Banner status="info" title={tApprovals("stagedNotice")} />}
 
         <HStack gap={4} vAlign="start">

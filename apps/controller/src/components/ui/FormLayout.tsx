@@ -11,7 +11,13 @@ import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { useTranslations } from "next-intl";
 
 export function StatusAlert({ message, success }: { message: string; success: boolean }) {
-  return <Banner status={success ? "success" : "error"} title={message} />;
+  return (
+    <Banner
+      role={success ? "status" : "alert"}
+      status={success ? "success" : "error"}
+      title={message}
+    />
+  );
 }
 
 export function InfoAlert({ title, children }: { title: string; children?: ReactNode }) {

@@ -134,6 +134,7 @@ export default function ResetPasswordForm({ canRequestAnother }: { canRequestAno
           {stage.kind === "invalid" && (
             <>
               <Banner
+                role="alert"
                 status="error"
                 title={t("auth.passwordReset.invalidTitle")}
                 description={t("auth.passwordReset.invalidBody")}
@@ -152,6 +153,7 @@ export default function ResetPasswordForm({ canRequestAnother }: { canRequestAno
           {stage.kind === "done" && (
             <>
               <Banner
+                role="status"
                 status="success"
                 title={t("auth.passwordReset.doneTitle")}
                 description={t("auth.passwordReset.doneBody")}
@@ -162,7 +164,7 @@ export default function ResetPasswordForm({ canRequestAnother }: { canRequestAno
 
           {stage.kind === "form" && (
             <>
-              {error && <Banner status="error" title={error} />}
+              {error && <Banner role="alert" status="error" title={error} />}
               <Card padding={4}>
                 <VStack gap={3}>
                   <SignInIdentity username={stage.link.username} />

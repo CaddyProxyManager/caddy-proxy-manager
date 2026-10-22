@@ -39,7 +39,8 @@ export function StatusSummaryBar({ expired, expiringSoon, healthy, filter, onFil
       {FILTERS.map((f) => (
         <ToggleButton
           key={f.key}
-          label={t(f.labelKey)}
+          // The name carries the count the chip shows, or it no longer contains its visible text.
+          label={t("statusFilter", { status: t(f.labelKey), count: counts[f.key] })}
           icon={f.icon}
           isPressed={filter === f.key}
           onPressedChange={(pressed) => onFilter(pressed ? f.key : null)}

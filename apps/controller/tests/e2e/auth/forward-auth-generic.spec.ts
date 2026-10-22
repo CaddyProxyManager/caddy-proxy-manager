@@ -6,6 +6,7 @@ import { test, expect } from '@playwright/test';
 import { goToSetting } from '../../helpers/settings-nav';
 import { applyStagedChanges, expectStaged } from '../../helpers/staged-settings';
 import { waitForHydration } from '../../helpers/hydration';
+import { saveThroughReview } from '../../helpers/host-editor';
 
 const API_PROXY_HOSTS = 'http://localhost:3000/api/v1/proxy-hosts';
 const API_FORWARD_AUTH_SETTINGS = 'http://localhost:3000/api/v1/settings/forward-auth';
@@ -86,8 +87,8 @@ test.describe('Generic forward auth', () => {
       .locator('input[name="forwardAuthApiBypassHeaders"]')
       .fill('X-Api-Key, Authorization');
 
-    await page.getByRole('button', { name: /^create$/i }).click();
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
+    await saveThroughReview(page, dialog);
+    await expect(page.locator('dialog[open]')).toHaveCount(0, { timeout: 15_000 });
 
     const hosts = (await (await page.request.get(API_PROXY_HOSTS)).json()) as {
       name: string;

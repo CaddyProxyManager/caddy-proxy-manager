@@ -254,7 +254,9 @@ export function HistoryTab({ overview }: { overview: AlertsOverview }) {
             onChange={set("status")}
           />
         </Grid>
-        {error && <Banner status="error" title={t("loadFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("loadFailed")} description={error} />
+        )}
         {rows.length === 0 && !loading ? (
           <EmptyState title={t("emptyTitle")} description={t("emptyDescription")} isCompact />
         ) : (

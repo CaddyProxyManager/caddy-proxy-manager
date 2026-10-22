@@ -153,7 +153,7 @@ export function TwoFactorSection({
     />
   );
   const errorBanner = error && (
-    <Banner status="error" title={t("errorTitle")} description={error} />
+    <Banner role="alert" status="error" title={t("errorTitle")} description={error} />
   );
 
   return (

@@ -272,6 +272,7 @@ export function MtlsFields({
 
             {!hasTrust && activeCerts.length > 0 && (
               <Banner
+                role="alert"
                 status="error"
                 title={t("mtlsAccessDeniedTitle")}
                 description={t("mtlsSubjectsEmptyDescription")}
@@ -473,7 +474,7 @@ function RuleDialog({
       isSubmitting={submitting}
     >
       <VStack gap={4}>
-        {error && <Banner status="error" title={error} />}
+        {error && <Banner role="alert" status="error" title={error} />}
 
         <HStack gap={3} vAlign="start">
           <TextInput

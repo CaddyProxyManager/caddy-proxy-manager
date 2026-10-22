@@ -272,7 +272,13 @@ function ComparisonCard({
             />
           </HStack>
         )}
-        {result && <Banner status={result.ok ? "success" : "error"} title={result.message} />}
+        {result && (
+          <Banner
+            role={result.ok ? "status" : "alert"}
+            status={result.ok ? "success" : "error"}
+            title={result.message}
+          />
+        )}
 
         {comparison && <ComparisonBody comparison={comparison} />}
       </VStack>

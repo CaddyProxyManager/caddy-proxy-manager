@@ -15,27 +15,28 @@ async function gotoAnalyticsMap(page: Page) {
 
 test.describe('Analytics world map', () => {
   test('maplibre worker is served as one self-contained chunk', async ({ page }) => {
-    const mapRequests: { url: string; status: number }[] = [];
-    page.on('response', (res) => {
+    // vinext names chunks by hash alone, so the worker is found by its folder and its banner.
+    const workers: { url: string; status: number; body: string }[] = [];
+    page.on('response', async (res) => {
       const url = new URL(res.url()).pathname;
-      if (url.includes('maplibre')) mapRequests.push({ url, status: res.status() });
+      if (!url.includes('/static/workers/')) return;
+      workers.push({ url, status: res.status(), body: await res.text().catch(() => '') });
     });
 
     await gotoAnalyticsMap(page);
-    // Content-hashed name in a directory the bundler chooses, so match the stem.
     await expect
-      .poll(() => mapRequests.map((r) => r.url), { timeout: 15_000 })
-      .toEqual(expect.arrayContaining([expect.stringContaining('maplibre-gl-worker-')]));
+      .poll(() => workers.filter((w) => w.body.includes('MapLibre GL JS')).length, {
+        timeout: 15_000,
+      })
+      .toBe(1);
 
-    // A separate request for the shared sibling means the worker entry was emitted alone, and its
-    // relative import 404s.
+    const [worker] = workers.filter((w) => w.body.includes('MapLibre GL JS'));
+    expect(worker.status).toBe(200);
+    // A relative import means the shared code was emitted beside the worker entry, and 404s.
     expect(
-      mapRequests.filter((r) => r.url.includes('maplibre-gl-shared')),
+      /\bfrom\s*["']\.\.?\//.test(worker.body),
       'maplibre-gl-shared should be bundled into the worker chunk, not fetched separately',
-    ).toEqual([]);
-
-    const failed = mapRequests.filter((r) => r.status >= 400);
-    expect(failed, `maplibre assets failed to load: ${JSON.stringify(failed)}`).toEqual([]);
+    ).toBe(false);
   });
 
   test('map loads without CSP violations or worker errors', async ({ page }) => {

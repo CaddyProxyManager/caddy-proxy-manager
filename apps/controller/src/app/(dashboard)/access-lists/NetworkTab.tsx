@@ -281,7 +281,9 @@ export function NetworkTab({
       <Text type="body" size="sm" color="secondary">
         {t("geoRulesHelp")}
       </Text>
-      {error && <Banner status="error" title={t("ipRulesSaveFailed")} description={error} />}
+      {error && (
+        <Banner role="alert" status="error" title={t("ipRulesSaveFailed")} description={error} />
+      )}
       {hasGeoRules && geoUnavailable && (
         <Banner
           status="warning"

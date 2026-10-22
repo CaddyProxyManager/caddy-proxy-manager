@@ -75,14 +75,14 @@ test.describe('Proxy host review before save', () => {
 
       await editor.getByLabel('Name').fill('Never saved');
       await expect(editor.getByText('1 unsaved change')).toBeVisible({ timeout: 5_000 });
-      await editor.getByRole('button', { name: 'Cancel' }).click();
+      await editor.getByRole('button', { name: 'Close' }).click();
 
       const prompt = page.getByRole('alertdialog', { name: 'Discard unsaved changes?' });
       await expect(prompt).toBeVisible();
       await prompt.getByRole('button', { name: 'Keep editing' }).click();
       await expect(editor).toBeVisible();
 
-      await editor.getByRole('button', { name: 'Cancel' }).click();
+      await editor.getByRole('button', { name: 'Close' }).click();
       await page
         .getByRole('alertdialog', { name: 'Discard unsaved changes?' })
         .getByRole('button', { name: 'Discard changes' })

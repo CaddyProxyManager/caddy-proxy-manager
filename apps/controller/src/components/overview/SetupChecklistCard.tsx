@@ -105,7 +105,7 @@ export function SetupChecklistCard({ preview }: { preview?: SetupChecklist }) {
         <Text type="supporting">
           {t("progress", { done: complete, total: checklist.steps.length })}
         </Text>
-        {error && <Banner status="error" title={error} />}
+        {error && <Banner role="alert" status="error" title={error} />}
         <Stepper activeStep={activeStep} orientation="vertical" label={t("title")}>
           {checklist.steps.map((step, index) => {
             const isComplete = stepComplete(step);

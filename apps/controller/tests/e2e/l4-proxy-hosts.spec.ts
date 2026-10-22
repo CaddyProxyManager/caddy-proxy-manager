@@ -1,6 +1,7 @@
 /** E2E: L4 Proxy Hosts page - navigation, list, create/edit/delete dialogs. */
 import { test, expect, type Page } from '@playwright/test';
 import { waitForHydration } from '../helpers/hydration';
+import { saveThroughReview } from '../helpers/host-editor';
 
 const API_L4_HOSTS = 'http://localhost:3000/api/v1/l4-proxy-hosts';
 const ORIGIN = 'http://localhost:3000';
@@ -108,9 +109,9 @@ test.describe('L4 Proxy Hosts page', () => {
     await page.getByLabel('Listen address').fill(':19999');
     await page.getByRole('textbox', { name: /^Upstreams/ }).fill('10.0.0.1:5432');
 
-    await page.getByRole('button', { name: /^create$/i }).click();
+    await saveThroughReview(page, page.getByRole('dialog'));
 
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('dialog[open]')).toHaveCount(0, { timeout: 10_000 });
     await expect(page.getByRole('table').getByText('E2E Test Host', { exact: true })).toBeVisible();
     await expect(page.getByRole('table').getByText(':19999', { exact: true })).toBeVisible();
   });
@@ -126,11 +127,11 @@ test.describe('L4 Proxy Hosts page', () => {
     await page.getByLabel('Listen address').fill(':443');
     await page.getByRole('textbox', { name: /^Upstreams/ }).fill('10.0.0.1:8443');
 
-    await page.getByRole('button', { name: /^create$/i }).click();
-
-    await expect(page.getByRole('dialog').getByText(/port 443 is reserved/i)).toBeVisible({
-      timeout: 10_000,
-    });
+    // The review's preview refuses it, and offers no Create.
+    await page.getByRole('dialog').getByRole('button', { name: 'Review', exact: true }).click();
+    const review = page.getByRole('dialog', { name: /^Review/ });
+    await expect(review.getByText(/port 443 is reserved/i)).toBeVisible({ timeout: 10_000 });
+    await expect(review.getByRole('button', { name: /^create$/i })).toBeDisabled();
     await expect(page.getByRole('table').getByText('E2E Reserved Port Host')).not.toBeVisible();
   });
 
@@ -174,9 +175,9 @@ test.describe('L4 Proxy Hosts page', () => {
       await page.getByLabel('Listen address').fill(`:2000${i}`);
       await page.getByRole('textbox', { name: /^Upstreams/ }).fill('10.0.0.1:5432');
 
-      await page.getByRole('button', { name: /^create$/i }).click();
+      await saveThroughReview(page, page.getByRole('dialog'));
 
-      await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
+      await expect(page.locator('dialog[open]')).toHaveCount(0, { timeout: 10_000 });
       // exact: the row's switch is labelled `Enable <name>`, which contains the name.
       await expect(
         page.getByRole('table').getByText(`E2E Rapid Host ${i}`, { exact: true }),
@@ -192,8 +193,8 @@ test.describe('L4 Proxy Hosts page', () => {
     await page.getByLabel('Name').fill('E2E Toggle Host');
     await page.getByLabel('Listen address').fill(':20010');
     await page.getByRole('textbox', { name: /^Upstreams/ }).fill('10.0.0.1:5432');
-    await page.getByRole('button', { name: /^create$/i }).click();
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
+    await saveThroughReview(page, page.getByRole('dialog'));
+    await expect(page.locator('dialog[open]')).toHaveCount(0, { timeout: 10_000 });
 
     const row = page.locator('tr', { hasText: 'E2E Toggle Host' });
     const rowSwitch = row.getByRole('switch').first();

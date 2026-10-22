@@ -186,7 +186,7 @@ export default function LogsClient({
       {missing && view !== "access" && (
         <Banner status="info" title={t("missingTitle")} description={t("missingDescription")} />
       )}
-      {error && <Banner status="error" title={t("readFailed")} description={error} />}
+      {error && <Banner role="alert" status="error" title={t("readFailed")} description={error} />}
 
       {shown.length === 0 ? (
         <Text type="body" size="sm" color="secondary">

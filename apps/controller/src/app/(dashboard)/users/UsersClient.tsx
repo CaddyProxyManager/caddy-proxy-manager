@@ -428,7 +428,12 @@ function UsersPage({
       detail={
         <VStack gap={4}>
           {error && (
-            <Banner status="error" title={tCommon("somethingWentWrong")} description={error} />
+            <Banner
+              role="alert"
+              status="error"
+              title={tCommon("somethingWentWrong")}
+              description={error}
+            />
           )}
           {adminsWithoutMfa.length > 0 && (
             <AdminsWithoutMfaBanner
@@ -982,6 +987,7 @@ function CreateUserDialog({
         <VStack gap={3}>
           {dialogError && (
             <Banner
+              role="alert"
               status="error"
               title={tCommon("somethingWentWrong")}
               description={dialogError}

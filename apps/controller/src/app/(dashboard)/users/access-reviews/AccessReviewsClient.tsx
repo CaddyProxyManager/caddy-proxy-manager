@@ -305,7 +305,9 @@ function CampaignTable({
 
   return (
     <VStack gap={3}>
-      {error && <Banner status="error" title={t("actionFailed")} description={error} />}
+      {error && (
+        <Banner role="alert" status="error" title={t("actionFailed")} description={error} />
+      )}
       <Card padding={0}>
         <Table
           density={density}
@@ -402,7 +404,9 @@ function CreateDialog({
       isSubmitDisabled={!ready}
     >
       <VStack gap={3}>
-        {error && <Banner status="error" title={t("saveFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("saveFailed")} description={error} />
+        )}
         <TextInput label={tCommon("name")} isRequired size="sm" value={name} onChange={setName} />
         <Selector
           label={t("scope")}
@@ -684,7 +688,9 @@ function CampaignView({
           </HStack>
         </HStack>
       </VStack>
-      {error && <Banner status="error" title={t("actionFailed")} description={error} />}
+      {error && (
+        <Banner role="alert" status="error" title={t("actionFailed")} description={error} />
+      )}
       {campaign.status === "confirming" && (
         <Banner
           status="warning"
@@ -846,7 +852,9 @@ function DecideDialog({
       }
     >
       <VStack gap={3}>
-        {error && <Banner status="error" title={t("saveFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("saveFailed")} description={error} />
+        )}
         {revokeBlocked && (
           <Banner status="info" title={t("scimManaged")} description={t("scimManagedHelp")} />
         )}
@@ -928,7 +936,9 @@ function ReassignDialog({
       isSubmitDisabled={!reviewer}
     >
       <VStack gap={3}>
-        {error && <Banner status="error" title={t("saveFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("saveFailed")} description={error} />
+        )}
         <Selector
           label={t("reviewer")}
           size="sm"

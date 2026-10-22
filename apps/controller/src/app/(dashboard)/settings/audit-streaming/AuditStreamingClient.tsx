@@ -136,10 +136,13 @@ function message(error: unknown, fallback: string): string {
 function TestResult({ result }: { result: SinkTestOutcome }) {
   const t = useTranslations("settings.auditStreaming");
   if (!result.ok) {
-    return <Banner status="error" title={t("testFailed")} description={result.error} />;
+    return (
+      <Banner role="alert" status="error" title={t("testFailed")} description={result.error} />
+    );
   }
   return (
     <Banner
+      role="status"
       status={result.data.encodingRefused ? "warning" : "success"}
       title={t("testDelivered")}
       description={result.data.encodingRefused ? t("testEncodingRefused") : undefined}
@@ -210,7 +213,9 @@ function SinkDialog({
       isSubmitDisabled={!form.name.trim()}
     >
       <VStack gap={3}>
-        {error && <Banner status="error" title={t("saveFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("saveFailed")} description={error} />
+        )}
         <Grid columns={{ minWidth: 220, max: 2 }} gap={2}>
           <TextInput
             label={tCommon("name")}
@@ -633,7 +638,9 @@ export default function AuditStreamingClient({
           <Text type="body" size="sm" color="secondary">
             {t("help")}
           </Text>
-          {error && <Banner status="error" title={t("deleteFailed")} description={error} />}
+          {error && (
+            <Banner role="alert" status="error" title={t("deleteFailed")} description={error} />
+          )}
           <SinkNotices sinks={sinks} />
           {testing !== null && <Banner status="info" title={tCommon("testing")} />}
           {tested && (

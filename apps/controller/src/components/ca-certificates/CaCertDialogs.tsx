@@ -170,6 +170,7 @@ export function IssueClientCertDialog({
       {issued ? (
         <VStack gap={4}>
           <Banner
+            role="status"
             status="success"
             title={t("clientCertificateIssued")}
             description={t("certificateDownloadWarning")}
@@ -229,7 +230,12 @@ export function IssueClientCertDialog({
               description={t("p12PasswordHelp", { policy: passwordPolicyHint(tRoot) })}
             />
             {error && (
-              <Banner status="error" title={t("couldNotIssueCertificate")} description={error} />
+              <Banner
+                role="alert"
+                status="error"
+                title={t("couldNotIssueCertificate")}
+                description={error}
+              />
             )}
           </VStack>
         </form>
@@ -311,7 +317,12 @@ export function ManageIssuedClientCertsDialog({
           description={t("revokeWarningDescription", { name: cert.name })}
         />
         {error && (
-          <Banner status="error" title={t("couldNotRevokeCertificate")} description={error} />
+          <Banner
+            role="alert"
+            status="error"
+            title={t("couldNotRevokeCertificate")}
+            description={error}
+          />
         )}
         {revokedCount > 0 && (
           <Switch
@@ -448,7 +459,12 @@ export function DeleteCaCertDialog({
           })}
         </Text>
         {error && (
-          <Banner status="error" title={t("couldNotDeleteCertificate")} description={error} />
+          <Banner
+            role="alert"
+            status="error"
+            title={t("couldNotDeleteCertificate")}
+            description={error}
+          />
         )}
       </VStack>
     </AppDialog>

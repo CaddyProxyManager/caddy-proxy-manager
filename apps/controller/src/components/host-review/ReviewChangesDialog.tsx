@@ -131,7 +131,7 @@ export function ReviewChangesDialog({
       }
     >
       <VStack gap={4}>
-        {error && <Banner status="error" title={error} />}
+        {error && <Banner role="alert" status="error" title={error} />}
         {approval && !isLoading && <Banner status="info" title={tApprovals("editorNotice")} />}
         {isLoading && <Spinner size="lg" label={t("loading")} />}
         {!isLoading && nothingToSave && <Text color="secondary">{t("noChanges")}</Text>}

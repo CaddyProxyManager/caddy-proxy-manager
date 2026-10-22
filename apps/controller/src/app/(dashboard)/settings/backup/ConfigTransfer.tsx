@@ -53,7 +53,8 @@ async function failureOf(response: Response, fallback: string): Promise<Failure>
 function FailureBanner({ failure, title }: { failure: Failure; title: string }) {
   const t = useTranslations("settings.configTransfer");
   const tCommon = useTranslations("common");
-  if (!failure.reauth) return <Banner status="error" title={title} description={failure.message} />;
+  if (!failure.reauth)
+    return <Banner role="alert" status="error" title={title} description={failure.message} />;
   return (
     <Banner
       status="warning"
@@ -298,6 +299,7 @@ function ImportCard() {
         {error && <FailureBanner failure={error} title={tErrors("configImportFailed")} />}
         {done && (
           <Banner
+            role="status"
             status="success"
             title={t("imported", {
               create: done.counts.create,

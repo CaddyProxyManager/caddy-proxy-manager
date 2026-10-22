@@ -83,13 +83,16 @@ function useDiffLayout(): [DiffLayout, (layout: DiffLayout) => void] {
 function ChainResult({ result }: { result: VerifyChainResult }) {
   const t = useTranslations("auditLog");
   if (!result.ok)
-    return <Banner status="error" title={t("verifyFailed")} description={result.message} />;
+    return (
+      <Banner role="alert" status="error" title={t("verifyFailed")} description={result.message} />
+    );
   const { verification } = result;
   const legacy =
     verification.legacy > 0 ? t("chainLegacy", { count: verification.legacy }) : undefined;
   if (verification.ok) {
     return (
       <Banner
+        role="status"
         status="success"
         title={t("chainIntact")}
         description={[t("chainIntactDetail", { count: verification.checked }), legacy]
@@ -101,6 +104,7 @@ function ChainResult({ result }: { result: VerifyChainResult }) {
   const broken = verification.firstBroken;
   return (
     <Banner
+      role="alert"
       status="error"
       title={t("chainBroken")}
       description={

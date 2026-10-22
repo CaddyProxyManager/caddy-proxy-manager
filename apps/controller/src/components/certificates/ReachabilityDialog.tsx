@@ -71,7 +71,7 @@ export function ReachabilityDialog({ hostUuid, hostName, open, onClose }: Props)
         <Text type="body" size="sm" color="secondary">
           {t("help")}
         </Text>
-        {error && <Banner status="error" title={t("failed")} description={error} />}
+        {error && <Banner role="alert" status="error" title={t("failed")} description={error} />}
         {!results && !error && (
           <Text type="body" size="sm" color="secondary">
             {tCommon("checking")}

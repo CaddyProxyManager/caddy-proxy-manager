@@ -1,5 +1,6 @@
 /** Each takes the standard `page` fixture, already signed in via the global storageState. */
 import { expect, type Page } from '@playwright/test';
+import { saveThroughReview } from './host-editor';
 
 export interface L4ProxyHostConfig {
   name: string;
@@ -72,9 +73,8 @@ export async function createL4ProxyHost(page: Page, config: L4ProxyHostConfig): 
     await page.getByRole('option', { name: config.proxyProtocolVersion }).click();
   }
 
-  await page.getByRole('button', { name: /^create$/i }).click();
-
-  await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
+  await saveThroughReview(page, page.getByRole('dialog'));
+  await expect(page.locator('dialog[open]')).toHaveCount(0, { timeout: 15_000 });
 
   await expect(page.getByRole('table').getByText(config.name, { exact: true })).toBeVisible({
     timeout: 10_000,

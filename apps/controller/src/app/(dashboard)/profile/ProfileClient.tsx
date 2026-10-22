@@ -418,6 +418,7 @@ export default function ProfileClient({
 
       {error && (
         <Banner
+          role="alert"
           status="error"
           title={tCommon("somethingWentWrong")}
           description={error}
@@ -427,7 +428,13 @@ export default function ProfileClient({
       )}
 
       {success && (
-        <Banner status="success" title={success} isDismissable onDismiss={() => setSuccess(null)} />
+        <Banner
+          role="status"
+          status="success"
+          title={success}
+          isDismissable
+          onDismiss={() => setSuccess(null)}
+        />
       )}
 
       <VStack gap={4}>

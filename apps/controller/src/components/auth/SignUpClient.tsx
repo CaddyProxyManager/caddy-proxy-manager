@@ -101,7 +101,9 @@ export default function SignUpClient({ appName = PRODUCT_NAME }: { appName?: str
             </Text>
           </VStack>
 
-          {error && <Banner status="error" title={t("failedTitle")} description={error} />}
+          {error && (
+            <Banner role="alert" status="error" title={t("failedTitle")} description={error} />
+          )}
 
           <form onSubmit={handleSubmit}>
             <VStack gap={3}>

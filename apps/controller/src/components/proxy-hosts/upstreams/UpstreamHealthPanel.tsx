@@ -108,7 +108,7 @@ export function UpstreamHealthPanel({ hostId }: { hostId: number }) {
             isDisabled={isPending}
           />
         </HStack>
-        {error && <Banner status="error" title={error} />}
+        {error && <Banner role="alert" status="error" title={error} />}
         {health && !health.healthChecks && <Text type="supporting">{t("noHealthChecks")}</Text>}
         {silent.length > 0 && (
           <Banner

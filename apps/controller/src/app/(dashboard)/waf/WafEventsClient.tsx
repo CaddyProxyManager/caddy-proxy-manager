@@ -1198,7 +1198,11 @@ export default function WafEventsClient({
               <FilterChip
                 className="cpm-mobile-flex"
                 label={rangeOptions.find((o) => o.value === range)?.label ?? range}
-                aria-label={tCommon("timeRange")}
+                // Starts with what the chip shows, so speech input can name it by what it says.
+                aria-label={tCommon("chosenValue", {
+                  value: rangeOptions.find((o) => o.value === range)?.label ?? range,
+                  field: tCommon("timeRange"),
+                })}
                 isActive={range !== "all"}
                 onClick={() => setRangeSheetOpen(true)}
               />
@@ -1336,7 +1340,11 @@ export default function WafEventsClient({
               <input type="hidden" name="wafPresetIds" value={JSON.stringify(wafPresetIds)} />
               <input type="hidden" name="wafPluginIds" value={JSON.stringify(wafPluginIds)} />
               {wafState?.message && (
-                <Banner status={wafState.success ? "success" : "error"} title={wafState.message} />
+                <Banner
+                  role={wafState.success ? "status" : "alert"}
+                  status={wafState.success ? "success" : "error"}
+                  title={wafState.message}
+                />
               )}
               {wafModuleDisabledReason && (
                 <Banner

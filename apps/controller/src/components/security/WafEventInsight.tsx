@@ -113,7 +113,7 @@ export function WafEventInsight({
   // Once per load, so a re-render does not re-key the list.
   const rules = useMemo(() => withRowIds(detail?.explanation.rules ?? []), [detail]);
 
-  if (error) return <Banner status="error" title={error} />;
+  if (error) return <Banner role="alert" status="error" title={error} />;
   if (!detail) {
     return (
       <HStack justify="center" vAlign="center">

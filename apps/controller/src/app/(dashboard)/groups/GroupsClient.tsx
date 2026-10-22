@@ -430,8 +430,10 @@ function GroupDetail({
         </HStack>
       </HStack>
 
-      {viewAsError && <Banner status="error" title={t("viewAsGroup")} description={viewAsError} />}
-      {failure && <Banner status="error" title={failure} />}
+      {viewAsError && (
+        <Banner role="alert" status="error" title={t("viewAsGroup")} description={viewAsError} />
+      )}
+      {failure && <Banner role="alert" status="error" title={failure} />}
 
       {isIdp && (
         <Banner status="info" title={t("idpManaged")} description={t("idpMembershipHelp")} />
@@ -805,7 +807,9 @@ function GroupRoleCard({
         <Text type="body" size="sm" color="secondary">
           {t("roleHelp")}
         </Text>
-        {error && <Banner status="error" title={t("roleFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("roleFailed")} description={error} />
+        )}
         <Selector
           label={tCommon("role")}
           size="sm"
@@ -881,7 +885,7 @@ function AddMemberDialog({
       }}
     >
       <VStack gap={3}>
-        {error && <Banner status="error" title={error} />}
+        {error && <Banner role="alert" status="error" title={error} />}
         <Text type="body" size="sm" weight="medium">
           {t("memberPickerLabel")}
         </Text>
@@ -1011,7 +1015,7 @@ function GroupFormDialog({
         }}
       >
         <VStack gap={3}>
-          {error && <Banner status="error" title={error} />}
+          {error && <Banner role="alert" status="error" title={error} />}
           <TextInput
             {...NATIVE_REQUIRED}
             label={tCommon("name")}

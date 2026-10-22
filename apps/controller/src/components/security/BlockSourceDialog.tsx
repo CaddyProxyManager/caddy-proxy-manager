@@ -74,7 +74,7 @@ export function BlockSourceDialog({
       isSubmitDisabled={!value.trim()}
     >
       <VStack gap={4}>
-        {error && <Banner status="error" title={error} />}
+        {error && <Banner role="alert" status="error" title={error} />}
         <Selector
           label={t("sourceKind")}
           value={kind}

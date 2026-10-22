@@ -36,11 +36,12 @@ test.describe
       await dialog.getByLabel('Name').fill(NAME);
       await dialog.getByLabel('Description').fill('WebDAV exclusions');
       const directives = dialog.locator('textarea');
-      await directives.fill('SecRuleEngine Off');
+      // Unknown to Coraza, so dropped whether or not the strict setting is on.
+      await directives.fill('SecNotADirective On');
       await dialog.getByRole('button', { name: 'Create' }).click();
 
       // Refused and named, and the dialog stays open with what was typed.
-      await expect(dialog.getByText(/would be dropped.*SecRuleEngine Off/)).toBeVisible();
+      await expect(dialog.getByText(/would be dropped.*SecNotADirective On/)).toBeVisible();
       await expect(dialog.getByLabel('Name')).toHaveValue(NAME);
 
       await directives.fill(MULTI_LINE_RULE);

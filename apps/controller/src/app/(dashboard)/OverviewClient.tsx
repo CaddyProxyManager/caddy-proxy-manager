@@ -721,7 +721,7 @@ export default function OverviewClient({
           }
         />
       )}
-      {hasFailed && <Banner status="error" title={t("loadFailedTitle")} />}
+      {hasFailed && <Banner role="alert" status="error" title={t("loadFailedTitle")} />}
       {analyticsStarting && (
         <Banner
           status="warning"

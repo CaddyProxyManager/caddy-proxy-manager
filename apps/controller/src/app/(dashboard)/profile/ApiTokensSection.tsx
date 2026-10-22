@@ -282,7 +282,7 @@ function CreateTokenDialog({
       isSubmitDisabled={incomplete}
     >
       <VStack gap={4}>
-        {error && <Banner status="error" title={error} />}
+        {error && <Banner role="alert" status="error" title={error} />}
         <TextInput
           label={tCommon("name")}
           isRequired

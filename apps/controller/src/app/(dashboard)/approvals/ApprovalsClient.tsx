@@ -411,7 +411,7 @@ function RequestView({ me, request }: { me: number; request: ChangeRequestView }
         </HStack>
       </VStack>
 
-      {notice && <Banner status="success" title={notice} />}
+      {notice && <Banner role="status" status="success" title={notice} />}
       {request.status === "pending" && request.requestedBy === me && (
         <Banner status="info" title={t("waitingOnOthers")} />
       )}
@@ -517,7 +517,7 @@ function RequestView({ me, request }: { me: number; request: ChangeRequestView }
           }
         >
           <VStack gap={3}>
-            {error && <Banner status="error" title={error} />}
+            {error && <Banner role="alert" status="error" title={error} />}
             <Text type="body" color="secondary">
               {dialog === "approve"
                 ? request.approvals + 1 >= request.requiredApprovals
@@ -554,7 +554,7 @@ function RequestView({ me, request }: { me: number; request: ChangeRequestView }
           }
         >
           <VStack gap={3}>
-            {error && <Banner status="error" title={error} />}
+            {error && <Banner role="alert" status="error" title={error} />}
             <Text type="body" color="secondary">
               {t("withdrawHelp")}
             </Text>
@@ -579,7 +579,7 @@ function RequestView({ me, request }: { me: number; request: ChangeRequestView }
           }
         >
           <VStack gap={3}>
-            {error && <Banner status="error" title={error} />}
+            {error && <Banner role="alert" status="error" title={error} />}
             <Banner status="warning" title={t("bypassHelp")} />
             <TextArea
               label={tCommon("reason")}
@@ -652,7 +652,13 @@ function PolicyTab({
           </Text>
         </VStack>
         {!canEdit && <Banner status="info" title={t("readOnly")} />}
-        {result && <Banner status={result.ok ? "success" : "error"} title={result.text} />}
+        {result && (
+          <Banner
+            role={result.ok ? "status" : "alert"}
+            status={result.ok ? "success" : "error"}
+            title={result.text}
+          />
+        )}
         <Switch
           label={t("enabled")}
           description={t("enabledHelp")}

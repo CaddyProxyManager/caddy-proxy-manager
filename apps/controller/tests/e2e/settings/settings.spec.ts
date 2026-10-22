@@ -299,7 +299,7 @@ test.describe('Settings - Default Response', () => {
     const behavior = page.getByRole('combobox', { name: 'Behaviour' });
     await expect(behavior).toBeVisible();
     await behavior.click();
-    await expect(page.getByRole('option', { name: 'Caddy native behavior' })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'Caddy native behaviour' })).toBeVisible();
     await expect(page.getByRole('option', { name: 'Custom HTTP response' })).toBeVisible();
     await expect(page.getByRole('option', { name: 'Redirect' })).toBeVisible();
     await expect(
@@ -339,7 +339,7 @@ test.describe('Settings - Default Response', () => {
     );
 
     await behavior.click();
-    await page.getByRole('option', { name: 'Caddy native behavior' }).click();
+    await page.getByRole('option', { name: 'Caddy native behaviour' }).click();
     await savePage(page);
     await expect(page.getByText('Staged. Review and apply to send it to Caddy.')).toBeVisible({
       timeout: 10_000,

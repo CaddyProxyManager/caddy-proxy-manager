@@ -304,7 +304,11 @@ function L4HostForm({
     <form id={formId} action={formAction}>
       <VStack gap={5}>
         {state.status !== "idle" && state.message && (
-          <Banner status={state.status === "error" ? "error" : "success"} title={state.message} />
+          <Banner
+            role={state.status === "error" ? "alert" : "status"}
+            status={state.status === "error" ? "error" : "success"}
+            title={state.message}
+          />
         )}
 
         <VStack gap={5} id={anchor("general")}>
@@ -950,7 +954,11 @@ export function DeleteL4HostDialog({
       <form id="delete-l4-host-form" action={formAction}>
         <VStack gap={4}>
           {state.status !== "idle" && state.message && (
-            <Banner status={state.status === "error" ? "error" : "success"} title={state.message} />
+            <Banner
+              role={state.status === "error" ? "alert" : "status"}
+              status={state.status === "error" ? "error" : "success"}
+              title={state.message}
+            />
           )}
           <Text type="body" size="sm">
             {t.rich("deleteConfirm", {

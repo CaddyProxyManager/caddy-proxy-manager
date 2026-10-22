@@ -390,6 +390,7 @@ function RestoreRow({
       </HStack>
       {result && !open && (
         <Banner
+          role={result.status === "success" ? "status" : "alert"}
           status={result.status === "success" ? "success" : "error"}
           title={result.message ?? ""}
         />
@@ -423,7 +424,9 @@ function RestoreRow({
                 )}
               </VStack>
             )}
-            {result?.status === "error" && <Banner status="error" title={result.message ?? ""} />}
+            {result?.status === "error" && (
+              <Banner role="alert" status="error" title={result.message ?? ""} />
+            )}
           </VStack>
         </AppDialog>
       )}

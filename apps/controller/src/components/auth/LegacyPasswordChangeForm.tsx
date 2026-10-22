@@ -88,7 +88,7 @@ export default function LegacyPasswordChangeForm() {
             </Text>
           </VStack>
 
-          {error && <Banner status="error" title={error} />}
+          {error && <Banner role="alert" status="error" title={error} />}
 
           <Card padding={4}>
             <VStack gap={3}>

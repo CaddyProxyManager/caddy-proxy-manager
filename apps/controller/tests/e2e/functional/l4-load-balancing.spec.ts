@@ -8,6 +8,8 @@
  */
 import { test, expect } from '@playwright/test';
 import { tcpSend, waitForTcpEcho } from '../../helpers/tcp';
+import { waitForHydration } from '../../helpers/hydration';
+import { saveThroughReview } from '../../helpers/host-editor';
 
 const TCP_PORT = 15434;
 const HOST_NAME = 'L4 LB First Available Test';
@@ -19,6 +21,7 @@ test.describe
   .serial('L4 TCP Load Balancing', () => {
     test('setup: create L4 host with load balancing and active health check', async ({ page }) => {
       await page.goto('/l4-proxy-hosts');
+      await waitForHydration(page);
       await page.getByRole('button', { name: 'New', exact: true }).click();
       const dialog = page.getByRole('dialog');
       await expect(dialog).toBeVisible();
@@ -41,10 +44,10 @@ test.describe
       await expect(dialog.getByLabel('Retries')).toHaveCount(0);
       await expect(dialog.getByLabel('Unhealthy latency')).toHaveCount(0);
 
-      await dialog.getByRole('button', { name: /^create$/i }).click();
+      await saveThroughReview(page, dialog);
 
       // Before the fix Caddy rejected the config and the dialog stayed open.
-      await expect(dialog).not.toBeVisible({ timeout: 10_000 });
+      await expect(page.locator('dialog[open]')).toHaveCount(0, { timeout: 10_000 });
       await expect(page.getByRole('table').getByText(HOST_NAME, { exact: true })).toBeVisible({
         timeout: 10_000,
       });

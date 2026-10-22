@@ -44,6 +44,24 @@ async function axe(page: Page, rules?: string[]): Promise<string[]> {
         );
         if (inactive) continue;
       }
+      // axe 4.14 reads the aria-hidden copy Astryx's ToggleButton renders to reserve its pressed
+      // width as visible text, so every label looks doubled. Checked against the shown copy alone.
+      if (violation.id === 'label-content-name-mismatch') {
+        const matches = await page.evaluate((selector) => {
+          const button = document.querySelector(selector);
+          if (!button) return false;
+          const text = (node: Element) => (node.textContent ?? '').replace(/\s+/g, '');
+          const name = (button.getAttribute('aria-label') ?? '').replace(/\s+/g, '');
+          // The copy is a hidden sibling with the same text; the icon is hidden too, but alone.
+          return [...button.querySelectorAll('[aria-hidden="true"]')].some((hidden) =>
+            [...(hidden.parentElement?.children ?? [])].some(
+              (shown) =>
+                shown !== hidden && text(shown) === text(hidden) && name.includes(text(shown)),
+            ),
+          );
+        }, target);
+        if (matches) continue;
+      }
       const detail = node.failureSummary?.split(/\r?\n/)[1]?.trim();
       failures.push(
         `${violation.id} (${violation.help}): ${target}${detail ? ` - ${detail}` : ''}`,

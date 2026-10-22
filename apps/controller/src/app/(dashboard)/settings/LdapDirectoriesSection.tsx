@@ -356,7 +356,9 @@ export default function LdapDirectoriesSection({
         isSubmitting={saving}
       >
         <VStack gap={3}>
-          {error && <Banner status="error" title={t("saveFailed")} description={error} />}
+          {error && (
+            <Banner role="alert" status="error" title={t("saveFailed")} description={error} />
+          )}
 
           <TextInput
             label={tCommon("name")}
@@ -642,6 +644,7 @@ export default function LdapDirectoriesSection({
               </HStack>
               {testResult && (
                 <Banner
+                  role={testResult.ok ? "status" : "alert"}
                   status={testResult.ok ? "success" : "error"}
                   title={testResult.message}
                   description={testResult.detail ?? undefined}

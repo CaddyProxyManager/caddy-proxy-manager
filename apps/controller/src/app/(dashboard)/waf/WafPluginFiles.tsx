@@ -178,6 +178,7 @@ export function WafPluginFiles({
             {plugin.loadFailedAt && (
               <VStack gap={2} paddingInline={3} paddingBlockEnd={3}>
                 <Banner
+                  role="alert"
                   status="error"
                   title={t("pluginDisabledTitle")}
                   description={t("pluginDisabledDescription")}
@@ -199,7 +200,7 @@ export function WafPluginFiles({
             )}
             {isConfig && (error || inUse) && (
               <VStack gap={2} paddingInline={3} paddingBlockEnd={3}>
-                {error && <Banner status="error" title={error} />}
+                {error && <Banner role="alert" status="error" title={error} />}
                 {inUse && <Banner status="info" title={t("pluginConfigAppliesEverywhere")} />}
               </VStack>
             )}

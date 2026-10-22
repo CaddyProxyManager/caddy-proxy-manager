@@ -119,7 +119,9 @@ function CreateRoleCard({ onClose }: { onClose: () => void }) {
   return (
     <Card padding={5}>
       <VStack gap={3}>
-        {error && <Banner status="error" title={t("couldNotCreateRole")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("couldNotCreateRole")} description={error} />
+        )}
         <Grid columns={{ minWidth: 200, max: 2 }} gap={3}>
           <TextInput
             label={tCommon("name")}

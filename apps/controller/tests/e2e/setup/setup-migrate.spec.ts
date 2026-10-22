@@ -56,8 +56,10 @@ test.describe('Migrating an existing installation', () => {
     // Unauthenticated and names a host file, so the guard must be "a file this host offered":
     // otherwise any path is an existence check, and a planted SQLite file an account import.
     for (const path of ['/etc/passwd', '/etc/hostname', '../../etc/passwd', '/nonexistent.db']) {
+      // Same-origin, or the CSRF check refuses it before the path is looked at.
       const response = await page.request.post('/api/setup/migrate', {
         data: { path, groups: ['users'] },
+        headers: { Origin: new URL(page.url()).origin },
       });
       expect(response.status()).toBe(400);
       expect(await response.text()).toContain('not one of the databases found on this host');

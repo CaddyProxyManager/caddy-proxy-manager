@@ -6,6 +6,7 @@ import { test, expect } from '@playwright/test';
 import { PROXY_HOSTS_NEWEST_FIRST } from '../../helpers/proxy-api';
 import { httpGet, turnOffForceHttps, waitForRoute } from '../../helpers/http';
 import { waitForHydration } from '../../helpers/hydration';
+import { saveThroughReview } from '../../helpers/host-editor';
 
 const DOMAIN = 'func-rewrite.test';
 
@@ -25,8 +26,8 @@ test.describe
       await page.getByLabel('Path prefix rewrite').fill('/api');
 
       await turnOffForceHttps(page);
-      await page.getByRole('button', { name: /^create$/i }).click();
-      await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 15_000 });
+      await saveThroughReview(page, page.getByRole('dialog'));
+      await expect(page.locator('dialog[open]')).toHaveCount(0, { timeout: 15_000 });
       await expect(
         page.getByRole('table').getByText('Functional Path Prefix Rewrite Test', { exact: true }),
       ).toBeVisible({ timeout: 10_000 });

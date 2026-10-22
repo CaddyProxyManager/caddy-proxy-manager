@@ -103,7 +103,7 @@ export function ExclusionDialog({
       isSubmitDisabled={ruleId === null || isProtected}
     >
       <VStack gap={4}>
-        {error && <Banner status="error" title={error} />}
+        {error && <Banner role="alert" status="error" title={error} />}
         <NumberInput
           label={tProxyHosts("ruleId")}
           value={ruleId}

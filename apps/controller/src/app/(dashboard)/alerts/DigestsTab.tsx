@@ -175,7 +175,9 @@ function DigestDialog({
       isSubmitDisabled={!form.name.trim() || !form.time || form.channelIds.length === 0}
     >
       <VStack gap={3}>
-        {error && <Banner status="error" title={t("saveFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("saveFailed")} description={error} />
+        )}
         <TextInput
           label={tCommon("name")}
           isRequired
@@ -251,7 +253,9 @@ function PreviewDialog({ digest, onClose }: { digest: DigestView; onClose: () =>
       actions={<Button variant="primary" label={tCommon("close")} onClick={onClose} />}
     >
       <VStack gap={3}>
-        {error && <Banner status="error" title={t("previewFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("previewFailed")} description={error} />
+        )}
         {!preview && !error && (
           <Text type="body" size="sm" color="secondary">
             {t("previewLoading")}
@@ -448,7 +452,9 @@ export function DigestsTab({
         <Text type="body" size="sm" color="secondary">
           {t("help")}
         </Text>
-        {error && <Banner status="error" title={tAlerts("actionFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={tAlerts("actionFailed")} description={error} />
+        )}
         {sending !== null && <Banner status="info" title={t("sending")} />}
         {sent && (
           <VStack gap={1}>

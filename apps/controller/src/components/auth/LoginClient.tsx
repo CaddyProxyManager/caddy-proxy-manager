@@ -281,11 +281,17 @@ export default function LoginClient({
           </VStack>
 
           {loginError && (
-            <Banner status="error" title={tAuth("couldNotSignIn")} description={loginError} />
+            <Banner
+              role="alert"
+              status="error"
+              title={tAuth("couldNotSignIn")}
+              description={loginError}
+            />
           )}
 
           {!passwordFormEnabled && !hasProviders && (
             <Banner
+              role="alert"
               status="error"
               title={tAuth("signInUnavailableTitle")}
               description={t("noMethodDescription")}

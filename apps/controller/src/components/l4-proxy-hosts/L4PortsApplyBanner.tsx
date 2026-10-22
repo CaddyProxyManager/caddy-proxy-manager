@@ -105,6 +105,7 @@ export function L4PortsApplyBanner({ refreshSignal }: { refreshSignal?: number }
 
   return (
     <Banner
+      role={bannerStatus === "error" ? "alert" : "status"}
       status={bannerStatus}
       // Banner supplies its own status icon; only the in-flight spinner needs
       // to replace it.

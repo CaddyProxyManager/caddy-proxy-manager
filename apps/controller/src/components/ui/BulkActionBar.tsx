@@ -84,7 +84,7 @@ export function BulkConfirmDialog({
       isSubmitting={isPending}
     >
       <VStack gap={4}>
-        {error && <Banner status="error" title={error} />}
+        {error && <Banner role="alert" status="error" title={error} />}
         {children}
         <Text type="body" size="sm">
           {summary ?? t("bulk.appliesTo", { count: items.length })}

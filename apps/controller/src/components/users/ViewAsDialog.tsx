@@ -61,7 +61,9 @@ export function ViewAsDialog({
       isSubmitting={busy}
     >
       <VStack gap={3}>
-        {error && <Banner status="error" title={t("errorTitle")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("errorTitle")} description={error} />
+        )}
         <Text type="body" size="sm" color="secondary">
           {t("description")}
         </Text>

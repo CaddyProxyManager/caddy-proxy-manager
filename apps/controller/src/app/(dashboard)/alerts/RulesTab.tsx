@@ -247,7 +247,9 @@ function RuleDialog({
       isSubmitDisabled={!valid}
     >
       <VStack gap={3}>
-        {error && <Banner status="error" title={t("saveFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("saveFailed")} description={error} />
+        )}
         {builtin && editing ? (
           <Banner
             status="info"
@@ -500,7 +502,9 @@ function SilenceDialog({
       isSubmitDisabled={preset === "custom" && !until}
     >
       <VStack gap={3}>
-        {error && <Banner status="error" title={t("saveFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("saveFailed")} description={error} />
+        )}
         <Text type="body" size="sm" color="secondary">
           {t("silenceHelp")}
         </Text>
@@ -738,9 +742,12 @@ export function RulesTab({
         <Text type="body" size="sm" color="secondary">
           {t("help")}
         </Text>
-        {error && <Banner status="error" title={tAlerts("actionFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={tAlerts("actionFailed")} description={error} />
+        )}
         {notice && (
           <Banner
+            role="status"
             status={notice.queued ? "success" : "warning"}
             title={notice.name}
             description={notice.queued ? t("testQueued") : t("testNoChannel")}

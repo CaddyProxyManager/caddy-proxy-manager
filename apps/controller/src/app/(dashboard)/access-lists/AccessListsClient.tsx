@@ -627,6 +627,7 @@ function SettingsTab({
       </Card>
 
       <Banner
+        role="alert"
         status="error"
         icon={<AlertTriangle />}
         title={t("dangerZone")}

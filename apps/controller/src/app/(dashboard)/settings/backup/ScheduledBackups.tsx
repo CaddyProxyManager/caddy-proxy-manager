@@ -168,7 +168,9 @@ function DestinationDialog({
       isSubmitDisabled={!form.name.trim()}
     >
       <VStack gap={3}>
-        {error && <Banner status="error" title={t("saveFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("saveFailed")} description={error} />
+        )}
         <TextInput
           label={tCommon("name")}
           isRequired
@@ -277,6 +279,7 @@ function DestinationDialog({
         </HStack>
         {tested && (
           <Banner
+            role={tested.ok ? "status" : "alert"}
             status={tested.ok ? "success" : "error"}
             title={tested.ok ? tested.message : t("testFailed")}
             description={tested.ok ? undefined : tested.message}
@@ -401,7 +404,9 @@ function DestinationsCard({
         <Text type="body" size="sm" color="secondary">
           {t("destinationsHelp")}
         </Text>
-        {error && <Banner status="error" title={t("deleteFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("deleteFailed")} description={error} />
+        )}
         {destinations.length === 0 ? (
           <EmptyState
             title={t("destinationsEmptyTitle")}
@@ -653,7 +658,9 @@ function ScheduleDialog({
       isSubmitDisabled={!form.name.trim() || !form.destinationId || !passphraseOk}
     >
       <VStack gap={3}>
-        {error && <Banner status="error" title={t("saveFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("saveFailed")} description={error} />
+        )}
         <Grid columns={{ minWidth: 220, max: 2 }} gap={2}>
           <TextInput
             label={tCommon("name")}
@@ -739,7 +746,12 @@ function ScheduleDialog({
           </Text>
         )}
         {timing && "message" in timing && timing.message && (
-          <Banner status="error" title={t("timingInvalid")} description={timing.message} />
+          <Banner
+            role="alert"
+            status="error"
+            title={t("timingInvalid")}
+            description={timing.message}
+          />
         )}
         <TextInput
           {...NO_SPELLCHECK}
@@ -1055,7 +1067,9 @@ function SchedulesCard({
         <Text type="body" size="sm" color="secondary">
           {t("schedulesHelp")}
         </Text>
-        {error && <Banner status="error" title={t("actionFailed")} description={error} />}
+        {error && (
+          <Banner role="alert" status="error" title={t("actionFailed")} description={error} />
+        )}
         {running !== null && (
           <Banner status="info" title={t("running")} description={t("runningHelp")} />
         )}

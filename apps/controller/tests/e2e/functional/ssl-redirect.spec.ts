@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import { PROXY_HOSTS_NEWEST_FIRST } from '../../helpers/proxy-api';
 import { httpGet, waitForRoute } from '../../helpers/http';
 import { waitForHydration } from '../../helpers/hydration';
+import { saveThroughReview } from '../../helpers/host-editor';
 
 const DOMAIN = 'func-ssl.test';
 
@@ -24,8 +25,8 @@ test.describe
         page.getByRole('dialog').getByRole('switch', { name: 'Force HTTPS' }),
       ).toBeChecked();
 
-      await page.getByRole('button', { name: /^create$/i }).click();
-      await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 15_000 });
+      await saveThroughReview(page, page.getByRole('dialog'));
+      await expect(page.locator('dialog[open]')).toHaveCount(0, { timeout: 15_000 });
       await expect(
         page.getByRole('table').getByText('Functional SSL Redirect Test', { exact: true }),
       ).toBeVisible({

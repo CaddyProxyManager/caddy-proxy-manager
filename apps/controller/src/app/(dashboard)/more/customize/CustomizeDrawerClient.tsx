@@ -96,7 +96,7 @@ export default function CustomizeDrawerClient({
         />
       </HStack>
 
-      {error && <Banner status="error" title={error} />}
+      {error && <Banner role="alert" status="error" title={error} />}
 
       {MORE_GROUPS.map((group) => {
         const items = destinations.filter((d) => d.moreGroup === group);

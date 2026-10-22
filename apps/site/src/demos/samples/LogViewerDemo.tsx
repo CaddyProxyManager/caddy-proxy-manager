@@ -1,6 +1,6 @@
 import LogsClient from "@cpm/controller/src/app/(dashboard)/logs/LogsClient";
 import { DemoSurface } from "../DemoSurface";
-import { json, serveApi } from "../fake-api";
+import { json, serveApi, serveStream } from "../fake-api";
 
 const AGENTS = [
   { agentId: "edge-fra", name: "edge-fra", canReadLogs: true },
@@ -80,22 +80,40 @@ const WRITERS = { access: accessEntry, waf: wafEntry, caddy: caddyEntry };
  */
 const written = new Map<string, number>();
 
+/** The page after `cursor` for one agent's file: a backlog first, then a line or two at a time. */
+function nextPage(agent: string, source: keyof typeof WRITERS, cursor: string | null) {
+  const write = WRITERS[source];
+  const key = `${agent}:${source}`;
+  const from = cursor ? (written.get(key) ?? 0) : 0;
+  const count = from === 0 ? 24 : source === "access" ? 1 + (from % 2) : from % 3 === 0 ? 1 : 0;
+  const now = Date.now();
+  const lines = Array.from({ length: count }, (_, i) =>
+    write(from + i + (agent === "edge-ams" ? 5 : 0), now - (count - i) * 1500),
+  );
+  written.set(key, from + count);
+  return { lines, cursor: String(from + count) };
+}
+
+const sourceOf = (url: URL) => (url.searchParams.get("source") ?? "access") as keyof typeof WRITERS;
+
 if (typeof window !== "undefined") {
   serveApi(async (url) => {
     if (url.pathname !== "/api/logs") return null;
+    if (!WRITERS[sourceOf(url)]) return json({ error: "Unknown log" }, 400);
     const agent = url.searchParams.get("agent") ?? "";
-    const source = (url.searchParams.get("source") ?? "access") as keyof typeof WRITERS;
-    const write = WRITERS[source];
-    if (!write) return json({ error: "Unknown log" }, 400);
-    const key = `${agent}:${source}`;
-    const from = url.searchParams.get("cursor") ? (written.get(key) ?? 0) : 0;
-    const count = from === 0 ? 24 : source === "access" ? 1 + (from % 2) : from % 3 === 0 ? 1 : 0;
-    const now = Date.now();
-    const lines = Array.from({ length: count }, (_, i) =>
-      write(from + i + (agent === "edge-ams" ? 5 : 0), now - (count - i) * 1500),
-    );
-    written.set(key, from + count);
-    return json({ lines, cursor: String(from + count) });
+    return json(nextPage(agent, sourceOf(url), url.searchParams.get("cursor")));
+  });
+  // Follow streams pages as the agent pushes them: the backlog at once, then every few seconds.
+  serveStream((url, emit) => {
+    if (url.pathname !== "/api/logs/stream" || !WRITERS[sourceOf(url)]) return null;
+    const agent = url.searchParams.get("agent") ?? "";
+    let page = nextPage(agent, sourceOf(url), url.searchParams.get("cursor"));
+    emit("lines", page);
+    const timer = window.setInterval(() => {
+      page = nextPage(agent, sourceOf(url), page.cursor);
+      emit("lines", page);
+    }, 3000);
+    return () => window.clearInterval(timer);
   });
 }
 

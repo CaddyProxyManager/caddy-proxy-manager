@@ -595,7 +595,14 @@ export default function OAuthProvidersSection({
               : t("oauthDialogAddDescription")}
           </Text>
 
-          {error && <Banner status="error" title={t("couldNotSaveProvider")} description={error} />}
+          {error && (
+            <Banner
+              role="alert"
+              status="error"
+              title={t("couldNotSaveProvider")}
+              description={error}
+            />
+          )}
 
           <TextInput
             label={tCommon("name")}

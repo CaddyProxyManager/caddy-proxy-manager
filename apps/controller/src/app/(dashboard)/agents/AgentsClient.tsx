@@ -55,6 +55,7 @@ function ApplyFailureBanner({ failure, title }: { failure: ApplyFailure; title: 
   const long = failure.error.length > APPLY_ERROR_PREVIEW_CHARS;
   return (
     <Banner
+      role="alert"
       status="error"
       title={title}
       description={
@@ -161,7 +162,13 @@ export default function AgentsClient({
         action={managesFleet ? { label: t("pair"), href: "/settings/agent" } : undefined}
       />
 
-      {message?.text && <Banner status={message.ok ? "success" : "error"} title={message.text} />}
+      {message?.text && (
+        <Banner
+          role={message.ok ? "status" : "alert"}
+          status={message.ok ? "success" : "error"}
+          title={message.text}
+        />
+      )}
 
       {fleetApplyFailure && (
         <ApplyFailureBanner failure={fleetApplyFailure} title={t("applyRefusedFleetTitle")} />

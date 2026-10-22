@@ -5,6 +5,7 @@
 import { test, expect } from '@playwright/test';
 import { createClient, type ClickHouseClient } from '@clickhouse/client';
 import { ANALYTICS_OFF } from '../../helpers/compose';
+import { waitForHydration } from '../../helpers/hydration';
 
 const ORIGIN = 'http://localhost:3000';
 
@@ -124,6 +125,7 @@ test.describe('Analytics explore', () => {
   test('a saved view can be saved, opened and deleted', async ({ page }) => {
     const name = `Explore view ${Date.now()}`;
     await page.goto('/analytics?range=7d&group=status');
+    await waitForHydration(page);
     await page.getByRole('button', { name: 'Views', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Save…', exact: true }).click();
     await page.getByRole('textbox', { name: 'Name' }).fill(name);
@@ -131,6 +133,7 @@ test.describe('Analytics explore', () => {
     await expect(page.getByText(`Saved view ${name}`)).toBeVisible({ timeout: 10_000 });
 
     await page.goto('/analytics');
+    await waitForHydration(page);
     await page.getByRole('button', { name: 'Views', exact: true }).click();
     await page.getByRole('menuitem', { name }).click();
     await expect(page).toHaveURL(/range=7d/);

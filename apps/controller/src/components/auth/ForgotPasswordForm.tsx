@@ -60,10 +60,15 @@ export default function ForgotPasswordForm({ appName }: { appName: string }) {
             </Text>
           </VStack>
 
-          {error && <Banner status="error" title={error} />}
+          {error && <Banner role="alert" status="error" title={error} />}
 
           {sent ? (
-            <Banner status="success" title={t("requestSentTitle")} description={t("requestSent")} />
+            <Banner
+              role="status"
+              status="success"
+              title={t("requestSentTitle")}
+              description={t("requestSent")}
+            />
           ) : (
             <form onSubmit={handleSubmit}>
               <VStack gap={3}>

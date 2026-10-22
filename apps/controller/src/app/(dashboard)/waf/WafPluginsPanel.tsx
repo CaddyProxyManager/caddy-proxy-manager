@@ -447,6 +447,7 @@ export function WafPluginsPanel({
           )}
           {registry?.sourceErrors.map((source) => (
             <Banner
+              role="alert"
               key={source.name}
               status="error"
               title={t("pluginRegistrySourceFailed", { name: source.name, error: source.message })}
@@ -454,6 +455,7 @@ export function WafPluginsPanel({
           ))}
           {registryError ? (
             <Banner
+              role="alert"
               status="error"
               title={registryError}
               endContent={

@@ -77,7 +77,13 @@ type ForwardAuthAccessData = { userIds: number[]; groupIds: number[] };
 
 function ActionStatus({ status, message }: { status: string; message?: string }) {
   if (status === "idle" || !message) return null;
-  return <Banner status={status === "error" ? "error" : "success"} title={message} />;
+  return (
+    <Banner
+      role={status === "error" ? "alert" : "status"}
+      status={status === "error" ? "error" : "success"}
+      title={message}
+    />
+  );
 }
 
 /** The create dialog's anchors differ: it stays mounted beside an open editor. */

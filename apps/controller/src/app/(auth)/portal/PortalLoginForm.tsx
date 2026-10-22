@@ -331,7 +331,12 @@ export default function PortalLoginForm({
             : t("signInToContinue")
         }
       >
-        <Banner status="error" title={t("couldNotSignIn")} description={errorMessage} />
+        <Banner
+          role="alert"
+          status="error"
+          title={t("couldNotSignIn")}
+          description={errorMessage}
+        />
       </PortalCard>
     );
   }
@@ -379,11 +384,12 @@ export default function PortalLoginForm({
             }
           />
         ) : (
-          <Banner status="error" title={t("couldNotSignIn")} description={error} />
+          <Banner role="alert" status="error" title={t("couldNotSignIn")} description={error} />
         ))}
 
       {!passwordFormEnabled && !hasProviders && (
         <Banner
+          role="alert"
           status="error"
           title={t("signInUnavailableTitle")}
           description={t("missingProviderDescription")}
