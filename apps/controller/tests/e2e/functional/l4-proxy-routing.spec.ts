@@ -45,11 +45,14 @@ test.describe
       await page.goto('/l4-proxy-hosts');
       const row = page.locator('tr', { hasText: 'L4 TCP Echo Test' });
       await row.getByRole('switch').click();
-      await page.waitForTimeout(3_000);
 
-      // Docker still accepts the TCP connection, but Caddy should not proxy/echo data
-      const res = await tcpSend('127.0.0.1', TCP_PORT, 'should-not-echo\n', 2000);
-      expect(res.data).not.toContain('should-not-echo');
+      // Docker still accepts the TCP connection, but Caddy should not proxy/echo data. Polled: the
+      // apply lands a moment after the switch, and a fixed wait raced it under load.
+      await expect
+        .poll(async () => (await tcpSend('127.0.0.1', TCP_PORT, 'should-not-echo\n', 2000)).data, {
+          timeout: 20_000,
+        })
+        .not.toContain('should-not-echo');
 
       // Re-enable and wait for the route to actually carry data again - the
       // port keeps accepting connections throughout, so only an echo proves it.
