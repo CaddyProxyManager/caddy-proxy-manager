@@ -1,17 +1,42 @@
 name: Tests
 
 on:
-  # Not main: everything reaches it through a PR whose checks ran on the merge result, and direct
-  # pushes to main are not permitted.
+  # Main too: releases and maintainer work are pushed there directly through the ruleset bypass.
   push:
-    branches-ignore:
-      - main
   pull_request:
     branches:
       - main
 
 jobs:
+  # A push to main that merged a PR was tested in that PR, against main as it stood then.
+  gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          if [ "$EVENT" != push ] || [ "$REF" != refs/heads/main ]; then
+            echo run=true >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Merge commits and rebase merges both record the commit that landed as merge_commit_sha.
+          merged=$(gh api "repos/$REPO/commits/$SHA/pulls" \
+            --jq "[.[] | select(.merged_at != null and .merge_commit_sha == \"$SHA\")] | length")
+          if [ "$merged" = 0 ]; then echo run=true; else echo run=false; fi >> "$GITHUB_OUTPUT"
+
   test:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-latest
     # Tests need no credentials, and nothing here references secrets.
     permissions: {}
