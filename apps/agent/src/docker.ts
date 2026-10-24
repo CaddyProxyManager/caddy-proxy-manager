@@ -102,13 +102,15 @@ export function hostPathForDaemon(label: string): string {
 }
 
 /**
- * Stand-ins for the two variables docker-compose.yml guards with `:?`, which only web and postgres
- * read. Compose interpolates the whole file, so without them every invocation aborts; too short for
- * web to accept as a SESSION_SECRET, so one can never become a running controller's key.
+ * Stand-ins for the variables docker-compose.yml guards with `:?`, which only web and postgres read
+ * (POSTGRES_HOST on the nodb channel). Compose interpolates the whole file, so without them every
+ * invocation aborts; too short for web to accept as a SESSION_SECRET, so one can never become a
+ * running controller's key.
  */
 export const COMPOSE_PLACEHOLDERS: Readonly<Record<string, string>> = {
   SESSION_SECRET: "unused-by-the-agent",
   POSTGRES_PASSWORD: "unused-by-the-agent",
+  POSTGRES_HOST: "unused-by-the-agent",
 };
 
 export class DockerHost {

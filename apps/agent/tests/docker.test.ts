@@ -362,6 +362,8 @@ describe("compose invocation", () => {
     const env = envs.at(-1);
     expect(env?.SESSION_SECRET).toBe("unused-by-the-agent");
     expect(env?.POSTGRES_PASSWORD).toBe("unused-by-the-agent");
+    // The nodb channel guards this one too; left out, every managed-service start failed there.
+    expect(env?.POSTGRES_HOST).toBe("unused-by-the-agent");
     expect(env?.CLICKHOUSE_PASSWORD).toBe("pw");
   });
 
