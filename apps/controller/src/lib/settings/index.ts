@@ -18,6 +18,11 @@ import {
   type TailscaleSettings,
 } from "../caddy/tailscale";
 import { encryptDnsProviderSettingCredentials } from "../dns/provider-credentials";
+import {
+  defaultDynamicDnsSettings,
+  type DynamicDnsSettings,
+  normalizeDynamicDnsSettings,
+} from "../dns/dynamic-dns";
 import type { AcmeDnsAccount, DnsChallengeDelegation } from "../dns/challenge-delegation";
 import { encryptSecret } from "../secrets";
 import {
@@ -63,6 +68,7 @@ export type { TailscaleSettings } from "../caddy/tailscale";
 export type { CompressionSettings } from "../proxy-hosts/compression";
 export type { HostDefaults } from "../proxy-hosts/host-defaults";
 export type { CrowdSecSettings } from "../caddy/crowdsec";
+export type { DynamicDnsSettings } from "../dns/dynamic-dns";
 
 export type SettingValue<T> = T | null;
 
@@ -581,6 +587,35 @@ export async function getDnsProviderSettings(): Promise<DnsProviderSettings | nu
 /** Encrypts here, not in the callers: the REST API saved credentials in plaintext when it was theirs. */
 export async function saveDnsProviderSettings(settings: DnsProviderSettings): Promise<void> {
   await setSetting("dns_provider", encryptDnsProviderSettingCredentials(settings));
+}
+
+// ─── Dynamic DNS ─────────────────────────────────────────────────────────────
+
+export async function getDynamicDnsSettings(): Promise<DynamicDnsSettings> {
+  const value = await getSetting<unknown>("dynamic_dns");
+  if (value === null) return defaultDynamicDnsSettings();
+  try {
+    // Throwing here would fail every config apply, taking every other host down with it.
+    return normalizeDynamicDnsSettings(value);
+  } catch (error) {
+    console.warn("Ignoring invalid dynamic DNS settings", error);
+    return defaultDynamicDnsSettings();
+  }
+}
+
+/** Refuses a provider without saved credentials, which would only ever be skipped. */
+export async function saveDynamicDnsSettings(value: DynamicDnsSettings): Promise<void> {
+  const normalized = normalizeDynamicDnsSettings(value);
+  const configured = (await getDnsProviderSettings())?.providers ?? {};
+  const missing = normalized.recordSets.find((set) => !configured[set.provider]);
+  if (missing) {
+    throw domainError(
+      "dynamicDnsProviderNotConfigured",
+      { provider: missing.provider },
+      { status: 400 },
+    );
+  }
+  await setSetting("dynamic_dns", normalized);
 }
 
 export async function getUpstreamDnsResolutionSettings(): Promise<UpstreamDnsResolutionSettings | null> {

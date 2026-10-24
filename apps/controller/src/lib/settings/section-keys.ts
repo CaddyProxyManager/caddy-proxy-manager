@@ -23,6 +23,7 @@ export const SECTION_STORAGE_KEYS: Record<string, SectionKeys> = {
   "dns-providers": { label: "DNS providers", keys: ["dns_provider", "cloudflare"] },
   "dns-resolvers": { label: "DNS resolvers", keys: ["dns"] },
   "upstream-dns": { label: "Upstream DNS", keys: ["upstream_dns_resolution"] },
+  "dynamic-dns": { label: "Dynamic DNS", keys: ["dynamic_dns"] },
   "trusted-proxies": { label: "Trusted proxies", keys: ["trusted_proxies"] },
   "http-protocols": { label: "HTTP versions", keys: ["http_protocols"] },
   compression: { label: "Compression", keys: ["compression"] },

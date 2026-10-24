@@ -121,6 +121,32 @@ function decryptAcmeDnsConfig(
   );
 }
 
+/** Decrypted credentials as Caddy's `dns.providers.<name>` module takes them. */
+function providerModuleConfig(
+  providerName: string,
+  decrypted: Record<string, string>,
+): Record<string, unknown> {
+  const def = getProviderDefinition(providerName);
+  const caddyKeys = new Map(def?.fields.map((field) => [field.key, field.caddyKey ?? field.key]));
+  const config: Record<string, unknown> = { name: providerName };
+  // Challenge option keys configure the challenge, not the provider module.
+  for (const [key, value] of Object.entries(decrypted)) {
+    if (value && !(CHALLENGE_OPTION_KEYS as readonly string[]).includes(key)) {
+      config[caddyKeys.get(key) ?? key] = value;
+    }
+  }
+  return config;
+}
+
+/** A `dns_provider` value for any app that takes one, such as `dynamic_dns`. */
+export function buildDnsProviderConfig(
+  providerName: string,
+  credentials: Record<string, string>,
+): Record<string, unknown> | null {
+  if (!getProviderDefinition(providerName)) return null;
+  return providerModuleConfig(providerName, decryptProviderCredentials(providerName, credentials));
+}
+
 /**
  * The Caddy DNS challenge config for `issuer.challenges.dns`. Challenge options are hoisted out
  * of the credentials to the challenge level; `resolvers` comes from the global DNS settings.
@@ -139,19 +165,10 @@ export function buildDnsChallengeConfig(
 
   const decrypted = decryptProviderCredentials(providerName, credentials);
 
-  // Challenge option keys configure the challenge, not the provider module, so they go below.
-  const providerConfig: Record<string, unknown> = { name: providerName };
-  if (delegation.acmeDnsConfig) {
-    // With `config` set the module ignores the single-account fields.
-    providerConfig.config = decryptAcmeDnsConfig(delegation.acmeDnsConfig);
-  } else {
-    const caddyKeys = new Map(def.fields.map((field) => [field.key, field.caddyKey ?? field.key]));
-    for (const [key, value] of Object.entries(decrypted)) {
-      if (value && !(CHALLENGE_OPTION_KEYS as readonly string[]).includes(key)) {
-        providerConfig[caddyKeys.get(key) ?? key] = value;
-      }
-    }
-  }
+  // With `config` set the module ignores the single-account fields.
+  const providerConfig: Record<string, unknown> = delegation.acmeDnsConfig
+    ? { name: providerName, config: decryptAcmeDnsConfig(delegation.acmeDnsConfig) }
+    : providerModuleConfig(providerName, decrypted);
 
   const dnsChallenge: Record<string, unknown> = { provider: providerConfig };
   if (delegation.overrideDomain) {

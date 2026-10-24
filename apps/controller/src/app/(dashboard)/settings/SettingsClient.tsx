@@ -115,6 +115,7 @@ import {
   updateUpstreamDnsResolutionSettingsAction,
   updateGeoBlockSettingsAction,
   updateRateLimitSettingsAction,
+  updateDynamicDnsSettingsAction,
   updateErrorPagesSettingsAction,
   updateTrustedProxiesSettingsAction,
   updateHttpProtocolsSettingsAction,
@@ -155,9 +156,11 @@ import type { SsoEnforcement } from "@/src/lib/auth/sso-enforcement";
 import type { SamlProvider } from "@/src/lib/models/saml-providers";
 import { CrowdSecSection } from "./CrowdSecSection";
 import { RateLimitSection } from "./RateLimitSection";
+import { DynamicDnsSection } from "./DynamicDnsSection";
 import { L4ProxyHostDefaultsSection, ProxyHostDefaultsSection } from "./HostDefaultsSection";
 import { DEFAULT_HOST_DEFAULTS, type HostDefaults } from "@/src/lib/proxy-hosts/host-defaults";
 import type { GlobalRateLimitSettings } from "@/src/lib/proxy-hosts/rate-limit";
+import { defaultDynamicDnsSettings, type DynamicDnsSettings } from "@/src/lib/dns/dynamic-dns";
 import { DnsDelegationSection } from "./DnsDelegationSection";
 import { HttpCacheSection } from "./HttpCacheSection";
 import { EmailServerSection, NotificationsSection } from "./EmailSection";
@@ -195,6 +198,9 @@ type Props = {
   defaultResponse: DefaultResponseSettings | null;
   globalGeoBlock?: GeoBlockSettings | null;
   globalRateLimit?: GlobalRateLimitSettings | null;
+  dynamicDns?: DynamicDnsSettings;
+  /** Paired agents, for which Caddy updates a dynamic DNS record set. */
+  dynamicDnsAgents?: { agentId: string; name: string }[];
   /** What new hosts start with; absent, the shipped values. */
   hostDefaults?: HostDefaults;
   globalErrorPages?: ErrorPagesSettings | null;
@@ -285,6 +291,8 @@ export default function SettingsClient({
   defaultResponse,
   globalGeoBlock,
   globalRateLimit = null,
+  dynamicDns = defaultDynamicDnsSettings(),
+  dynamicDnsAgents = [],
   hostDefaults = DEFAULT_HOST_DEFAULTS,
   globalErrorPages,
   oauthProviders,
@@ -392,6 +400,10 @@ export default function SettingsClient({
   );
   const [geoBlockState, geoBlockFormAction] = useActionState(updateGeoBlockSettingsAction, null);
   const [rateLimitState, rateLimitFormAction] = useActionState(updateRateLimitSettingsAction, null);
+  const [dynamicDnsState, dynamicDnsFormAction] = useActionState(
+    updateDynamicDnsSettingsAction,
+    null,
+  );
   const [hostDefaultsState, hostDefaultsFormAction] = useActionState(
     updateHostDefaultsAction,
     null,
@@ -603,6 +615,16 @@ export default function SettingsClient({
         upstreamDnsResolution={upstreamDnsResolution}
         upstreamDnsResolutionState={upstreamDnsResolutionState}
         upstreamDnsResolutionFormAction={upstreamDnsResolutionFormAction}
+      />
+    ),
+    "dynamic-dns": (
+      <DynamicDnsSection
+        dynamicDns={dynamicDns}
+        providerDefinitions={dnsProviderDefinitions}
+        configuredProviders={configuredProviders}
+        agents={dynamicDnsAgents}
+        state={dynamicDnsState}
+        formAction={dynamicDnsFormAction}
       />
     ),
     "trusted-proxies": (

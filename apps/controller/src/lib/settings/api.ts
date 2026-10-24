@@ -37,6 +37,8 @@ import {
   saveGeoBlockSettings,
   getRateLimitSettings,
   saveRateLimitSettings,
+  getDynamicDnsSettings,
+  saveDynamicDnsSettings,
   getWafSettings,
   saveWafSettings,
   getErrorPagesSettings,
@@ -146,6 +148,12 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
     get: getUpstreamDnsResolutionSettings,
     save: saveUpstreamDnsResolutionSettings as (data: never) => Promise<void>,
     storageKey: "upstream_dns_resolution",
+    applyCaddy: true,
+  },
+  "dynamic-dns": {
+    get: getDynamicDnsSettings,
+    save: saveDynamicDnsSettings as (data: never) => Promise<void>,
+    storageKey: "dynamic_dns",
     applyCaddy: true,
   },
   geoblock: {

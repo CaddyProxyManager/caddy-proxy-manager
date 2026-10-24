@@ -40,6 +40,7 @@ import {
   getSetting,
   saveCloudflareSettings,
   getDnsProviderSettings,
+  getDynamicDnsSettings,
   saveDnsProviderSettings,
   getDashboardSettings,
   saveDashboardSettings,
@@ -53,6 +54,7 @@ import {
   saveUpstreamDnsResolutionSettings,
   saveGeoBlockSettings,
   saveRateLimitSettings,
+  saveDynamicDnsSettings,
   saveWafSettings,
   getWafSettings,
   saveErrorPagesSettings,
@@ -77,6 +79,7 @@ import {
   saveCrowdSecSettings,
 } from "@/src/lib/settings";
 import { normalizeCrowdSecSettings, probeCrowdSecLapi } from "@/src/lib/caddy/crowdsec";
+import type { DynamicDnsSettings } from "@/src/lib/dns/dynamic-dns";
 import type { GlobalRateLimitSettings } from "@/src/lib/proxy-hosts/rate-limit";
 import {
   mergeProxyHostMeta,
@@ -398,6 +401,17 @@ async function updateDnsProviderSettingsActionUnlocked(
           success: false,
           message: t("results.dnsProviderUsedByDelegations", {
             domains: delegated.map((d) => d.domain).join(", "),
+          }),
+        };
+      }
+      const dynamicZones = (await getDynamicDnsSettings()).recordSets
+        .filter((set) => set.provider === providerName)
+        .map((set) => set.zone);
+      if (dynamicZones.length > 0) {
+        return {
+          success: false,
+          message: t("results.dnsProviderUsedByDynamicDns", {
+            zones: [...new Set(dynamicZones)].join(", "),
           }),
         };
       }
@@ -2066,6 +2080,58 @@ async function updateGeoBlockSettingsActionUnlocked(
   }
 }
 
+async function updateDynamicDnsSettingsActionUnlocked(
+  _prevState: SettingsResult | null,
+  formData: FormData,
+): Promise<SettingsResult> {
+  const t = await getTranslations("settings");
+  try {
+    await requireCan("settings:write");
+    const recordSetsRaw = formData.get("ddnsRecordSetsJson");
+    let recordSets: unknown = [];
+    try {
+      recordSets =
+        typeof recordSetsRaw === "string" && recordSetsRaw ? JSON.parse(recordSetsRaw) : [];
+    } catch (error) {
+      unstable_rethrow(error);
+      recordSets = [];
+    }
+    const text = (name: string) => {
+      const value = formData.get(name);
+      return typeof value === "string" ? value : "";
+    };
+    // Validated and normalised in one place, which refuses what Caddy would.
+    await saveDynamicDnsSettings({
+      enabled: parseCheckbox(formData.get("ddnsEnabled")),
+      recordSets: recordSets as DynamicDnsSettings["recordSets"],
+      ipv4: parseCheckbox(formData.get("ddnsIpv4")),
+      ipv6: parseCheckbox(formData.get("ddnsIpv6")),
+      checkInterval: text("ddnsCheckInterval"),
+      ttl: text("ddnsTtl"),
+      updateOnly: parseCheckbox(formData.get("ddnsUpdateOnly")),
+      ipEndpoints: text("ddnsIpEndpoints").split(/\s+/).filter(Boolean),
+    });
+    try {
+      await applyCaddyConfig();
+      revalidatePath("/settings");
+      return { success: true, message: t("results.dynamicDnsSaved") };
+    } catch (error) {
+      unstable_rethrow(error);
+      console.error("Failed to apply Caddy config:", error);
+      revalidatePath("/settings");
+      const errorMsg = await errorText(error, t("results.unknownError"));
+      return { success: true, message: t("results.applyFailed", { error: errorMsg }) };
+    }
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("Failed to save dynamic DNS settings:", error);
+    return {
+      success: false,
+      message: await errorText(error, t("results.dynamicDnsFailed")),
+    };
+  }
+}
+
 async function updateRateLimitSettingsActionUnlocked(
   _prevState: SettingsResult | null,
   formData: FormData,
@@ -2752,6 +2818,9 @@ export const updateUpstreamDnsResolutionSettingsAction = stagedSettingsAction(
 );
 export const updateGeoBlockSettingsAction = stagedSettingsAction(
   updateGeoBlockSettingsActionUnlocked,
+);
+export const updateDynamicDnsSettingsAction = stagedSettingsAction(
+  updateDynamicDnsSettingsActionUnlocked,
 );
 export const updateRateLimitSettingsAction = stagedSettingsAction(
   updateRateLimitSettingsActionUnlocked,

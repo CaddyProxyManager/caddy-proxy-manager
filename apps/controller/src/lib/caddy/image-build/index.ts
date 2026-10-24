@@ -389,6 +389,7 @@ const GATED_FEATURES: CaddyFeatureId[] = [
   "cache",
   "ratelimit",
   "crowdsec",
+  "ddns",
 ];
 
 /** Gates on *desired*: following applied, a control stays greyed out right after it is enabled. */

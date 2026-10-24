@@ -24,6 +24,7 @@ import { normalizeDefaultResponseSettings } from "../caddy/default-response";
 import { normalizeTailscaleSettings } from "../caddy/tailscale";
 import { normalizeCrowdSecSettings } from "../caddy/crowdsec";
 import { normalizeGlobalRateLimitInput } from "../proxy-hosts/rate-limit-global";
+import { DYNAMIC_DNS_MAX_RECORD_SETS, normalizeDynamicDnsSettings } from "../dns/dynamic-dns";
 import { DEFAULT_HOST_DEFAULTS } from "../proxy-hosts/host-defaults";
 import { HOST_COMPRESSION_MODES } from "../proxy-hosts/compression";
 import { getProviderDefinition, isValidDnsDuration } from "../dns/providers";
@@ -812,6 +813,33 @@ function validateHttpCache(value: Record<string, unknown>): void {
   }
 }
 
+const DYNAMIC_DNS_RECORD_SET_KEYS = ["provider", "zone", "names", "agentId"] as const;
+
+function validateDynamicDns(value: Record<string, unknown>): void {
+  onlyKeys(
+    value,
+    ["enabled", "recordSets", "ipv4", "ipv6", "checkInterval", "ttl", "updateOnly", "ipEndpoints"],
+    "dynamic DNS settings",
+  );
+  booleanValue(required(value, "enabled", "dynamic DNS settings"), "enabled");
+  for (const key of ["ipv4", "ipv6", "updateOnly"]) {
+    if (value[key] !== undefined) booleanValue(value[key], key);
+  }
+  if (value.recordSets !== undefined) {
+    if (!Array.isArray(value.recordSets) || value.recordSets.length > DYNAMIC_DNS_MAX_RECORD_SETS) {
+      invalid("settingsFieldArrayMax", { field: "recordSets", max: DYNAMIC_DNS_MAX_RECORD_SETS });
+    }
+    for (const set of value.recordSets) {
+      onlyKeys(record(set, "recordSets[]"), DYNAMIC_DNS_RECORD_SET_KEYS, "recordSets[]");
+    }
+  }
+  try {
+    normalizeDynamicDnsSettings(value);
+  } catch (error) {
+    invalidFrom(error);
+  }
+}
+
 function validateTailscale(value: Record<string, unknown>): void {
   onlyKeys(
     value,
@@ -929,6 +957,9 @@ export function validateSettingsGroup(
       break;
     case "upstream-dns":
       validateUpstreamDns(value);
+      break;
+    case "dynamic-dns":
+      validateDynamicDns(value);
       break;
     case "geoblock":
       validateGeoBlock(value);

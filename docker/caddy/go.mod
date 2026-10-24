@@ -50,6 +50,7 @@ require (
 	github.com/darkweak/storages/simplefs/caddy v0.0.22
 	github.com/fuomag9/caddy-blocker-plugin v0.0.0-20261021185730-79c008222209
 	github.com/hslatman/caddy-crowdsec-bouncer v0.14.1
+	github.com/mholt/caddy-dynamicdns v0.0.0-20260805195708-67d107a42c02
 	github.com/mholt/caddy-l4 v0.1.2
 	github.com/mholt/caddy-ratelimit v0.1.1-0.20260612195517-5625512f24f6
 	github.com/tailscale/caddy-tailscale v0.0.0-20260826180304-de41b249af4f
@@ -301,6 +302,8 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zeebo/blake3 v0.2.4 // indirect
+	gitlab.com/NebulousLabs/fastrand v0.0.0-20181126182046-603482d69e40 // indirect
+	gitlab.com/NebulousLabs/go-upnp v0.0.0-20211002182029-11da932010b6 // indirect
 	go.etcd.io/bbolt v1.5.0 // indirect
 	go.etcd.io/etcd/api/v3 v3.5.18 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.18 // indirect

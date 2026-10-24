@@ -33,6 +33,7 @@ const FALLBACK: ModuleGateState = {
     cache: true,
     ratelimit: true,
     crowdsec: true,
+    ddns: true,
   },
   moduleNames: {
     l4: "",
@@ -43,6 +44,7 @@ const FALLBACK: ModuleGateState = {
     cache: "",
     ratelimit: "",
     crowdsec: "",
+    ddns: "",
   },
   enabledModuleIds: null,
   pendingRebuild: false,

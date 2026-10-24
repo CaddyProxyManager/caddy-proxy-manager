@@ -318,7 +318,8 @@ break-glass account was named: `docker compose exec web /app/cpm-server --lift-s
 - **OAuth / SSO** - OAuth2/OIDC authentication with any compliant provider (Authentik, Keycloak, Auth0, etc.), and SAML 2.0 with signed assertions required. Account linking from the Profile page. Optional group-based role mapping (e.g. members of `CPM_Admin` become admins), OIDC-only mode, which disables local accounts entirely, and enforced single sign-on with named break-glass accounts
 - **SCIM provisioning** - An identity provider creates, updates and disables accounts and groups through SCIM 2.0, each on its own connection token; deprovisioning ends sessions and revokes API tokens, and provisioned groups carry mapped roles (PostgreSQL only)
 - **DNS providers** - DNS-01 challenges for ACME certificates through Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, netcup, Spaceship, deSEC, Dynu, acme-dns, Infomaniak, INWX, ClouDNS, and RFC2136 (BIND/TSIG). Credentials are encrypted at rest, and a certificate can override the provider. DNS propagation delay and timeout are configurable per provider (netcup ships with slow-propagation defaults). Challenge delegation: CNAME `_acme-challenge` to a zone a provider can write, per domain, with a live CNAME check; acme-dns accounts per domain, registered from the UI
-- **Caddy build** - Choose which Caddy plugins the image is compiled with. Toggle any supported module (Layer 4, Tailscale, Request Blocker, Coraza WAF, and each DNS provider), add your own Go modules, and rebuild from the UI - or build the image yourself and have the agent only load it. Rate Limit, CrowdSec, HTTP Cache and its storages are opt-in and not in the default image. Settings that depend on a disabled module are greyed out and say which module to turn back on
+- **Dynamic DNS** - Keep A and AAAA records pointed at Caddy's public IP through any of those providers except acme-dns, for a connection whose address changes: record sets per zone, each updated by one agent's Caddy (the bundled agent's by default), a check interval, optional TTL and update-only mode, and your own IP lookup services. Needs the opt-in Dynamic DNS module
+- **Caddy build** - Choose which Caddy plugins the image is compiled with. Toggle any supported module (Layer 4, Tailscale, Request Blocker, Coraza WAF, and each DNS provider), add your own Go modules, and rebuild from the UI - or build the image yourself and have the agent only load it. Rate Limit, CrowdSec, Dynamic DNS, HTTP Cache and its storages are opt-in and not in the default image. Settings that depend on a disabled module are greyed out and say which module to turn back on
 - **Settings** - ACME email, default response, DNS provider configuration, upstream DNS pinning defaults, Authentik outpost, Prometheus metrics, logging format, HTTP/2 and HTTP/3 switches, response compression - plus everything that used to be in `.env`, stored in the database and editable without a restart. Edits are staged and reviewed against the Caddy config they would produce before one apply sends them all; every apply is a revision that can be diffed against any other and restored. A search finds any setting by name or by what it is for, such as `smtp`, `prometheus` or `redis`
 - **Email** - Password reset links from the sign-in page, invitations that let a new user choose their own password, a certificate expiry digest for the administrators, and admin notifications, sent through any SMTP server set under **Settings → Email** with a test message to check it. Links are single-use, carried in the URL fragment so they never reach an access log, and a reset signs every other session out
 - **Notifications** - Tells the administrators by email and browser push, a minute's worth at a time, when an agent stays offline, a proxy host keeps answering 502/503/504 (counted from the access log, no ClickHouse needed), Caddy refuses a configuration, an agent's Caddy build, optional service, L4 port change or log files fail, the GeoIP update keeps failing, a CRS plugin is switched off, a release is out, an account is disabled after failed sign-ins, the lock engages on an administrator, or a new administrator appears - and again when each problem is over. A switch per event under **Settings → Email → Notifications** turns it off for everyone; each administrator picks their own events and channels under **Profile → Notifications**
@@ -1106,7 +1107,7 @@ reach.
 
 Caddy automatically obtains Let's Encrypt certificates for all proxy hosts.
 
-**DNS-01 challenge** (optional): Configure a DNS provider in **Settings → DNS → DNS providers** for wildcard certificates and environments where ports 80/443 are not public. Supported providers: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, netcup, Spaceship, deSEC, Dynu, acme-dns, Infomaniak, INWX, ClouDNS, and RFC2136 (BIND/TSIG). Credentials are encrypted at rest with AES-256-GCM. You can override the DNS provider per certificate. For a domain whose DNS host has no API, delegate its challenges under **Challenge delegation** on the same page, to another zone or to an acme-dns server.
+**DNS-01 challenge** (optional): Configure a DNS provider in **Settings → DNS → DNS providers** for wildcard certificates and environments where ports 80/443 are not public. Supported providers: Cloudflare, Route 53, DigitalOcean, Duck DNS, Hetzner, Vultr, Porkbun, GoDaddy, Namecheap, OVH, IONOS, Linode, Njalla, netcup, Spaceship, deSEC, Dynu, acme-dns, Infomaniak, INWX, ClouDNS, and RFC2136 (BIND/TSIG). Credentials are encrypted at rest with AES-256-GCM. You can override the DNS provider per certificate. For a domain whose DNS host has no API, delegate its challenges under **Challenge delegation** on the same page, to another zone or to an acme-dns server. The same credentials can keep records pointed at Caddy's public IP under **Settings → DNS → Dynamic DNS**, once the opt-in Dynamic DNS module is built in.
 
 **Custom certificates** (optional): Import your own certificates via the Certificates page, pasted in or read from a file on an agent's host (`CERT_FILES_HOST_DIR`). A pair is refused unless the certificate is PEM X.509, the key is an unencrypted PEM key, and the key matches the certificate. Private keys are encrypted at rest with AES-256-GCM, migrated from legacy plaintext storage on startup, and treated as write-only by ordinary API responses and browser payloads. The built-in mTLS CA's private keys are encrypted the same way.
 
@@ -1544,7 +1545,7 @@ Caddy is a single static binary: a plugin either was compiled in with
 **Settings → Caddy build** makes that list editable.
 
 The default image ships with every supported module except the opt-in ones -
-Rate Limit, CrowdSec, HTTP Cache and its storages - so an existing install behaves exactly as it did
+Rate Limit, CrowdSec, Dynamic DNS, HTTP Cache and its storages - so an existing install behaves exactly as it did
 before this page existed. An opt-in module is compiled in only once you select
 it and rebuild.
 
@@ -1561,6 +1562,7 @@ Each supported plugin has a toggle. Turning one off has two effects:
   Proxy hosts page follows caddy-l4; the Tailscale settings and every per-host
   tailnet option follow caddy-tailscale; the **Caddy cache** mode of a host's
   Cache assets follows HTTP Cache; a host's rate limiting follows Rate Limit;
+  Settings → DNS → Dynamic DNS follows Dynamic DNS;
   the CrowdSec settings follow CrowdSec (whose L4 part compiles caddy-l4 in
   regardless); and each DNS provider follows its own
   `caddy-dns` module, so disabling Cloudflare leaves Route 53 alone.
@@ -1569,9 +1571,9 @@ A module still in use cannot be switched off - the save is refused and names
 what is using it (for example "3 enabled L4 proxy hosts need the Layer 4 Proxy
 module"). That check covers global WAF and geoblocking, CrowdSec while it is
 switched on, per-host WAF and geoblock rules, enabled L4 hosts, and every DNS
-provider with credentials on file. Turn the feature off first. Rate Limit and HTTP Cache are not checked,
+provider with credentials on file. Turn the feature off first. Rate Limit, Dynamic DNS and HTTP Cache are not checked,
 because nothing breaks without them: a rate-limited host is served without
-limits, and a host set to the Caddy cache falls back to browser caching, each
+limits, dynamic DNS records stop being updated, and a host set to the Caddy cache falls back to browser caching, each
 with a warning in its editor.
 
 Per-host **Custom Caddyfile** snippets cannot be checked the same way - they are

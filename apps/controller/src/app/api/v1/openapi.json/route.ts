@@ -1439,6 +1439,7 @@ const spec = {
                     { $ref: "#/components/schemas/LoggingSettings" },
                     { $ref: "#/components/schemas/DnsSettings" },
                     { $ref: "#/components/schemas/UpstreamDnsSettings" },
+                    { $ref: "#/components/schemas/DynamicDnsSettings" },
                     { $ref: "#/components/schemas/GeoBlockConfig" },
                     { $ref: "#/components/schemas/WafSettings" },
                     { $ref: "#/components/schemas/DefaultResponseSettings" },
@@ -1483,6 +1484,7 @@ const spec = {
                   { $ref: "#/components/schemas/DnsSettings" },
                   { $ref: "#/components/schemas/DnsProviderSettings" },
                   { $ref: "#/components/schemas/UpstreamDnsSettings" },
+                  { $ref: "#/components/schemas/DynamicDnsSettings" },
                   { $ref: "#/components/schemas/GeoBlockConfig" },
                   { $ref: "#/components/schemas/WafSettings" },
                   { $ref: "#/components/schemas/DefaultResponseSettings" },
@@ -3475,6 +3477,65 @@ const spec = {
         description:
           "HttpCacheSettings with redis.hasPassword and cdn.hasApiKey in place of the secrets",
         allOf: [{ $ref: "#/components/schemas/HttpCacheSettings" }],
+      },
+      DynamicDnsSettings: {
+        type: "object",
+        description:
+          "A and AAAA records Caddy keeps pointed at its public IP through a DNS provider with saved credentials. Needs the opt-in caddy-dynamicdns module; without it nothing is updated",
+        properties: {
+          enabled: { type: "boolean" },
+          recordSets: {
+            type: "array",
+            maxItems: 100,
+            items: {
+              type: "object",
+              properties: {
+                provider: {
+                  type: "string",
+                  description: "A DNS provider configured under dns-provider. Not acmedns",
+                  example: "cloudflare",
+                },
+                zone: { type: "string", example: "example.com" },
+                names: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: 'Record names relative to the zone; "@" is the zone itself',
+                  example: ["@", "home"],
+                },
+                agentId: {
+                  type: "string",
+                  nullable: true,
+                  description:
+                    "The agent whose Caddy updates these records, with its public IP. Null: the bundled agent, or the controller's own Caddy when none is paired",
+                },
+              },
+              required: ["provider", "zone", "names"],
+            },
+          },
+          ipv4: { type: "boolean", description: "Update A records. Defaults to true" },
+          ipv6: { type: "boolean", description: "Update AAAA records. Defaults to false" },
+          checkInterval: {
+            type: "string",
+            description: "Caddy duration between public IP checks, at least 1m",
+            example: "5m",
+          },
+          ttl: {
+            type: "string",
+            description: "Caddy duration for the record TTL; empty leaves it to the provider",
+          },
+          updateOnly: {
+            type: "boolean",
+            description: "Only change records that already exist, never create one",
+          },
+          ipEndpoints: {
+            type: "array",
+            items: { type: "string" },
+            maxItems: 10,
+            description:
+              "HTTP(S) services answering with the caller's IP as plain text; empty uses the plugin's defaults",
+          },
+        },
+        required: ["enabled"],
       },
       CrowdSecSettings: {
         type: "object",

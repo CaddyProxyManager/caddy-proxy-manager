@@ -48,6 +48,7 @@ import {
   getLoggingSettings,
   getDnsSettings,
   getDnsProviderSettings,
+  getDynamicDnsSettings,
   getUpstreamDnsResolutionSettings,
   getGeoBlockSettings,
   getRateLimitSettings,
@@ -85,6 +86,7 @@ import {
   TAILSCALE_DEFAULT_NODE,
 } from "./tailscale";
 import { buildDnsChallengeConfig } from "../dns/provider-credentials";
+import { buildDynamicDnsApp } from "../dns/dynamic-dns-config";
 import { parseStoredCertificateProviderOptions } from "../certificates/provider-options";
 import { partitionDnsChallenges } from "../dns/challenge-delegation";
 import { caddyAdminRequest } from "./admin";
@@ -3188,6 +3190,40 @@ async function runsManagedServices(agentRowId: number | undefined): Promise<bool
   return runsControllerServices(agentRowId);
 }
 
+async function buildDynamicDnsDocumentApp(
+  settings: Awaited<ReturnType<typeof getDynamicDnsSettings>>,
+  providerCredentials: Record<string, Record<string, string>>,
+  availability: CaddyModuleAvailability,
+  agentRowId: number | undefined,
+): Promise<{ dynamic_dns?: Record<string, unknown> }> {
+  if (!settings?.enabled) return {};
+  if (!isFeatureUsable(availability, "ddns")) {
+    console.warn(
+      "Dynamic DNS is enabled in settings but its Caddy module is not in the running binary. " +
+        "Enable it in Settings → Caddy build and rebuild Caddy.",
+    );
+    return {};
+  }
+  const [{ findAgentById }, { bundledAgentId }] = await Promise.all([
+    import("../models/agents"),
+    import("../agent/bootstrap"),
+  ]);
+  const agent = agentRowId === undefined ? null : await findAgentById(agentRowId);
+  const { app, skipped } = buildDynamicDnsApp(settings, {
+    agentId: agent?.agentId ?? null,
+    bundledAgentId: await bundledAgentId(),
+    providerCredentials,
+    isProviderUsable: (provider) => isDnsProviderUsable(availability, provider),
+  });
+  for (const set of skipped) {
+    console.warn(
+      `Dynamic DNS for ${set.zone} is skipped: provider "${set.provider}" has no saved ` +
+        "credentials or its Caddy module is not in the running binary.",
+    );
+  }
+  return app ? { dynamic_dns: app } : {};
+}
+
 /**
  * The table reads a document starts from. Fleet-wide, so an apply reads them once and hands them
  * to every agent's build rather than each agent repeating them.
@@ -3547,6 +3583,7 @@ export async function buildCaddyDocument(
     wafExclusions,
     blockedSources,
     globalRateLimit,
+    dynamicDnsSettings,
   ] = await Promise.all([
     getAccessRulesForHosts(enabledProxyHostIds),
     getGeneralSettings(),
@@ -3575,6 +3612,7 @@ export async function buildCaddyDocument(
     listWafExclusionRules(),
     listActiveBlockedSources(),
     getRateLimitSettings(),
+    getDynamicDnsSettings(),
   ]);
 
   if (
@@ -3608,6 +3646,13 @@ export async function buildCaddyDocument(
           ),
         }
       : {};
+
+  const dynamicDnsApp = await buildDynamicDnsDocumentApp(
+    dynamicDnsSettings,
+    dnsProviderSettings?.providers ?? {},
+    moduleAvailability,
+    agentRowId,
+  );
 
   // Resolved before anything reads it, because both the routes and the servers depend on the same
   // answer. "Enabled but not usable" is worth saying out loud: the operator turned Tailscale on,
@@ -3942,6 +3987,7 @@ export async function buildCaddyDocument(
       ...tailscaleApp,
       ...cacheApp,
       ...crowdsecApp,
+      ...dynamicDnsApp,
     },
   };
   const globalCaddyfile =

@@ -252,7 +252,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       {
         id: "dns",
         name: "DNS",
-        desc: "Provider credentials, challenge resolvers and upstream pinning",
+        desc: "Provider credentials, challenge resolvers, upstream pinning and dynamic DNS",
         icon: Cloud,
         blocks: [
           {
@@ -266,6 +266,10 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
           {
             id: "upstream-dns",
             name: "Upstream DNS pinning",
+          },
+          {
+            id: "dynamic-dns",
+            name: "Dynamic DNS",
           },
         ],
       },

@@ -78,6 +78,8 @@ export type HealthInput = {
   notifications: { alertDays: number; lastError: string | null; noRecipients: boolean };
   dnsResolvers: { enabled: boolean; count: number };
   upstreamDns: { enabled: boolean; family: "ipv4" | "ipv6" | "both" } | null;
+  /** Optional for callers that predate it: off. */
+  dynamicDns?: { enabled: boolean; names: number };
   httpProtocols: { http2: boolean; http3: boolean };
   compressionEnabled: boolean;
   tailscaleEnabled: boolean;
@@ -473,6 +475,14 @@ export function sectionHealth(input: HealthInput, t: SettingsTranslator): Sectio
     input.upstreamDns?.enabled
       ? t("health.upstreamDns.valueFamily", { family: input.upstreamDns.family })
       : t("health.off"),
+  );
+
+  const dynamicNames = input.dynamicDns?.enabled ? input.dynamicDns.names : 0;
+  push(
+    "dynamic-dns",
+    "dynamicDns",
+    dynamicNames > 0 ? "ok" : "unset",
+    dynamicNames > 0 ? t("health.dynamicDns.valueNames", { count: dynamicNames }) : t("health.off"),
   );
 
   const { http2, http3 } = input.httpProtocols;

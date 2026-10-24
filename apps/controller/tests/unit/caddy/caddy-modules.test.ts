@@ -136,6 +136,14 @@ describe('caddy module registry', () => {
     expect(dockerfileDefaultModules()).not.toContain('github.com/mholt/caddy-ratelimit');
   });
 
+  it('offers dynamic DNS as an opt-in module the shipped image leaves out', () => {
+    const path = 'github.com/mholt/caddy-dynamicdns';
+    expect(modulesForFeature('ddns').map((m) => m.modulePath)).toEqual([path]);
+    expect(DEFAULT_ENABLED_MODULE_IDS).not.toContain('caddy-dynamicdns');
+    expect(SHIPPED_CADDY_MODULES).not.toContain(path);
+    expect(dockerfileDefaultModules()).not.toContain(path);
+  });
+
   it('offers CrowdSec as one opt-in module pinned at its root, which imports every part', () => {
     const path = 'github.com/hslatman/caddy-crowdsec-bouncer';
     expect(modulesForFeature('crowdsec').map((m) => m.modulePath)).toEqual([path]);
@@ -153,6 +161,7 @@ describe('caddy module registry', () => {
       'dns01',
       'ratelimit',
       'crowdsec',
+      'ddns',
     ] as const) {
       expect(modulesForFeature(feature).length, `no module powers "${feature}"`).toBeGreaterThan(0);
     }

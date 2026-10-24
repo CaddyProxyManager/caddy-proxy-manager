@@ -93,6 +93,7 @@ async function remainingBlocks() {
     logging,
     rateLimit,
     hostDefaults,
+    dynamicDns,
   ] = await Promise.all([
     stored.getGeneralSettings(),
     getUpdateStatus().catch(() => null),
@@ -126,6 +127,7 @@ async function remainingBlocks() {
     stored.getLoggingSettings(),
     stored.getRateLimitSettings(),
     stored.getHostDefaults(),
+    stored.getDynamicDnsSettings(),
   ]);
   const caddyfile = globalCaddy.caddyfile.trim();
   return {
@@ -184,6 +186,10 @@ async function remainingBlocks() {
       allowlist: rateLimit?.allowlist.length ?? 0,
     },
     logging: { enabled: logging?.enabled ?? false, format: logging?.format ?? "json" },
+    dynamicDns: {
+      enabled: dynamicDns.enabled,
+      names: dynamicDns.recordSets.reduce((count, set) => count + set.names.length, 0),
+    },
     hostDefaults: {
       proxyHostStock: isStockHostDefaults(hostDefaults, "proxyHost"),
       l4ProxyHostStock: isStockHostDefaults(hostDefaults, "l4ProxyHost"),

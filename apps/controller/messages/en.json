@@ -1017,6 +1017,10 @@
     "disabledReasonNamed": "Requires the {name} Caddy module. Enable it in Settings → Caddy build and rebuild Caddy.",
     "disabledReasonUnnamed": "Requires a Caddy module that is not enabled. See Settings → Caddy build.",
     "modules": {
+      "caddyDynamicdns": {
+        "name": "Dynamic DNS",
+        "description": "Keeps A and AAAA records pointed at Caddy's public IP through a configured DNS provider. Required by the Dynamic DNS settings."
+      },
       "caddyL4": {
         "name": "Layer 4 Proxy",
         "description": "TCP/UDP proxying. Required by L4 proxy hosts and by the agent that binds their ports."
@@ -1360,6 +1364,21 @@
     "passwordsDoNotMatch": "Passwords do not match"
   },
   "errors": {
+    "dynamicDnsProviderUnknown": "Unknown DNS provider for dynamic DNS: {provider}",
+    "dynamicDnsProviderUnsupported": "{provider} cannot hold address records, so it cannot be used for dynamic DNS",
+    "dynamicDnsProviderNotConfigured": "The DNS provider {provider} has no saved credentials. Add it under DNS providers first.",
+    "dynamicDnsZoneInvalid": "\"{zone}\" is not a DNS zone, such as example.com",
+    "dynamicDnsNamesRequired": "The zone {zone} needs at least one record name; use @ for the zone itself",
+    "dynamicDnsTooManyNames": "The zone {zone} lists more than {max} record names",
+    "dynamicDnsNameInvalid": "\"{name}\" is not a record name in {zone}",
+    "dynamicDnsAgentInvalid": "The agent of a dynamic DNS record set is not a valid agent id",
+    "dynamicDnsTooManyRecordSets": "Dynamic DNS holds at most {max} record sets",
+    "dynamicDnsRecordSetsRequired": "Add a record set before turning dynamic DNS on",
+    "dynamicDnsNoIpVersion": "Dynamic DNS needs IPv4, IPv6 or both",
+    "dynamicDnsIntervalInvalid": "The check interval \"{value}\" must be a duration of at least 1m, such as 5m",
+    "dynamicDnsTtlInvalid": "The TTL \"{value}\" must be a duration of at least 1s, such as 5m",
+    "dynamicDnsEndpointInvalid": "\"{url}\" is not an HTTP or HTTPS address",
+    "dynamicDnsTooManyEndpoints": "List at most {max} IP lookup services",
     "setupStepUnknown": "That is not a setup checklist step",
     "setupChecklistFailed": "Could not update the setup checklist",
     "attentionAcknowledgeFailed": "Could not acknowledge that item",
@@ -3512,6 +3531,36 @@
     "wafLegacyExclusions": "Still excluded from an older version, until the next restart moves them to the WAF page:"
   },
   "settings": {
+    "dynamicDns": {
+      "help": "Keeps A and AAAA records pointed at Caddy's public IP address, for a connection whose address changes. Caddy checks the address on an interval and updates the records through the DNS provider's API.",
+      "enabled": "Update records",
+      "enabledHelp": "While off, the record sets are kept and nothing is updated.",
+      "unavailable": "Dynamic DNS is unavailable",
+      "noProvidersTitle": "No DNS provider configured",
+      "noProviders": "Dynamic DNS updates records through a DNS provider with saved credentials. Add one under DNS providers.",
+      "providerModuleDisabled": "Its Caddy module is not enabled",
+      "providerPlaceholder": "Choose a provider",
+      "providerHelp": "One with saved credentials.",
+      "recordSet": "Record set {index}",
+      "removeRecordSet": "Remove record set {index}",
+      "zone": "Zone",
+      "zoneHelp": "The domain as your DNS provider lists it.",
+      "names": "Record names",
+      "namesHelp": "Relative to the zone, comma-separated. @ is the zone itself.",
+      "agentDefault": "Bundled agent",
+      "agentHelp": "Whose public IP the records get. Each set is updated by one agent's Caddy only.",
+      "ipv4": "IPv4 (A records)",
+      "ipv6": "IPv6 (AAAA records)",
+      "checkInterval": "IP check interval",
+      "checkIntervalHelp": "How often Caddy looks up its public IP. At least 1m.",
+      "ttl": "Record TTL",
+      "ttlHelp": "Empty leaves it to the provider.",
+      "durationInvalid": "Use a duration such as 5m or 1h.",
+      "updateOnly": "Only update existing records",
+      "updateOnlyHelp": "Never create a record; one that does not exist yet is left alone.",
+      "ipEndpoints": "IP lookup services",
+      "ipEndpointsHelp": "One URL per line, each answering with the caller's IP as plain text. Up to {max}; empty uses the plugin's own list."
+    },
     "auditStreaming": {
       "navLabel": "Audit streaming",
       "sinksTitle": "Sinks",
@@ -4536,7 +4585,7 @@
       },
       "dns": {
         "name": "DNS",
-        "desc": "Provider credentials, challenge resolvers and upstream pinning"
+        "desc": "Provider credentials, challenge resolvers, upstream pinning and dynamic DNS"
       },
       "network": {
         "name": "Network",
@@ -4580,6 +4629,9 @@
       }
     },
     "blocks": {
+      "dynamicDns": {
+        "name": "Dynamic DNS"
+      },
       "general": {
         "name": "General"
       },
@@ -5040,6 +5092,9 @@
     "oauthDialogEditDescription": "Update the OAuth provider configuration.",
     "oauthDialogAddDescription": "Configure a new OAuth or OIDC provider for single sign-on.",
     "health": {
+      "dynamicDns": {
+        "valueNames": "{count, plural, one {Updating # name} other {Updating # names}}"
+      },
       "off": "Off",
       "on": "On",
       "notSet": "Not set",
@@ -5210,6 +5265,7 @@
       }
     },
     "stagedLabels": {
+      "dynamicDns": "Dynamic DNS",
       "general": "General",
       "acme": "ACME server",
       "defaultResponse": "Default response",
@@ -5243,6 +5299,9 @@
       "ssoEnforcement": "Single sign-on enforcement"
     },
     "results": {
+      "dynamicDnsSaved": "Dynamic DNS settings saved.",
+      "dynamicDnsFailed": "Dynamic DNS settings could not be saved.",
+      "dnsProviderUsedByDynamicDns": "Dynamic DNS still updates {zones} through this provider. Remove those record sets first.",
       "unknownError": "Unknown error",
       "applyFailed": "Settings saved, but could not apply to Caddy: {error}",
       "generalSaved": "General settings saved",
@@ -5688,6 +5747,7 @@
     },
     "search": {
       "synonyms": {
+        "dynamicDns": "ddns, dyndns, public ip, home ip, a record, aaaa record, changing ip",
         "general": "domain, default domain, hostname",
         "acme": "certificate authority, ca, lets encrypt, ssl, tls, https, issuer",
         "updates": "upgrade, version, release",

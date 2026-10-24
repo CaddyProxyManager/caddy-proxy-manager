@@ -22,7 +22,8 @@ export type CaddyFeatureId =
   | "dns01"
   | "cache"
   | "ratelimit"
-  | "crowdsec";
+  | "crowdsec"
+  | "ddns";
 
 export type CaddyModuleCategory = "dns" | "proxy" | "cache" | "security";
 
@@ -80,6 +81,17 @@ const CORE_MODULES: CaddyModuleDefinition[] = [
     docsUrl: "https://github.com/tailscale/caddy-tailscale",
     category: "proxy",
     features: ["tailscale"],
+  },
+  {
+    id: "caddy-dynamicdns",
+    name: "Dynamic DNS",
+    modulePath: "github.com/mholt/caddy-dynamicdns",
+    description:
+      "Keeps A and AAAA records pointed at Caddy's public IP through a configured DNS provider. Required by the Dynamic DNS settings.",
+    docsUrl: "https://github.com/mholt/caddy-dynamicdns",
+    category: "proxy",
+    features: ["ddns"],
+    defaultEnabled: false,
   },
   {
     id: "caddy-blocker",

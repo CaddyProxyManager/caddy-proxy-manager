@@ -17,6 +17,7 @@ import {
   getUpstreamDnsResolutionSettings,
   getGeoBlockSettings,
   getRateLimitSettings,
+  getDynamicDnsSettings,
   getErrorPagesSettings,
   getTrustedProxiesSettings,
   getHttpProtocolsSettings,
@@ -162,6 +163,7 @@ export default async function SettingsSectionPage({
       updates,
       globalRateLimit,
       hostDefaults,
+      dynamicDns,
     ],
     pairedAgents,
     agentStatuses,
@@ -208,6 +210,7 @@ export default async function SettingsSectionPage({
         getUpdateStatus(),
         getRateLimitSettings(),
         getHostDefaults(),
+        getDynamicDnsSettings(),
       ]),
     ),
     listAgents(),
@@ -304,6 +307,8 @@ export default async function SettingsSectionPage({
       defaultResponse={defaultResponse}
       globalGeoBlock={globalGeoBlock}
       globalRateLimit={globalRateLimit}
+      dynamicDns={dynamicDns}
+      dynamicDnsAgents={pairedAgents.map((agent) => ({ agentId: agent.agentId, name: agent.name }))}
       hostDefaults={hostDefaults}
       globalErrorPages={globalErrorPages}
       oauthProviders={oauthProviders}
