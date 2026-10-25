@@ -3486,6 +3486,9 @@
     "removeLocationRuleLabel": "Remove location rule {index}",
     "upstreamLabel": "Upstream {index}",
     "removeUpstreamLabel": "Remove upstream {index}",
+    "reorderUpstreamLabel": "Move upstream {index}",
+    "reorderUpstream": "Drag, or press the up and down arrow keys, to reorder",
+    "upstreamsOrderHelp": "First available tries them from the top; drag a row by its handle to change the order.",
     "atLeastOneUpstreamRequired": "At least one upstream is required",
     "removeUpstream": "Remove upstream",
     "geoipStatus": {

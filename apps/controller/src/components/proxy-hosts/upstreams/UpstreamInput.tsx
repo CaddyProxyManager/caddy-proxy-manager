@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { MinusCircle, Network, Plus } from "lucide-react";
+import { type KeyboardEvent, useState } from "react";
+import { GripVertical, MinusCircle, Network, Plus } from "lucide-react";
 import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { Divider } from "@astryxdesign/core/Divider";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { Selector } from "@astryxdesign/core/Selector";
@@ -77,6 +79,31 @@ export function UpstreamInput({
   const handleRemove = (rowId: string) =>
     setEntries((prev) => (prev.length === 1 ? prev : prev.filter((e) => e.rowId !== rowId)));
 
+  const moveTo = (rowId: string, to: number) =>
+    setEntries((prev) => {
+      const from = prev.findIndex((e) => e.rowId === rowId);
+      if (from === -1 || to < 0 || to >= prev.length || to === from) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+
+  // A row is draggable only while its handle is held, so text in its inputs still selects.
+  const [armed, setArmed] = useState<string | null>(null);
+  const [dragging, setDragging] = useState<string | null>(null);
+  const endDrag = () => {
+    setArmed(null);
+    setDragging(null);
+  };
+
+  // The rows are keyed, so the handle keeps focus as its row moves.
+  const handleKeys = (event: KeyboardEvent, rowId: string, index: number) => {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    event.preventDefault();
+    moveTo(rowId, index + (event.key === "ArrowUp" ? -1 : 1));
+  };
+
   const serializedValue = entries
     .filter((e) => e.address.trim() !== "")
     .map((e) => `${e.protocol}${e.address.trim()}`)
@@ -85,15 +112,51 @@ export function UpstreamInput({
   const isOnlyEntry = entries.length === 1;
 
   return (
-    <VStack gap={2}>
-      <input type="hidden" name={name} value={serializedValue} />
-      <Text type="body" size="sm" weight="semibold">
-        {t("upstreams")}
-      </Text>
-
+    <Card>
       <VStack gap={3}>
+        <input type="hidden" name={name} value={serializedValue} />
+        <VStack gap={1}>
+          <Text type="body" size="sm" weight="semibold">
+            {t("upstreams")}
+          </Text>
+          <Text type="supporting" size="sm" color="secondary">
+            {t("upstreamsOrderHelp")}
+          </Text>
+        </VStack>
+        <Divider />
         {entries.map((entry, index) => (
-          <HStack key={entry.rowId} gap={2} vAlign="end">
+          <HStack
+            key={entry.rowId}
+            gap={2}
+            vAlign="end"
+            draggable={armed === entry.rowId}
+            className={dragging === entry.rowId ? "opacity-50" : undefined}
+            onDragStart={(event) => {
+              event.dataTransfer.effectAllowed = "move";
+              // Firefox starts no drag without data.
+              event.dataTransfer.setData("text/plain", entry.rowId);
+              setDragging(entry.rowId);
+            }}
+            onDragOver={(event) => {
+              if (!dragging) return;
+              event.preventDefault();
+              if (dragging !== entry.rowId) moveTo(dragging, index);
+            }}
+            onDrop={(event) => event.preventDefault()}
+            onDragEnd={endDrag}
+          >
+            <IconButton
+              variant="ghost"
+              size="sm"
+              className="cursor-grab"
+              label={t("reorderUpstreamLabel", { index: index + 1 })}
+              icon={<GripVertical />}
+              isDisabled={isOnlyEntry}
+              tooltip={t("reorderUpstream")}
+              onPointerDown={() => setArmed(entry.rowId)}
+              onPointerUp={() => setArmed(null)}
+              onKeyDown={(event) => handleKeys(event, entry.rowId, index)}
+            />
             <Selector
               label={t("protocol")}
               isLabelHidden
@@ -135,6 +198,6 @@ export function UpstreamInput({
           />
         </HStack>
       </VStack>
-    </VStack>
+    </Card>
   );
 }
