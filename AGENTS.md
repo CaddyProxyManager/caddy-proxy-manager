@@ -352,6 +352,11 @@ Three constraints are not obvious from reading the suites:
 - **Playwright specs run under Node, not Bun.** `bun:sqlite`, `Bun.password` and the rest are
   unavailable in `tests/e2e/**`. Anything needing them belongs in a script the spec spawns with
   `bun` - see `tests/helpers/build-legacy-db.ts`.
+- **Parsers and decoders get a `*.prop.test.ts` beside their unit test**, property-based with
+  fast-check: never throws anything but the refusal the caller catches, idempotent, and a clean
+  input reads back to what was written. Pass `fuzz` from `tests/helpers/fuzz.ts` as the run
+  count, which `FUZZ_RUNS` raises for a long run, and the helper's timeout to `it`. On a failure
+  fast-check prints the shrunk counterexample: commit it as a plain unit test, not the seed.
 
 <!-- ASTRYX:START -->
 Astryx v0.4.5 · 90+ components
