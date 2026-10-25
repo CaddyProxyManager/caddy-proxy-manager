@@ -4,10 +4,11 @@
  */
 
 import { resolveEnabledModuleIds } from "./index";
-import { CADDY_MODULES, CROWDSEC_MODULE_ID, dnsModuleId } from "./modules";
+import { CADDY_MODULES, CROWDSEC_MODULE_ID, DYNAMIC_DNS_MODULE_ID, dnsModuleId } from "./modules";
 import { listEnabledL4ProxyHostIds } from "../../models/l4-proxy-hosts";
 import { listHostAssignments, servedByAgent } from "../../models/host-agents";
 import { listProxyHosts } from "../../models/proxy-hosts";
+import { dynamicDnsInUse } from "../../dns/host-dynamic-dns-sets";
 import {
   type CaddyBuildSettings,
   getCrowdSecSettings,
@@ -22,7 +23,7 @@ import {
  */
 export type ModuleConflict =
   | { kind: "l4Hosts" | "hostWaf" | "hostGeoblock" | "tailnetHosts"; count: number }
-  | { kind: "globalWaf" | "globalGeoblock" | "globalCrowdsec" }
+  | { kind: "globalWaf" | "globalGeoblock" | "globalCrowdsec" | "globalDynamicDns" }
   | { kind: "defaultDnsProvider" | "dnsProviderCredentials"; provider: string };
 
 /** A conflict as `/api/v1` has always worded it. */
@@ -36,6 +37,8 @@ export function englishModuleConflict(conflict: ModuleConflict): string {
       return "global geoblocking is switched on and needs the Request Blocker module";
     case "globalCrowdsec":
       return "CrowdSec is switched on and needs the CrowdSec module";
+    case "globalDynamicDns":
+      return "Dynamic DNS is on, in Settings or on a host, and needs the Dynamic DNS module";
     case "hostWaf":
       return `${conflict.count} proxy host${conflict.count === 1 ? " has" : "s have"} per-host WAF enabled and ${conflict.count === 1 ? "needs" : "need"} the Coraza WAF module`;
     case "hostGeoblock":
@@ -73,6 +76,7 @@ export async function findModuleConflicts(
   const blockerOff = !enabled.has("caddy-blocker");
   const tailscaleOff = !enabled.has("caddy-tailscale");
   const crowdsecOff = !enabled.has(CROWDSEC_MODULE_ID);
+  const dynamicDnsOff = !enabled.has(DYNAMIC_DNS_MODULE_ID);
 
   // Scoped to this agent: a host pinned elsewhere would refuse with a reason nobody can act on.
   const [
@@ -84,6 +88,7 @@ export async function findModuleConflicts(
     allHosts,
     dnsProviders,
     crowdsec,
+    dynamicDns,
   ] = await Promise.all([
     agentRowId === undefined ? null : listHostAssignments("http"),
     agentRowId === undefined ? null : listHostAssignments("l4"),
@@ -93,6 +98,7 @@ export async function findModuleConflicts(
     wafOff || blockerOff || tailscaleOff ? listProxyHosts() : null,
     getDnsProviderSettings(),
     crowdsecOff ? getCrowdSecSettings() : null,
+    dynamicDnsOff ? dynamicDnsInUse() : false,
   ]);
   const servesHttp = (hostId: number) =>
     httpAssignments === null || servedByAgent(httpAssignments, hostId, agentRowId ?? null);
@@ -115,6 +121,11 @@ export async function findModuleConflicts(
   // Refused rather than warned: every host would quietly stop checking decisions.
   if (crowdsec?.enabled) {
     problems.push({ kind: "globalCrowdsec" });
+  }
+
+  // Refused too: the next start would select it again (ensureDynamicDnsModule) and undo the choice.
+  if (dynamicDns) {
+    problems.push({ kind: "globalDynamicDns" });
   }
 
   // WAF and geoblocking can be on per host with the global switch off.

@@ -103,10 +103,15 @@ async function commitSettings(
   invalidateSettingsCache();
 
   const keys = staged.map((entry) => entry.key);
-  let crowdsecEnabled = false;
+  // A module one of these switches on is selected here, so the push below builds it in.
+  let moduleSelected = false;
   if (keys.includes("crowdsec")) {
     const { ensureCrowdSecModule } = await import("../caddy/image-build");
-    crowdsecEnabled = await ensureCrowdSecModule();
+    moduleSelected = await ensureCrowdSecModule();
+  }
+  if (keys.includes("dynamic_dns")) {
+    const { ensureDynamicDnsModule } = await import("../caddy/image-build");
+    moduleSelected = (await ensureDynamicDnsModule()) || moduleSelected;
   }
   const fallback = domainError("applyCaddyConfigFailed");
   let failure: Error | null = null;
@@ -121,7 +126,7 @@ async function commitSettings(
     const { applyManagedServices } = await import("../agent/managed-services");
     await applyManagedServices();
   }
-  if (crowdsecEnabled) {
+  if (moduleSelected) {
     const { pushDesiredState } = await import("../agent/desired-state");
     await pushDesiredState();
   }

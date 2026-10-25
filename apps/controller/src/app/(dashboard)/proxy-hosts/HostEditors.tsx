@@ -19,6 +19,7 @@ import {
   EditHostDialog,
 } from "@/components/proxy-hosts/HostDialogs";
 import { WafPresetOptionsProvider } from "@/src/components/proxy-hosts/waf/WafPresetOptions";
+import { DynamicDnsProvidersProvider } from "@/src/components/dns/DynamicDnsHostFields";
 import { hostForwardAuthAccessAction } from "./actions";
 
 type ForwardAuthAccess = { userIds: number[]; groupIds: number[] };
@@ -91,33 +92,14 @@ export default function HostEditors({
     <>
       {options && (
         <WafPresetOptionsProvider presets={options.wafPresets} plugins={options.wafPlugins}>
-          <CreateHostDialog
-            defaultDomain={options.defaultDomain}
-            hostDefaults={options.hostDefaults}
-            key={createKey}
-            open={createOpen}
-            onClose={onCloseCreate}
-            initialData={duplicateHost}
-            certificates={options.certificates}
-            accessLists={options.accessLists}
-            authentikDefaults={options.authentikDefaults}
-            forwardAuthDefaults={options.forwardAuthDefaults}
-            tailscaleDefaults={options.tailscaleDefaults}
-            caCertificates={options.caCertificates}
-            mtlsRoles={options.mtlsRoles}
-            issuedClientCerts={options.issuedClientCerts}
-            forwardAuthUsers={options.forwardAuthUsers}
-            forwardAuthGroups={options.forwardAuthGroups}
-            agents={agents}
-          />
-
-          {editHost && forwardAuthAccess !== null && (
-            <EditHostDialog
-              open
-              host={editHost}
-              rollback={editRollback}
-              initialSection={editSection}
-              onClose={onCloseEdit}
+          <DynamicDnsProvidersProvider value={options.dynamicDnsProviders}>
+            <CreateHostDialog
+              defaultDomain={options.defaultDomain}
+              hostDefaults={options.hostDefaults}
+              key={createKey}
+              open={createOpen}
+              onClose={onCloseCreate}
+              initialData={duplicateHost}
               certificates={options.certificates}
               accessLists={options.accessLists}
               authentikDefaults={options.authentikDefaults}
@@ -128,12 +110,33 @@ export default function HostEditors({
               issuedClientCerts={options.issuedClientCerts}
               forwardAuthUsers={options.forwardAuthUsers}
               forwardAuthGroups={options.forwardAuthGroups}
-              forwardAuthAccess={forwardAuthAccess ?? null}
               agents={agents}
-              assignedAgentIds={agentAssignments[editHost.id] ?? []}
-              canEditRawConfig={canEditRawConfig}
             />
-          )}
+
+            {editHost && forwardAuthAccess !== null && (
+              <EditHostDialog
+                open
+                host={editHost}
+                rollback={editRollback}
+                initialSection={editSection}
+                onClose={onCloseEdit}
+                certificates={options.certificates}
+                accessLists={options.accessLists}
+                authentikDefaults={options.authentikDefaults}
+                forwardAuthDefaults={options.forwardAuthDefaults}
+                tailscaleDefaults={options.tailscaleDefaults}
+                caCertificates={options.caCertificates}
+                mtlsRoles={options.mtlsRoles}
+                issuedClientCerts={options.issuedClientCerts}
+                forwardAuthUsers={options.forwardAuthUsers}
+                forwardAuthGroups={options.forwardAuthGroups}
+                forwardAuthAccess={forwardAuthAccess ?? null}
+                agents={agents}
+                assignedAgentIds={agentAssignments[editHost.id] ?? []}
+                canEditRawConfig={canEditRawConfig}
+              />
+            )}
+          </DynamicDnsProvidersProvider>
         </WafPresetOptionsProvider>
       )}
 

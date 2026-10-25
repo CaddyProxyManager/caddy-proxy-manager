@@ -66,6 +66,7 @@ function host(overrides: Partial<ProxyHost> = {}): ProxyHost {
     rateLimit: null,
     crowdsec: true,
     anubis: null,
+    dynamicDns: null,
     ...overrides,
   };
 }

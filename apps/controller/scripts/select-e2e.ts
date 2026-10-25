@@ -265,6 +265,16 @@ export const RULES: readonly Rule[] = [
     ],
     specs: ACCESS_LISTS,
   },
+  // Before lib/dns/: dynamic DNS is edited from Settings and from both host editors.
+  {
+    match: [
+      `${LIB}dns/dynamic-dns`,
+      `${LIB}dns/host-dynamic-dns`,
+      `${SRC}components/dns/`,
+      `${DASH}settings/DynamicDnsSection.tsx`,
+    ],
+    specs: [...PROXY_HOSTS, ...L4, ...SETTINGS_PAGE],
+  },
   {
     match: [
       `${LIB}certificates/`,
@@ -474,6 +484,7 @@ export const NAMESPACES: Readonly<Record<string, Specs>> = {
   caddyModules: ["functional/caddy-rebuild", "settings/"],
   certificates: CERTIFICATES,
   commandPalette: NAV,
+  dynamicDnsHost: [...PROXY_HOSTS, ...L4],
   email: NOTIFICATIONS,
   groups: GROUPS,
   hostReview: [...PROXY_HOSTS, ...L4],

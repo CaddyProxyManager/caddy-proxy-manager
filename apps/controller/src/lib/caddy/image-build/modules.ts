@@ -51,6 +51,9 @@ export type CaddyModuleDefinition = {
 /** Named by the build-conflict check, which refuses dropping it while CrowdSec is on. */
 export const CROWDSEC_MODULE_ID = "caddy-crowdsec";
 
+/** Selected automatically while dynamic DNS is on, and refused off likewise. */
+export const DYNAMIC_DNS_MODULE_ID = "caddy-dynamicdns";
+
 /**
  * Paths a module shipped under before, to the one it has now. A binary built with the old one
  * still carries it - the plugin registers the same Caddy module and takes the same config - and
@@ -83,7 +86,7 @@ const CORE_MODULES: CaddyModuleDefinition[] = [
     features: ["tailscale"],
   },
   {
-    id: "caddy-dynamicdns",
+    id: DYNAMIC_DNS_MODULE_ID,
     name: "Dynamic DNS",
     modulePath: "github.com/mholt/caddy-dynamicdns",
     description:

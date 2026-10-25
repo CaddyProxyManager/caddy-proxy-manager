@@ -71,6 +71,13 @@ import {
 } from "../proxy-hosts/upstream-timeouts";
 import { hasDnsChallengeFor } from "../dns/challenge-delegation";
 import {
+  type HostDynamicDnsConfig,
+  isDynamicDnsHostname,
+  normalizeHostDynamicDnsInput,
+  sanitizeHostDynamicDns,
+} from "../dns/dynamic-dns";
+import { completeHostDynamicDns, selectDynamicDnsModule } from "../dns/host-dynamic-dns";
+import {
   type HostRateLimitConfig,
   type HostRateLimitMeta,
   hydrateHostRateLimit,
@@ -977,6 +984,7 @@ type ProxyHostMeta = {
   rate_limit?: HostRateLimitMeta;
   crowdsec?: HostCrowdSecMeta;
   anubis?: HostAnubisMeta;
+  dynamic_dns?: HostDynamicDnsConfig;
 };
 
 export type ProxyHost = {
@@ -1038,6 +1046,8 @@ export type ProxyHost = {
   crowdsec: boolean;
   /** Null when never configured; kept while off. */
   anubis: HostAnubisConfig | null;
+  /** Keeps the domains' address records on the serving Caddy's public IP. Kept while off. */
+  dynamicDns: HostDynamicDnsConfig | null;
 };
 
 export type ProxyHostInput = {
@@ -1099,6 +1109,8 @@ export type ProxyHostInput = {
   crowdsec?: boolean | null;
   /** Null forgets it. Enabling needs the upstream; a bad upstream or exempt path is refused. */
   anubis?: Partial<HostAnubisConfig> | null;
+  /** Null forgets it. An empty zone is looked up from DNS; `hostnames` is ignored. */
+  dynamicDns?: Partial<HostDynamicDnsConfig> | null;
 };
 
 type ProxyHostRow = typeof proxyHosts.$inferSelect;
@@ -1662,6 +1674,9 @@ function serializeMeta(meta: ProxyHostMeta | null | undefined) {
   const anubis = sanitizeHostAnubis(meta.anubis);
   if (anubis) normalized.anubis = anubis;
 
+  const dynamicDns = sanitizeHostDynamicDns(meta.dynamic_dns);
+  if (dynamicDns) normalized.dynamic_dns = { ...dynamicDns, hostnames: [] };
+
   if (meta.error_pages && meta.error_pages.length > 0) {
     const errorPages = sanitizeErrorPageRules(meta.error_pages);
     if (errorPages.length > 0) {
@@ -1946,6 +1961,7 @@ function parseMeta(value: string | null): ProxyHostMeta {
       rate_limit: sanitizeHostRateLimit(parsed.rate_limit),
       crowdsec: sanitizeHostCrowdSec(parsed.crowdsec),
       anubis: sanitizeHostAnubis(parsed.anubis),
+      dynamic_dns: sanitizeHostDynamicDns(parsed.dynamic_dns) ?? undefined,
     };
   } catch (error) {
     console.warn("Failed to parse proxy host meta", error);
@@ -2827,6 +2843,14 @@ function buildMeta(
     else delete next.rate_limit;
   }
 
+  if (input.dynamicDns !== undefined) {
+    if (input.dynamicDns) {
+      next.dynamic_dns = { ...normalizeHostDynamicDnsInput(input.dynamicDns), hostnames: [] };
+    } else {
+      delete next.dynamic_dns;
+    }
+  }
+
   if (input.crowdsec !== undefined) {
     const crowdsec = storedHostCrowdSec(input.crowdsec !== false);
     if (crowdsec) next.crowdsec = crowdsec;
@@ -3240,6 +3264,7 @@ export type ProxyHostMetaView = Pick<
   | "rateLimit"
   | "crowdsec"
   | "anubis"
+  | "dynamicDns"
 >;
 
 /**
@@ -3287,6 +3312,7 @@ export function proxyHostMetaView(value: string | null): ProxyHostMetaView {
     rateLimit: hydrateHostRateLimit(meta.rate_limit),
     crowdsec: hostCrowdSecEnabled(sanitizeHostCrowdSec(meta.crowdsec)),
     anubis: hydrateHostAnubis(meta.anubis),
+    dynamicDns: sanitizeHostDynamicDns(meta.dynamic_dns),
   };
 }
 
@@ -3666,7 +3692,10 @@ async function prepareProxyHostCreate(
   await assertCertificateServable(input.certificateId ?? null, input.agentIds ?? []);
   await assertCaddyfileAdapts(input.customCaddyfile, input.agentIds ?? []);
 
-  const meta = buildMeta({}, input, input.waf ? await getWafSettings() : null);
+  const meta = await completeMetaDynamicDns(
+    buildMeta({}, input, input.waf ? await getWafSettings() : null),
+    domains,
+  );
   await assertTailscaleServable(meta);
   await assertWafPresetIdsExist(parseMeta(meta).waf?.preset_ids);
   await assertLocationAccessListsExist(parseMeta(meta).location_rules);
@@ -3808,6 +3837,7 @@ export async function createProxyHost(input: ProxyHostInput, actorUserId: number
   });
 
   await applyCaddyConfig();
+  if (parseMeta(values.meta ?? null).dynamic_dns?.enabled) await selectDynamicDnsModule();
   return (await getProxyHost(id))!;
 }
 
@@ -3938,8 +3968,12 @@ async function prepareProxyHostUpdate(
     rate_limit: sanitizeHostRateLimit(existing.rateLimit),
     crowdsec: storedHostCrowdSec(existing.crowdsec),
     anubis: sanitizeHostAnubis(existing.anubis),
+    dynamic_dns: existing.dynamicDns ?? undefined,
   };
-  const meta = buildMeta(existingMeta, input, input.waf ? await getWafSettings() : null);
+  let meta = buildMeta(existingMeta, input, input.waf ? await getWafSettings() : null);
+  if (input.dynamicDns !== undefined || input.domains !== undefined) {
+    meta = await completeMetaDynamicDns(meta, domainList);
+  }
   await assertTailscaleServable(meta);
   await assertWafPresetIdsExist(parseMeta(meta).waf?.preset_ids);
   await assertLocationAccessListsExist(parseMeta(meta).location_rules);
@@ -4024,7 +4058,22 @@ export async function updateProxyHost(
   await pruneHostRevisions("http", [id]);
 
   await applyCaddyConfig();
+  if (parseMeta(set.meta ?? null).dynamic_dns?.enabled) await selectDynamicDnsModule();
   return (await getProxyHost(id))!;
+}
+
+/** Its zone found and its provider checked, against the domains the host is saved with. */
+async function completeMetaDynamicDns(
+  meta: string | null,
+  domains: readonly string[],
+): Promise<string | null> {
+  const parsed = parseMeta(meta);
+  if (!parsed.dynamic_dns?.enabled) return meta;
+  const completed = await completeHostDynamicDns(
+    parsed.dynamic_dns,
+    domains.filter(isDynamicDnsHostname),
+  );
+  return serializeMeta({ ...parsed, dynamic_dns: completed });
 }
 
 /** A stored `meta` with maintenance switched, keeping the host's bypass ranges and page. */

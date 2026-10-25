@@ -28,6 +28,12 @@ import { normalizeHostDescription } from "../proxy-hosts/description";
 import { collectTags, hasTagClause, normalizeHostTags, parseStoredTags } from "../proxy-hosts/tags";
 import { assertL4PortPlan, MAX_L4_PORTS_PER_HOST } from "../l4/port-plan";
 import {
+  type HostDynamicDnsConfig,
+  normalizeHostDynamicDnsInput,
+  sanitizeHostDynamicDns,
+} from "../dns/dynamic-dns";
+import { completeHostDynamicDns, selectDynamicDnsModule } from "../dns/host-dynamic-dns";
+import {
   type HostCrowdSecMeta,
   hostCrowdSecEnabled,
   sanitizeHostCrowdSec,
@@ -155,6 +161,7 @@ export type L4ProxyHostMeta = {
   crowdsec?: HostCrowdSecMeta;
   /** Absent means `fixed`. */
   upstream_port_mode?: "same";
+  dynamic_dns?: HostDynamicDnsConfig;
 };
 
 const VALID_L4_LB_POLICIES: L4LoadBalancingPolicy[] = [
@@ -201,6 +208,8 @@ export type L4ProxyHost = {
   crowdsec: boolean;
   /** With `same`, each upstream is a bare host. */
   upstreamPortMode: L4UpstreamPortMode;
+  /** Keeps its hostnames' address records on the serving Caddy's public IP. Kept while off. */
+  dynamicDns: HostDynamicDnsConfig | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -235,6 +244,8 @@ export type L4ProxyHostInput = {
   /** False opts the host out of CrowdSec; true or null follows the global setting. */
   crowdsec?: boolean | null;
   upstreamPortMode?: L4UpstreamPortMode;
+  /** Null forgets it. An empty zone is looked up from DNS. */
+  dynamicDns?: Partial<HostDynamicDnsConfig> | null;
 };
 
 const VALID_PROTOCOLS: L4Protocol[] = ["tcp", "udp"];
@@ -484,6 +495,7 @@ function parseL4ProxyHost(row: L4ProxyHostRow): L4ProxyHost {
     geoblockMode: meta.geoblock_mode ?? "merge",
     crowdsec: hostCrowdSecEnabled(sanitizeHostCrowdSec(meta.crowdsec)),
     upstreamPortMode: meta.upstream_port_mode === "same" ? "same" : "fixed",
+    dynamicDns: sanitizeHostDynamicDns(meta.dynamic_dns),
     createdAt: toIso(row.createdAt)!,
     updatedAt: toIso(row.updatedAt)!,
   };
@@ -757,7 +769,7 @@ async function prepareL4ProxyHostCreate(
   await assertL4AccessList(input.accessListId);
   await assertNoNewAdminDialTargets([], input.upstreams, actorUserId);
 
-  return {
+  const values = {
     name: input.name.trim(),
     description: normalizeHostDescription(input.description) ?? null,
     tags: JSON.stringify(normalizeHostTags(input.tags) ?? []),
@@ -793,10 +805,21 @@ async function prepareL4ProxyHostCreate(
       // What was validated, not a raw `meta` passed through.
       if (input.upstreamPortMode === "same") meta.upstream_port_mode = "same";
       else delete meta.upstream_port_mode;
+      if (input.dynamicDns) meta.dynamic_dns = normalizeHostDynamicDnsInput(input.dynamicDns);
+      else delete meta.dynamic_dns;
       return Object.keys(meta).length > 0 ? JSON.stringify(meta) : null;
     })(),
     enabled: input.enabled ?? true,
   };
+  return { ...values, meta: await completeL4MetaDynamicDns(values.meta) };
+}
+
+/** Its zone found and its provider checked; see completeHostDynamicDns. */
+async function completeL4MetaDynamicDns(meta: string | null): Promise<string | null> {
+  const parsed = safeJsonParse<L4ProxyHostMeta>(meta, {});
+  if (!parsed.dynamic_dns?.enabled) return meta;
+  const completed = await completeHostDynamicDns(parsed.dynamic_dns, parsed.dynamic_dns.hostnames);
+  return JSON.stringify({ ...parsed, dynamic_dns: completed });
 }
 
 /** A new host as the defaults leave it, for diffing a create against. */
@@ -912,6 +935,12 @@ export async function createL4ProxyHost(input: L4ProxyHostInput, actorUserId: nu
   });
 
   await applyCaddyConfig();
+  if (
+    sanitizeHostDynamicDns(safeJsonParse<L4ProxyHostMeta>(values.meta ?? null, {}).dynamic_dns)
+      ?.enabled
+  ) {
+    await selectDynamicDnsModule();
+  }
   return (await getL4ProxyHost(id))!;
 }
 
@@ -1002,119 +1031,125 @@ async function prepareL4ProxyHostUpdate(
   // API on this host's listen port - the same hole the HTTP host model closes.
   await assertNoNewAdminDialTargets(existing.upstreams, input.upstreams ?? [], actorUserId);
 
-  return {
-    existing,
-    row,
-    set: {
-      ...(input.name !== undefined ? { name: input.name.trim() } : {}),
-      ...(input.description !== undefined
-        ? { description: normalizeHostDescription(input.description) }
-        : {}),
-      ...(input.tags !== undefined ? { tags: JSON.stringify(normalizeHostTags(input.tags)) } : {}),
-      ...(input.protocol !== undefined ? { protocol: input.protocol } : {}),
-      ...(input.listenAddress !== undefined ? { listenAddress: input.listenAddress.trim() } : {}),
-      ...(input.upstreams !== undefined
-        ? { upstreams: JSON.stringify(Array.from(new Set(input.upstreams.map((u) => u.trim())))) }
-        : {}),
-      ...(input.matcherType !== undefined ? { matcherType: input.matcherType } : {}),
-      ...(input.matcherValue !== undefined
-        ? { matcherValue: JSON.stringify(input.matcherValue.map((v) => v.trim()).filter(Boolean)) }
-        : {}),
-      ...(input.tlsTermination !== undefined ? { tlsTermination: input.tlsTermination } : {}),
-      ...(input.proxyProtocolVersion !== undefined
-        ? { proxyProtocolVersion: input.proxyProtocolVersion }
-        : {}),
-      ...(input.proxyProtocolReceive !== undefined
-        ? { proxyProtocolReceive: input.proxyProtocolReceive }
-        : {}),
-      ...(input.accessListId !== undefined ? { accessListId: input.accessListId } : {}),
-      ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
-      ...(() => {
-        const hasMetaChanges =
-          input.meta !== undefined ||
-          input.loadBalancer !== undefined ||
-          input.dnsResolver !== undefined ||
-          input.upstreamDnsResolution !== undefined ||
-          input.geoblock !== undefined ||
-          input.geoblockMode !== undefined ||
-          input.crowdsec !== undefined ||
-          input.upstreamPortMode !== undefined;
-        if (!hasMetaChanges) return {};
+  const set: Partial<L4ProxyHostRow> = {
+    ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+    ...(input.description !== undefined
+      ? { description: normalizeHostDescription(input.description) }
+      : {}),
+    ...(input.tags !== undefined ? { tags: JSON.stringify(normalizeHostTags(input.tags)) } : {}),
+    ...(input.protocol !== undefined ? { protocol: input.protocol } : {}),
+    ...(input.listenAddress !== undefined ? { listenAddress: input.listenAddress.trim() } : {}),
+    ...(input.upstreams !== undefined
+      ? { upstreams: JSON.stringify(Array.from(new Set(input.upstreams.map((u) => u.trim())))) }
+      : {}),
+    ...(input.matcherType !== undefined ? { matcherType: input.matcherType } : {}),
+    ...(input.matcherValue !== undefined
+      ? { matcherValue: JSON.stringify(input.matcherValue.map((v) => v.trim()).filter(Boolean)) }
+      : {}),
+    ...(input.tlsTermination !== undefined ? { tlsTermination: input.tlsTermination } : {}),
+    ...(input.proxyProtocolVersion !== undefined
+      ? { proxyProtocolVersion: input.proxyProtocolVersion }
+      : {}),
+    ...(input.proxyProtocolReceive !== undefined
+      ? { proxyProtocolReceive: input.proxyProtocolReceive }
+      : {}),
+    ...(input.accessListId !== undefined ? { accessListId: input.accessListId } : {}),
+    ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
+    ...(() => {
+      const hasMetaChanges =
+        input.meta !== undefined ||
+        input.loadBalancer !== undefined ||
+        input.dnsResolver !== undefined ||
+        input.upstreamDnsResolution !== undefined ||
+        input.geoblock !== undefined ||
+        input.geoblockMode !== undefined ||
+        input.crowdsec !== undefined ||
+        input.upstreamPortMode !== undefined ||
+        input.dynamicDns !== undefined;
+      if (!hasMetaChanges) return {};
 
-        const existingMeta: L4ProxyHostMeta = {
-          ...(existing.loadBalancer
-            ? { load_balancer: dehydrateL4LoadBalancer(existing.loadBalancer) }
-            : {}),
-          ...(existing.dnsResolver
-            ? { dns_resolver: dehydrateL4DnsResolver(existing.dnsResolver) }
-            : {}),
-          ...(existing.upstreamDnsResolution
-            ? {
-                upstream_dns_resolution: dehydrateL4UpstreamDnsResolution(
-                  existing.upstreamDnsResolution,
-                ),
-              }
-            : {}),
-          ...(existing.geoblock ? { geoblock: existing.geoblock } : {}),
-          ...(existing.geoblockMode !== "merge" ? { geoblock_mode: existing.geoblockMode } : {}),
-          ...(existing.crowdsec ? {} : { crowdsec: { enabled: false } as const }),
-          ...(existing.upstreamPortMode === "same" ? { upstream_port_mode: "same" as const } : {}),
-        };
+      const existingMeta: L4ProxyHostMeta = {
+        ...(existing.loadBalancer
+          ? { load_balancer: dehydrateL4LoadBalancer(existing.loadBalancer) }
+          : {}),
+        ...(existing.dnsResolver
+          ? { dns_resolver: dehydrateL4DnsResolver(existing.dnsResolver) }
+          : {}),
+        ...(existing.upstreamDnsResolution
+          ? {
+              upstream_dns_resolution: dehydrateL4UpstreamDnsResolution(
+                existing.upstreamDnsResolution,
+              ),
+            }
+          : {}),
+        ...(existing.geoblock ? { geoblock: existing.geoblock } : {}),
+        ...(existing.geoblockMode !== "merge" ? { geoblock_mode: existing.geoblockMode } : {}),
+        ...(existing.crowdsec ? {} : { crowdsec: { enabled: false } as const }),
+        ...(existing.upstreamPortMode === "same" ? { upstream_port_mode: "same" as const } : {}),
+        ...(existing.dynamicDns ? { dynamic_dns: existing.dynamicDns } : {}),
+      };
 
-        const meta: L4ProxyHostMeta =
-          input.meta !== undefined ? { ...(input.meta ?? {}) } : { ...existingMeta };
+      const meta: L4ProxyHostMeta =
+        input.meta !== undefined ? { ...(input.meta ?? {}) } : { ...existingMeta };
 
-        if (input.loadBalancer !== undefined) {
-          const lb = dehydrateL4LoadBalancer(input.loadBalancer);
-          if (lb) {
-            meta.load_balancer = lb;
-          } else {
-            delete meta.load_balancer;
-          }
+      if (input.loadBalancer !== undefined) {
+        const lb = dehydrateL4LoadBalancer(input.loadBalancer);
+        if (lb) {
+          meta.load_balancer = lb;
+        } else {
+          delete meta.load_balancer;
         }
-        if (input.dnsResolver !== undefined) {
-          const dr = dehydrateL4DnsResolver(input.dnsResolver);
-          if (dr) {
-            meta.dns_resolver = dr;
-          } else {
-            delete meta.dns_resolver;
-          }
+      }
+      if (input.dnsResolver !== undefined) {
+        const dr = dehydrateL4DnsResolver(input.dnsResolver);
+        if (dr) {
+          meta.dns_resolver = dr;
+        } else {
+          delete meta.dns_resolver;
         }
-        if (input.upstreamDnsResolution !== undefined) {
-          const udr = dehydrateL4UpstreamDnsResolution(input.upstreamDnsResolution);
-          if (udr) {
-            meta.upstream_dns_resolution = udr;
-          } else {
-            delete meta.upstream_dns_resolution;
-          }
+      }
+      if (input.upstreamDnsResolution !== undefined) {
+        const udr = dehydrateL4UpstreamDnsResolution(input.upstreamDnsResolution);
+        if (udr) {
+          meta.upstream_dns_resolution = udr;
+        } else {
+          delete meta.upstream_dns_resolution;
         }
-        if (input.geoblock !== undefined) {
-          if (input.geoblock) {
-            meta.geoblock = input.geoblock;
-          } else {
-            delete meta.geoblock;
-          }
+      }
+      if (input.geoblock !== undefined) {
+        if (input.geoblock) {
+          meta.geoblock = input.geoblock;
+        } else {
+          delete meta.geoblock;
         }
-        if (input.geoblockMode !== undefined) {
-          if (input.geoblockMode !== "merge") {
-            meta.geoblock_mode = input.geoblockMode;
-          } else {
-            delete meta.geoblock_mode;
-          }
+      }
+      if (input.geoblockMode !== undefined) {
+        if (input.geoblockMode !== "merge") {
+          meta.geoblock_mode = input.geoblockMode;
+        } else {
+          delete meta.geoblock_mode;
         }
-        const crowdsec =
-          input.crowdsec !== undefined
-            ? storedHostCrowdSec(input.crowdsec !== false)
-            : sanitizeHostCrowdSec(meta.crowdsec);
-        if (crowdsec) meta.crowdsec = crowdsec;
-        else delete meta.crowdsec;
-        if (upstreamPortMode === "same") meta.upstream_port_mode = "same";
-        else delete meta.upstream_port_mode;
+      }
+      const crowdsec =
+        input.crowdsec !== undefined
+          ? storedHostCrowdSec(input.crowdsec !== false)
+          : sanitizeHostCrowdSec(meta.crowdsec);
+      if (crowdsec) meta.crowdsec = crowdsec;
+      else delete meta.crowdsec;
+      if (upstreamPortMode === "same") meta.upstream_port_mode = "same";
+      else delete meta.upstream_port_mode;
+      if (input.dynamicDns !== undefined) {
+        if (input.dynamicDns) meta.dynamic_dns = normalizeHostDynamicDnsInput(input.dynamicDns);
+        else delete meta.dynamic_dns;
+      }
 
-        return { meta: Object.keys(meta).length > 0 ? JSON.stringify(meta) : null };
-      })(),
-    },
+      return { meta: Object.keys(meta).length > 0 ? JSON.stringify(meta) : null };
+    })(),
   };
+  if (input.dynamicDns !== undefined && set.meta !== undefined) {
+    set.meta = await completeL4MetaDynamicDns(set.meta);
+  }
+  return { existing, row, set };
 }
 
 export async function updateL4ProxyHost(
@@ -1161,6 +1196,12 @@ export async function updateL4ProxyHost(
   await pruneHostRevisions("l4", [id]);
 
   await applyCaddyConfig();
+  if (
+    sanitizeHostDynamicDns(safeJsonParse<L4ProxyHostMeta>(set.meta ?? null, {}).dynamic_dns)
+      ?.enabled
+  ) {
+    await selectDynamicDnsModule();
+  }
   return (await getL4ProxyHost(id))!;
 }
 

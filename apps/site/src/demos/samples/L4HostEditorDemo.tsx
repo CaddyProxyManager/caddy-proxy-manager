@@ -64,6 +64,7 @@ const POSTGRES: L4ProxyHost = {
   geoblockMode: "merge",
   crowdsec: true,
   upstreamPortMode: "fixed",
+  dynamicDns: null,
   createdAt: "2026-09-01T12:00:00Z",
   updatedAt: "2026-09-01T12:00:00Z",
 };

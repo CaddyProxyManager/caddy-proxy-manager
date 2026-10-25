@@ -155,6 +155,13 @@ const SETTINGS_HANDLERS: Record<string, SettingsHandler> = {
     save: saveDynamicDnsSettings as (data: never) => Promise<void>,
     storageKey: "dynamic_dns",
     applyCaddy: true,
+    // Switched on without its module, it builds the module in rather than updating nothing.
+    afterSave: async () => {
+      const { ensureDynamicDnsModule } = await import("../caddy/image-build");
+      if (!(await ensureDynamicDnsModule())) return;
+      const { pushDesiredState } = await import("../agent/desired-state");
+      await pushDesiredState();
+    },
   },
   geoblock: {
     get: getGeoBlockSettings,

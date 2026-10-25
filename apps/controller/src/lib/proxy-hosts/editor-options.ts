@@ -16,10 +16,12 @@ import {
 import { type MtlsRole, listMtlsRoles } from "../models/mtls-roles";
 import { listUsers } from "../models/user";
 import { listWafPresets, toWafPresetOption } from "../models/waf-presets";
+import { type DynamicDnsProviderOptions, dynamicDnsProviderOptions } from "../dns/dynamic-dns";
 import {
   type AuthentikSettings,
   type ForwardAuthSettings,
   getAuthentikSettings,
+  getDnsProviderSettings,
   getForwardAuthSettings,
   getGeneralSettings,
   getHostDefaults,
@@ -61,6 +63,7 @@ export type HostEditorOptions = {
   forwardAuthGroups: ForwardAuthGroupOption[];
   wafPresets: PickerOption[];
   wafPlugins: PickerOption[];
+  dynamicDnsProviders: DynamicDnsProviderOptions;
 };
 
 export async function loadHostEditorOptions(): Promise<HostEditorOptions> {
@@ -80,6 +83,7 @@ export async function loadHostEditorOptions(): Promise<HostEditorOptions> {
     groups,
     wafPresets,
     crsPlugins,
+    dnsProviders,
   ] = await Promise.all([
     listCertificateSummaries(),
     listCaCertificates(),
@@ -95,6 +99,7 @@ export async function loadHostEditorOptions(): Promise<HostEditorOptions> {
     listGroups().catch(() => []),
     listWafPresets(),
     listCrsPlugins(),
+    getDnsProviderSettings(),
   ]);
   return {
     certificates: certificates.map(toCertificatePickerOption),
@@ -121,6 +126,7 @@ export async function loadHostEditorOptions(): Promise<HostEditorOptions> {
     })),
     wafPresets: wafPresets.map(toWafPresetOption),
     wafPlugins: crsPlugins.map(toCrsPluginOption),
+    dynamicDnsProviders: dynamicDnsProviderOptions(dnsProviders),
   };
 }
 

@@ -1,4 +1,18 @@
 {
+  "dynamicDnsHost": {
+    "title": "Dynamic DNS",
+    "description": "Keeps this host's domains pointed at the public IP of the Caddy serving it, through your DNS provider's API.",
+    "descriptionL4": "Keeps the hostnames below pointed at the public IP of the Caddy serving this host, through your DNS provider's API.",
+    "enable": "Update this host's DNS records",
+    "noProviders": "Dynamic DNS updates records through a DNS provider with saved credentials. Add one under Settings → DNS → DNS providers.",
+    "moduleTitle": "Caddy is rebuilt on save",
+    "module": "The Dynamic DNS module is not built into Caddy yet. Saving selects it and the agent rebuilds Caddy, which takes a few minutes.",
+    "hostnames": "Hostnames",
+    "hostnamesHelp": "One per line. Each gets an A record, and an AAAA record if IPv6 is on in Settings → DNS → Dynamic DNS.",
+    "defaultProvider": "Default provider (none set)",
+    "defaultProviderNamed": "Default ({name})",
+    "zoneHelp": "Empty looks it up from DNS when you save."
+  },
   "attention": {
     "title": "Needs attention",
     "count": "{count, plural, one {# item} other {# items}}",
@@ -1078,6 +1092,7 @@
       "globalWaf": "global WAF is switched on and needs the Coraza WAF module",
       "globalGeoblock": "global geoblocking is switched on and needs the Request Blocker module",
       "globalCrowdsec": "CrowdSec is switched on and needs the CrowdSec module",
+      "globalDynamicDns": "Dynamic DNS is on, in Settings or on a host, and needs the Dynamic DNS module",
       "hostWaf": "{count, plural, one {# proxy host has per-host WAF enabled and needs} other {# proxy hosts have per-host WAF enabled and need}} the Coraza WAF module",
       "hostGeoblock": "{count, plural, one {# proxy host has per-host geoblocking enabled and needs} other {# proxy hosts have per-host geoblocking enabled and need}} the Request Blocker module",
       "tailnetHosts": "{count, plural, one {# proxy host is served on the tailnet and needs} other {# proxy hosts are served on the tailnet and need}} the Tailscale module",
@@ -1364,6 +1379,12 @@
     "passwordsDoNotMatch": "Passwords do not match"
   },
   "errors": {
+    "dynamicDnsTooManyHostnames": "Dynamic DNS lists at most {max} hostnames per host",
+    "dynamicDnsHostnameInvalid": "\"{hostname}\" is not a hostname, such as game.example.com",
+    "dynamicDnsHostOutsideZone": "{hostname} is not in the zone {zone}. Set the zone that holds it, or use a record set under Settings → DNS → Dynamic DNS.",
+    "dynamicDnsNoDefaultProvider": "Dynamic DNS needs a DNS provider: pick one, or set a default under Settings → DNS → DNS providers",
+    "dynamicDnsHostnamesRequired": "Dynamic DNS needs at least one hostname to update",
+    "dynamicDnsZoneNotFound": "No DNS zone answers for {hostname}. Enter the zone your DNS provider holds it in.",
     "dynamicDnsProviderUnknown": "Unknown DNS provider for dynamic DNS: {provider}",
     "dynamicDnsProviderUnsupported": "{provider} cannot hold address records, so it cannot be used for dynamic DNS",
     "dynamicDnsProviderNotConfigured": "The DNS provider {provider} has no saved credentials. Add it under DNS providers first.",
@@ -2254,6 +2275,7 @@
       }
     },
     "fields": {
+      "dynamicDns": "Dynamic DNS",
       "name": "Name",
       "description": "Notes",
       "tags": "Tags",

@@ -45,6 +45,12 @@ and warnings when the save removes the access list, geo blocking or CrowdSec, sw
 list with geo rules, or disables the host. A new listen address, protocol or agent pinning also
 notes that the port is published only when the agent recreates Caddy, from the banner after saving.
 
+## Dynamic DNS
+
+An L4 host has no domains of its own, so **Dynamic DNS** under Listener lists the hostnames to keep
+pointed at the Caddy serving it, such as `play.example.com` for a game server behind a home
+connection. Otherwise it works as for a [proxy host](../reverse-proxy/#dynamic-dns).
+
 ## Port ranges
 
 The listen address can name a range, such as `:27015-27030`, of up to 1000 ports - for game

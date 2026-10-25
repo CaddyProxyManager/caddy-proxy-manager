@@ -217,22 +217,30 @@ export async function register() {
       console.error("Failed to move suppressed WAF rules into exclusions:", error);
     }
 
-    let crowdsecEnabled = false;
+    // An upgrade can find either switched on with its module not built in; the push builds it.
+    let moduleSelected = false;
+    const { ensureCrowdSecModule, ensureDynamicDnsModule } = await import(
+      "./lib/caddy/image-build"
+    );
     try {
-      const { ensureCrowdSecModule } = await import("./lib/caddy/image-build");
-      crowdsecEnabled = await ensureCrowdSecModule();
+      moduleSelected = await ensureCrowdSecModule();
     } catch (error) {
       console.error("Failed to ensure the Caddy CrowdSec module:", error);
+    }
+    try {
+      moduleSelected = (await ensureDynamicDnsModule()) || moduleSelected;
+    } catch (error) {
+      console.error("Failed to ensure the Caddy Dynamic DNS module:", error);
     }
 
     await releaseStartupLock();
 
-    if (crowdsecEnabled) {
+    if (moduleSelected) {
       try {
         const { pushDesiredState } = await import("./lib/agent/desired-state");
         await pushDesiredState();
       } catch (error) {
-        console.error("Failed to request a Caddy build with the CrowdSec module:", error);
+        console.error("Failed to request a Caddy build with the selected modules:", error);
       }
     }
 

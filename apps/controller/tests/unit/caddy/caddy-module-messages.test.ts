@@ -27,6 +27,7 @@ const CONFLICTS: ModuleConflict[] = [
   { kind: 'globalWaf' },
   { kind: 'globalGeoblock' },
   { kind: 'globalCrowdsec' },
+  { kind: 'globalDynamicDns' },
   { kind: 'hostWaf', count: 1 },
   { kind: 'hostWaf', count: 2 },
   { kind: 'hostGeoblock', count: 1 },

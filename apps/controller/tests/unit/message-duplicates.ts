@@ -196,6 +196,8 @@ export const SEPARATE_DUPLICATES: readonly {
     reason: 'composed',
     keys: [
       'caddyModules.modules.caddyDynamicdns.name',
+      'dynamicDnsHost.title',
+      'hostReview.fields.dynamicDns',
       'settings.blocks.dynamicDns.name',
       'settings.stagedLabels.dynamicDns',
     ],

@@ -85,6 +85,7 @@ const HOST: ProxyHost = {
   rateLimit: { enabled: true, zones: [] },
   crowdsec: true,
   anubis: null,
+  dynamicDns: null,
 };
 
 const NOW = Math.floor(Date.parse("2026-02-11T12:00:00.000Z") / 1000);

@@ -16,6 +16,7 @@ import type {
   L4UpstreamPortMode,
 } from "../models/l4-proxy-hosts";
 import { parseAgentIds } from "../models/host-agents";
+import { parseDynamicDnsConfig } from "../proxy-hosts/form";
 import {
   parseCheckbox,
   parseCsv,
@@ -252,6 +253,7 @@ export function parseL4CreateForm(formData: FormData): L4ProxyHostInput {
     crowdsec: formData.has("crowdsecPresent")
       ? parseCheckbox(formData.get("crowdsecEnabled"))
       : undefined,
+    dynamicDns: parseDynamicDnsConfig(formData),
   };
 
   return input;
@@ -305,6 +307,7 @@ export function parseL4UpdateForm(formData: FormData): Partial<L4ProxyHostInput>
     crowdsec: formData.has("crowdsecPresent")
       ? parseCheckbox(formData.get("crowdsecEnabled"))
       : undefined,
+    dynamicDns: parseDynamicDnsConfig(formData),
   };
 
   return input;

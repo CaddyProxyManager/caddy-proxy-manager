@@ -3751,6 +3751,33 @@ const spec = {
         },
         required: ["enabled", "zones"],
       },
+      HostDynamicDnsConfig: {
+        type: "object",
+        description:
+          "Keeps the host's names pointed at the public IP of the Caddy serving it, through a DNS provider with saved credentials: the bundled agent's, or the agent the host is pinned to. Interval, IP versions and TTL come from the dynamic-dns settings group. Switching it on selects the Dynamic DNS module, so the agents rebuild Caddy. Kept while off",
+        properties: {
+          enabled: { type: "boolean" },
+          provider: {
+            type: "string",
+            nullable: true,
+            description: "A configured DNS provider, not acmedns. Null uses the default provider",
+          },
+          zone: {
+            type: "string",
+            description:
+              "The zone the provider holds the names in. Empty is looked up from DNS on save, and a name outside it is refused (400)",
+            example: "example.com",
+          },
+          hostnames: {
+            type: "array",
+            items: { type: "string" },
+            maxItems: 50,
+            description:
+              "L4 hosts only: the names to update, which a switched-on host needs. A proxy host updates its domains and ignores this",
+          },
+        },
+        required: ["enabled"],
+      },
       HostAnubisConfig: {
         type: "object",
         description:
@@ -4043,6 +4070,9 @@ const spec = {
           anubis: {
             oneOf: [{ $ref: "#/components/schemas/HostAnubisConfig" }, { type: "null" }],
           },
+          dynamicDns: {
+            oneOf: [{ $ref: "#/components/schemas/HostDynamicDnsConfig" }, { type: "null" }],
+          },
           locationRules: {
             type: "array",
             items: { $ref: "#/components/schemas/LocationRule" },
@@ -4152,6 +4182,9 @@ const spec = {
           anubis: {
             oneOf: [{ $ref: "#/components/schemas/HostAnubisConfig" }, { type: "null" }],
           },
+          dynamicDns: {
+            oneOf: [{ $ref: "#/components/schemas/HostDynamicDnsConfig" }, { type: "null" }],
+          },
           locationRules: {
             type: "array",
             items: { $ref: "#/components/schemas/LocationRule" },
@@ -4208,6 +4241,9 @@ const spec = {
             items: { type: "string" },
             example: ["db-server:5432"],
             description: "'host:port' each, or a bare host when upstreamPortMode is 'same'",
+          },
+          dynamicDns: {
+            oneOf: [{ $ref: "#/components/schemas/HostDynamicDnsConfig" }, { type: "null" }],
           },
           upstreamPortMode: {
             type: "string",
@@ -4294,6 +4330,9 @@ const spec = {
             items: { type: "string" },
             example: ["db:5432"],
             description: "'host:port' each, or a bare host when upstreamPortMode is 'same'",
+          },
+          dynamicDns: {
+            oneOf: [{ $ref: "#/components/schemas/HostDynamicDnsConfig" }, { type: "null" }],
           },
           upstreamPortMode: {
             type: "string",

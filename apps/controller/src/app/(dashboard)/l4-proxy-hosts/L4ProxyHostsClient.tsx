@@ -1,5 +1,7 @@
 "use client";
 
+import { DynamicDnsProvidersProvider } from "@/components/dns/DynamicDnsHostFields";
+import type { DynamicDnsProviderOptions } from "@/lib/dns/dynamic-dns";
 import type { EditorRollback } from "@/components/host-history/RollbackNotice";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -60,6 +62,7 @@ type Props = {
   accessLists?: L4AccessListOption[];
   /** What a new host's form starts with. */
   hostDefaults?: L4ProxyHostDefaults | null;
+  dynamicDnsProviders?: DynamicDnsProviderOptions;
   /** A host absent from here is served by every agent. */
   agentAssignments?: Record<number, number[]>;
   /** False for an operator - see ProxyHostsClient. */
@@ -183,6 +186,7 @@ export default function L4ProxyHostsClient({
   agents,
   accessLists = [],
   hostDefaults = null,
+  dynamicDnsProviders = { choices: [], default: null },
   agentAssignments,
   canCreate = true,
   manageableIds = [],
@@ -510,36 +514,38 @@ export default function L4ProxyHostsClient({
         }}
       />
 
-      <CreateL4HostDialog
-        key={dialogKey}
-        open={createOpen}
-        onClose={() => {
-          setCreateOpen(false);
-          setTimeout(() => setDuplicateHost(null), 200);
-          signalBannerRefresh();
-          router.refresh();
-        }}
-        initialData={duplicateHost}
-        defaults={hostDefaults}
-        agents={agents ?? []}
-        accessLists={accessLists}
-      />
-
-      {editHost && (
-        <EditL4HostDialog
-          open={!!editHost}
-          host={editHost}
-          rollback={rollback && editHost === editTarget ? rollback : null}
-          initialSection={editSection}
+      <DynamicDnsProvidersProvider value={dynamicDnsProviders}>
+        <CreateL4HostDialog
+          key={dialogKey}
+          open={createOpen}
           onClose={() => {
+            setCreateOpen(false);
+            setTimeout(() => setDuplicateHost(null), 200);
             signalBannerRefresh();
-            closeEditor();
+            router.refresh();
           }}
+          initialData={duplicateHost}
+          defaults={hostDefaults}
           agents={agents ?? []}
           accessLists={accessLists}
-          assignedAgentIds={agentAssignments?.[editHost.id] ?? []}
         />
-      )}
+
+        {editHost && (
+          <EditL4HostDialog
+            open={!!editHost}
+            host={editHost}
+            rollback={rollback && editHost === editTarget ? rollback : null}
+            initialSection={editSection}
+            onClose={() => {
+              signalBannerRefresh();
+              closeEditor();
+            }}
+            agents={agents ?? []}
+            accessLists={accessLists}
+            assignedAgentIds={agentAssignments?.[editHost.id] ?? []}
+          />
+        )}
+      </DynamicDnsProvidersProvider>
 
       {deleteHost && (
         <DeleteL4HostDialog

@@ -3196,7 +3196,10 @@ async function buildDynamicDnsDocumentApp(
   availability: CaddyModuleAvailability,
   agentRowId: number | undefined,
 ): Promise<{ dynamic_dns?: Record<string, unknown> }> {
-  if (!settings?.enabled) return {};
+  if (!settings) return {};
+  const { effectiveDynamicDnsSettings } = await import("../dns/host-dynamic-dns-sets");
+  const effective = await effectiveDynamicDnsSettings(settings);
+  if (!effective.enabled) return {};
   if (!isFeatureUsable(availability, "ddns")) {
     console.warn(
       "Dynamic DNS is enabled in settings but its Caddy module is not in the running binary. " +
@@ -3209,7 +3212,7 @@ async function buildDynamicDnsDocumentApp(
     import("../agent/bootstrap"),
   ]);
   const agent = agentRowId === undefined ? null : await findAgentById(agentRowId);
-  const { app, skipped } = buildDynamicDnsApp(settings, {
+  const { app, skipped } = buildDynamicDnsApp(effective, {
     agentId: agent?.agentId ?? null,
     bundledAgentId: await bundledAgentId(),
     providerCredentials,

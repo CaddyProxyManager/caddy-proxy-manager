@@ -47,12 +47,17 @@ cache somewhere to live other than memory (see [HTTP cache storage](#http-cache-
 
 A module still being used cannot be switched off. The save is refused and names what is using it,
 such as "3 enabled L4 proxy hosts need the Layer 4 Proxy module". That check covers global and
-per-host WAF and geo blocking, CrowdSec while it is switched on, enabled L4 hosts, hosts served on
-the tailnet, and every DNS provider with credentials on file. Turn the feature off first.
+per-host WAF and geo blocking, CrowdSec and Dynamic DNS while each is switched on, enabled L4 hosts,
+hosts served on the tailnet, and every DNS provider with credentials on file. Turn the feature off
+first.
 
-Rate Limit, Dynamic DNS and the HTTP caching modules are the exception: turning one off is allowed.
-Hosts with rate limiting are served without limits, dynamic DNS records stop being updated, hosts in
-Caddy cache mode fall back to browser caching, and a storage falls back to memory.
+CrowdSec and Dynamic DNS also work the other way round: switching one on selects its module, and
+the agent rebuilds Caddy with it. The same check runs at every start, so an upgrade that finds
+either switched on with its module missing builds it in without asking.
+
+Rate Limit and the HTTP caching modules are the exception: turning one off is allowed. Hosts with
+rate limiting are served without limits, hosts in Caddy cache mode fall back to browser caching, and
+a storage falls back to memory.
 
 Per-host **custom Caddyfile** snippets cannot be checked the same way: they are free-form text, and
 only Caddy's adapter knows what a directive resolves to, and only for the binary running *now*

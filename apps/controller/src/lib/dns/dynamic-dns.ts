@@ -6,7 +6,11 @@
 
 import { CADDY_DURATION_SEGMENT, isCaddyDuration } from "../caddy/duration";
 import { domainError } from "../errors/domain-error";
-import { getProviderDefinition } from "./providers";
+import {
+  type DnsProviderChoice,
+  configuredDnsProviderChoices,
+  getProviderDefinition,
+} from "./providers";
 
 export type DynamicDnsRecordSet = {
   /** A DNS provider with saved credentials. */
@@ -213,4 +217,103 @@ export function normalizeDynamicDnsSettings(value: unknown): DynamicDnsSettings 
 /** The fully qualified names a record set keeps updated, for display. */
 export function recordSetHostnames(set: DynamicDnsRecordSet): string[] {
   return set.names.map((name) => (name === "@" ? set.zone : `${name}.${set.zone}`));
+}
+
+// ─── Per host ────────────────────────────────────────────────────────────────
+
+/**
+ * A proxy host's or L4 host's own record set. A proxy host updates its domains; an L4 host has no
+ * names of its own, so it lists them. Kept while off, so turning it back on restores the rest.
+ */
+export type HostDynamicDnsConfig = {
+  enabled: boolean;
+  /** Null uses the default DNS provider. */
+  provider: string | null;
+  /** Looked up from DNS on save when left empty. */
+  zone: string;
+  /** L4 hosts only. */
+  hostnames: string[];
+};
+
+export const HOST_DYNAMIC_DNS_MAX_HOSTNAMES = DYNAMIC_DNS_MAX_NAMES;
+
+/** Lenient: for a stored blob, where a bad value means "never configured" rather than an error. */
+export function sanitizeHostDynamicDns(value: unknown): HostDynamicDnsConfig | null {
+  try {
+    return value && typeof value === "object" ? normalizeHostDynamicDnsInput(value) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Throws a DomainError naming the first problem. The zone may still be empty here. */
+export function normalizeHostDynamicDnsInput(value: unknown): HostDynamicDnsConfig {
+  const input = (value ?? {}) as Partial<Record<keyof HostDynamicDnsConfig, unknown>>;
+  const provider = text(input.provider) || null;
+  if (provider && !getProviderDefinition(provider)) {
+    throw domainError("dynamicDnsProviderUnknown", { provider }, { status: 400 });
+  }
+  if (provider && !isDynamicDnsProvider(provider)) {
+    throw domainError("dynamicDnsProviderUnsupported", { provider }, { status: 400 });
+  }
+
+  const zone = text(input.zone).toLowerCase().replace(/\.$/, "");
+  if (zone && (!ZONE_PATTERN.test(zone) || zone.length > 253)) {
+    throw domainError("dynamicDnsZoneInvalid", { zone }, { status: 400 });
+  }
+
+  const hostnames = [
+    ...new Set(stringList(input.hostnames).map((name) => name.toLowerCase().replace(/\.$/, ""))),
+  ];
+  if (hostnames.length > HOST_DYNAMIC_DNS_MAX_HOSTNAMES) {
+    throw domainError(
+      "dynamicDnsTooManyHostnames",
+      { max: HOST_DYNAMIC_DNS_MAX_HOSTNAMES },
+      { status: 400 },
+    );
+  }
+  for (const hostname of hostnames) {
+    if (!NAME_PATTERN.test(hostname) || !hostname.includes(".") || hostname.length > 253) {
+      throw domainError("dynamicDnsHostnameInvalid", { hostname }, { status: 400 });
+    }
+  }
+
+  return { enabled: input.enabled === true, provider, zone, hostnames };
+}
+
+/** A name for an address record: a proxy host's IP or `:port` domain has none. */
+export function isDynamicDnsHostname(value: string): boolean {
+  const name = value.toLowerCase();
+  return NAME_PATTERN.test(name) && name.includes(".") && !/^[\d.]+$/.test(name);
+}
+
+/** Record names relative to the zone. Throws for a name outside it. */
+export function hostRecordNames(hostnames: readonly string[], zone: string): string[] {
+  return [
+    ...new Set(
+      hostnames.map((raw) => {
+        const hostname = raw.toLowerCase().replace(/\.$/, "");
+        if (hostname !== zone && !hostname.endsWith(`.${zone}`)) {
+          throw domainError("dynamicDnsHostOutsideZone", { hostname, zone }, { status: 400 });
+        }
+        return normalizeName(hostname, zone);
+      }),
+    ),
+  ];
+}
+
+/** What a host editor offers: providers with credentials that can hold an address. */
+export type DynamicDnsProviderOptions = { choices: DnsProviderChoice[]; default: string | null };
+
+export function dynamicDnsProviderOptions(
+  settings: { providers: Record<string, Record<string, string>>; default: string | null } | null,
+): DynamicDnsProviderOptions {
+  const choices = configuredDnsProviderChoices(settings).filter((choice) =>
+    isDynamicDnsProvider(choice.name),
+  );
+  const fallback = settings?.default ?? null;
+  return {
+    choices,
+    default: fallback && choices.some((choice) => choice.name === fallback) ? fallback : null,
+  };
 }

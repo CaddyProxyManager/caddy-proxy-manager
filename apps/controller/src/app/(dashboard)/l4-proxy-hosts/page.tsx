@@ -14,7 +14,8 @@ import { strictId } from "@/src/lib/http/strict-id";
 import type { L4Protocol } from "@/src/lib/models/l4-proxy-hosts";
 import { listAgentOptions } from "@/src/lib/agent/client";
 import { listL4AccessListOptions } from "@/src/lib/models/access-lists";
-import { getHostDefaults } from "@/src/lib/settings";
+import { getDnsProviderSettings, getHostDefaults } from "@/src/lib/settings";
+import { dynamicDnsProviderOptions } from "@/src/lib/dns/dynamic-dns";
 import { agentIdsForHosts } from "@/src/lib/models/host-agents";
 import { canCreate, canManage, requireReach, visibleIdFilter } from "@/src/lib/users/permissions";
 import type { Metadata } from "next";
@@ -67,15 +68,26 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
   const protocol: L4Protocol | undefined =
     protocolParam === "tcp" || protocolParam === "udp" ? protocolParam : undefined;
 
-  const [hosts, total, counts, tags, agents, accessLists, hostDefaults] = await Promise.all([
-    listL4ProxyHostsPaginated(PER_PAGE, offset, search, sortBy, sortDir, visibleIds, protocol, tag),
-    countL4ProxyHosts(search, visibleIds, protocol, tag),
-    countL4ProxyHostsByProtocol(search, visibleIds, tag),
-    listL4ProxyHostTags(visibleIds),
-    listAgentOptions().catch(() => []),
-    listL4AccessListOptions(),
-    getHostDefaults(),
-  ]);
+  const [hosts, total, counts, tags, agents, accessLists, hostDefaults, dnsProviders] =
+    await Promise.all([
+      listL4ProxyHostsPaginated(
+        PER_PAGE,
+        offset,
+        search,
+        sortBy,
+        sortDir,
+        visibleIds,
+        protocol,
+        tag,
+      ),
+      countL4ProxyHosts(search, visibleIds, protocol, tag),
+      countL4ProxyHostsByProtocol(search, visibleIds, tag),
+      listL4ProxyHostTags(visibleIds),
+      listAgentOptions().catch(() => []),
+      listL4AccessListOptions(),
+      getHostDefaults(),
+      getDnsProviderSettings(),
+    ]);
 
   // The editor opened from a link, on a host that may sit on another page of the list.
   const editId = editParam ? await resolveL4ProxyHostId(editParam) : null;
@@ -110,6 +122,7 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
         agents={agents}
         accessLists={accessLists}
         hostDefaults={hostDefaults.l4ProxyHost}
+        dynamicDnsProviders={dynamicDnsProviderOptions(dnsProviders)}
         agentAssignments={Object.fromEntries(assignments)}
         canCreate={canCreate(access, "l4ProxyHost")}
         manageableIds={hosts.filter((h) => canManage(access, "l4ProxyHost", h.id)).map((h) => h.id)}

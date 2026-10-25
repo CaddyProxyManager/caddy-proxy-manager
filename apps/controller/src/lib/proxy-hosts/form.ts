@@ -47,6 +47,7 @@ import {
 } from "@/src/lib/proxy-hosts/upstream-timeouts";
 import type { HostRateLimitConfig } from "@/src/lib/proxy-hosts/rate-limit";
 import type { HostAnubisConfig } from "@/src/lib/proxy-hosts/anubis";
+import type { HostDynamicDnsConfig } from "@/src/lib/dns/dynamic-dns";
 import { getCertificate } from "@/src/lib/models/certificates";
 import { getCloudflareSettings, type GeoBlockSettings } from "@/src/lib/settings";
 import {
@@ -770,6 +771,27 @@ export function parseAnubisConfig(formData: FormData): Partial<HostAnubisConfig>
   };
 }
 
+/** Undefined without the section; null when it holds nothing worth keeping. Shared with L4 hosts. */
+export function parseDynamicDnsConfig(
+  formData: FormData,
+): Partial<HostDynamicDnsConfig> | null | undefined {
+  if (!formData.has("dynamicDnsPresent")) return undefined;
+  const text = (name: string) => {
+    const value = formData.get(name);
+    return typeof value === "string" ? value.trim() : "";
+  };
+  const config = {
+    enabled: parseCheckbox(formData.get("dynamicDnsEnabled")),
+    provider: text("dynamicDnsProvider") || null,
+    zone: text("dynamicDnsZone"),
+    hostnames: text("dynamicDnsHostnames")
+      .split(/[\s,]+/)
+      .filter(Boolean),
+  };
+  const empty = !config.enabled && !config.provider && !config.zone && !config.hostnames.length;
+  return empty ? null : config;
+}
+
 export function parseCrowdSecEnabled(formData: FormData): boolean | undefined {
   if (!formData.has("crowdsecPresent")) return undefined;
   return parseCheckbox(formData.get("crowdsecEnabled"));
@@ -905,6 +927,7 @@ export function parseProxyHostOptionUpdates(formData: FormData): Partial<ProxyHo
     rateLimit: parseRateLimitConfig(formData),
     crowdsec: parseCrowdSecEnabled(formData),
     anubis: parseAnubisConfig(formData),
+    dynamicDns: parseDynamicDnsConfig(formData),
     locationRules: formData.has("locationRulesJson")
       ? parseLocationRulesConfig(formData)
       : undefined,
@@ -987,6 +1010,7 @@ export async function parseProxyHostCreateForm(
     rateLimit: parseRateLimitConfig(formData),
     crowdsec: parseCrowdSecEnabled(formData),
     anubis: parseAnubisConfig(formData),
+    dynamicDns: parseDynamicDnsConfig(formData),
     locationRules: parseLocationRulesConfig(formData),
     pathAllows: parsePathAllowsConfig(formData),
     pathBlocks: parsePathBlocksConfig(formData),

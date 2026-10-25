@@ -134,7 +134,12 @@ AAAA records if IPv6 is on, through the provider's API. **Only update existing r
 creating a record that is not there yet.
 
 Every provider above works except acme-dns, which serves only challenge TXT records. A provider
-in use by a record set cannot be removed until the set is.
+in use by a record set, or by a host, cannot be removed until that stops.
+
+A host can do the same for itself: **Dynamic DNS** in a [proxy host](../reverse-proxy/#dynamic-dns)
+or an [L4 host](../l4-proxy/#dynamic-dns) editor keeps that host's names pointed at the Caddy
+serving it. The interval, IP versions, TTL and lookup services above apply to hosts too, and so
+does the check below.
 
 Each record set is updated by exactly one Caddy, with that Caddy's address: the bundled agent's by
 default, or the agent picked for the set. Two agents updating one name would flip it between their
@@ -142,7 +147,9 @@ addresses on every check, so a fleet behind several connections gives each site'
 names.
 
 Dynamic DNS is the opt-in [caddy-dynamicdns](https://github.com/mholt/caddy-dynamicdns) module.
-Turn it on in [Caddy build](../caddy-build/) and rebuild before the settings take effect.
+Switching dynamic DNS on, here or on a host, selects it in [Caddy build](../caddy-build/) and the
+agent rebuilds Caddy with it, so the records start updating once the new image is running. While
+dynamic DNS is on anywhere, the module cannot be switched off.
 
 ## Manual imports
 

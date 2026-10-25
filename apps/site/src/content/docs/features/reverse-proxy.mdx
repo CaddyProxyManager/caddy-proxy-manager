@@ -386,6 +386,17 @@ over it.
 Pinning is skipped for HTTPS upstreams when one handler has several different HTTPS hostnames,
 because a single pinned address cannot carry more than one SNI name.
 
+## Dynamic DNS
+
+For a host on a connection whose public IP changes, **Dynamic DNS** under the domains keeps their
+A records, and AAAA records if IPv6 is on, pointed at the Caddy serving the host, through a DNS
+provider with saved credentials. The provider defaults to the default one, and the zone, left
+empty, is looked up from DNS when you save; a domain outside that zone is refused, and IP addresses
+among the domains are skipped. The records follow the bundled agent, or the agent the host is
+pinned to, never two at once. Interval, IP versions and TTL come from
+[Settings → DNS → Dynamic DNS](../certificates/#dynamic-dns), and switching it on builds the
+Dynamic DNS module into Caddy.
+
 ## Headers
 
 The host header is forwarded by default, which is what most applications behind a proxy expect;

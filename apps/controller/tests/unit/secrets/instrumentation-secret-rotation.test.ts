@@ -53,6 +53,7 @@ vi.mock('../../../src/lib/db/connection', () => ({
 vi.mock('../../../src/lib/caddy', () => ({ applyCaddyConfig: step('applyCaddyConfig') }));
 vi.mock('../../../src/lib/caddy/image-build', () => ({
   ensureCrowdSecModule: step('ensureCrowdSecModule', true),
+  ensureDynamicDnsModule: step('ensureDynamicDnsModule', true),
 }));
 vi.mock('../../../src/lib/agent/desired-state', () => ({
   pushDesiredState: step('pushDesiredState'),
@@ -122,6 +123,7 @@ describe('startup secret passes', () => {
     expect(at('purge')).toBeGreaterThan(at('rotation'));
     expect(at('purge')).toBeLessThan(at('applyCaddyConfig'));
     expect(at('ensureCrowdSecModule')).toBeLessThan(at('pushDesiredState'));
+    expect(at('ensureDynamicDnsModule')).toBeLessThan(at('pushDesiredState'));
     expect(at('pushDesiredState')).toBeLessThan(at('applyCaddyConfig'));
     // Nothing was rewritten, so only the once-per-database vacuum may run.
     expect(mocks.purgeForced).toEqual([false]);

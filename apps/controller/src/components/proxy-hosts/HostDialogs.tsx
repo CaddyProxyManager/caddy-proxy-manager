@@ -1,5 +1,6 @@
 "use client";
 
+import { DynamicDnsHostFields } from "@/components/dns/DynamicDnsHostFields";
 import { type EditorRollback, RollbackNotice } from "@/components/host-history/RollbackNotice";
 import { useActionState, useEffect, useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
@@ -188,6 +189,7 @@ export function CreateHostDialog({
               rows={2}
               description={t("domainsHelp")}
             />
+            <DynamicDnsHostFields dynamicDns={initialData?.dynamicDns} />
           </VStack>
           <VStack gap={5} id={anchor("upstreams")}>
             <UpstreamInput defaultUpstreams={initialData?.upstreams} />
@@ -389,6 +391,7 @@ export function EditHostDialog({
               rows={2}
               description={t("domainsHelp")}
             />
+            <DynamicDnsHostFields dynamicDns={host.dynamicDns} />
           </VStack>
           <VStack gap={5} id={editorSectionAnchor("upstreams")}>
             <UpstreamInput defaultUpstreams={host.upstreams} />

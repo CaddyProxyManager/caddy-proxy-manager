@@ -9,6 +9,7 @@ import { type CaddyBuildState, type CaddyBuildStatus, SHIPPED_CADDY_MODULES } fr
 import {
   CADDY_MODULES,
   CROWDSEC_MODULE_ID,
+  DYNAMIC_DNS_MODULE_ID,
   PREVIOUS_MODULE_PATHS,
   type CaddyCustomModule,
   type CaddyFeatureId,
@@ -66,31 +67,47 @@ export function resolveEnabledModuleIds(settings: CaddyBuildSettings | null): st
   );
 }
 
-/** Keep the build selection aligned with CrowdSec's global switch. */
-export async function ensureCrowdSecModule(): Promise<boolean> {
-  const [crowdsec, settings, agentSettings] = await Promise.all([
-    getCrowdSecSettings(),
+/** Selects a module in the fleet default and in every agent's own selection. */
+async function ensureModuleSelected(moduleId: string): Promise<void> {
+  const [settings, agentSettings] = await Promise.all([
     getCaddyBuildSettings(),
     getAllAgentBuildSettings(),
   ]);
-  if (!crowdsec.enabled) return false;
 
-  if (!resolveEnabledModuleIds(settings).includes(CROWDSEC_MODULE_ID)) {
+  if (!resolveEnabledModuleIds(settings).includes(moduleId)) {
     await saveCaddyBuildSettings({
-      modules: { ...(settings?.modules ?? {}), [CROWDSEC_MODULE_ID]: true },
+      modules: { ...(settings?.modules ?? {}), [moduleId]: true },
       customModules: settings?.customModules ?? [],
     });
   }
 
   await Promise.all(
     Array.from(agentSettings, async ([agentRowId, agentBuild]) => {
-      if (resolveEnabledModuleIds(agentBuild).includes(CROWDSEC_MODULE_ID)) return;
+      if (resolveEnabledModuleIds(agentBuild).includes(moduleId)) return;
       await setAgentBuildSettings(agentRowId, {
-        modules: { ...agentBuild.modules, [CROWDSEC_MODULE_ID]: true },
+        modules: { ...agentBuild.modules, [moduleId]: true },
         customModules: agentBuild.customModules,
       });
     }),
   );
+}
+
+/** Keep the build selection aligned with CrowdSec's global switch. */
+export async function ensureCrowdSecModule(): Promise<boolean> {
+  if (!(await getCrowdSecSettings()).enabled) return false;
+  await ensureModuleSelected(CROWDSEC_MODULE_ID);
+  return true;
+}
+
+/**
+ * Likewise for dynamic DNS, in Settings or on any host, which an upgrade can find switched on
+ * without its module built in.
+ */
+export async function ensureDynamicDnsModule(): Promise<boolean> {
+  // Lazy: it reads the host models, which import this module.
+  const { dynamicDnsInUse } = await import("../../dns/host-dynamic-dns-sets");
+  if (!(await dynamicDnsInUse())) return false;
+  await ensureModuleSelected(DYNAMIC_DNS_MODULE_ID);
   return true;
 }
 

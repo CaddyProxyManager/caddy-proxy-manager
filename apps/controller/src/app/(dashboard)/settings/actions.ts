@@ -404,7 +404,12 @@ async function updateDnsProviderSettingsActionUnlocked(
           }),
         };
       }
-      const dynamicZones = (await getDynamicDnsSettings()).recordSets
+      // Hosts too, by name or as the default they leave the provider to.
+      const { hostDynamicDnsRecordSets } = await import("@/src/lib/dns/host-dynamic-dns-sets");
+      const dynamicZones = [
+        ...(await getDynamicDnsSettings()).recordSets,
+        ...(await hostDynamicDnsRecordSets()),
+      ]
         .filter((set) => set.provider === providerName)
         .map((set) => set.zone);
       if (dynamicZones.length > 0) {

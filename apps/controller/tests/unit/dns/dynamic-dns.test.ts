@@ -2,9 +2,15 @@ import { describe, expect, it } from 'bun:test';
 import {
   caddyDurationMs,
   defaultDynamicDnsSettings,
+  dynamicDnsProviderOptions,
+  hostRecordNames,
+  isDynamicDnsHostname,
   normalizeDynamicDnsSettings,
+  normalizeHostDynamicDnsInput,
   recordSetHostnames,
+  sanitizeHostDynamicDns,
 } from '@/src/lib/dns/dynamic-dns';
+import { findDnsZone } from '@/src/lib/dns/host-dynamic-dns';
 import { buildDynamicDnsApp, recordSetsFor } from '@/src/lib/dns/dynamic-dns-config';
 import { encryptProviderCredentials } from '@/src/lib/dns/provider-credentials';
 import { DomainError } from '@/src/lib/errors/domain-error';
@@ -171,5 +177,82 @@ describe('buildDynamicDnsApp', () => {
         agentId: 'agent-x',
       }).app,
     ).toBeNull();
+  });
+});
+
+describe('host dynamic DNS', () => {
+  it('normalizes a host config and keeps an empty zone for the lookup', () => {
+    expect(
+      normalizeHostDynamicDnsInput({
+        enabled: true,
+        provider: '',
+        zone: 'Example.COM.',
+        hostnames: 'Game.example.com. game.example.com, *.lab.example.com',
+      }),
+    ).toEqual({
+      enabled: true,
+      provider: null,
+      zone: 'example.com',
+      hostnames: ['game.example.com', '*.lab.example.com'],
+    });
+    expect(normalizeHostDynamicDnsInput({ enabled: true }).zone).toBe('');
+  });
+
+  it.each([
+    [{ provider: 'acmedns' }, 'dynamicDnsProviderUnsupported'],
+    [{ provider: 'nope' }, 'dynamicDnsProviderUnknown'],
+    [{ zone: 'localhost' }, 'dynamicDnsZoneInvalid'],
+    [{ hostnames: ['nodots'] }, 'dynamicDnsHostnameInvalid'],
+  ])('refuses %j with %s', (value, code) => {
+    expect(codeOf(() => normalizeHostDynamicDnsInput({ enabled: true, ...value }))).toBe(code);
+  });
+
+  it('reads a stored blob leniently', () => {
+    expect(sanitizeHostDynamicDns({ enabled: true, provider: 'nope' })).toBeNull();
+    expect(sanitizeHostDynamicDns('nonsense')).toBeNull();
+  });
+
+  it('names records relative to the zone and refuses one outside it', () => {
+    expect(
+      hostRecordNames(['example.com', 'App.example.com', '*.example.com'], 'example.com'),
+    ).toEqual(['@', 'app', '*']);
+    expect(codeOf(() => hostRecordNames(['app.example.net'], 'example.com'))).toBe(
+      'dynamicDnsHostOutsideZone',
+    );
+  });
+
+  it('skips domains that cannot hold an address record', () => {
+    expect(
+      ['app.example.com', '192.0.2.1', 'localhost', '*.example.com'].filter(isDynamicDnsHostname),
+    ).toEqual(['app.example.com', '*.example.com']);
+  });
+
+  it('offers only providers that can hold an address, and a default only among them', () => {
+    expect(
+      dynamicDnsProviderOptions({
+        providers: { cloudflare: {}, acmedns: {} },
+        default: 'acmedns',
+      }),
+    ).toEqual({ choices: [{ name: 'cloudflare', displayName: 'Cloudflare' }], default: null });
+  });
+});
+
+describe('findDnsZone', () => {
+  const zones =
+    (...names: string[]) =>
+    async (name: string) => {
+      if (!names.includes(name)) throw Object.assign(new Error('no SOA'), { code: 'ENODATA' });
+      return {};
+    };
+
+  it('walks up to the nearest name with an SOA record', async () => {
+    expect(await findDnsZone('a.b.example.co.uk', zones('example.co.uk'))).toBe('example.co.uk');
+    expect(await findDnsZone('*.lab.example.com', zones('lab.example.com', 'example.com'))).toBe(
+      'lab.example.com',
+    );
+  });
+
+  it('never answers with a bare TLD, and null when nothing answers', async () => {
+    expect(await findDnsZone('app.example.com', zones('com'))).toBeNull();
   });
 });

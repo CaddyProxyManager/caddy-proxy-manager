@@ -1,5 +1,6 @@
 "use client";
 
+import { DynamicDnsHostFields } from "@/components/dns/DynamicDnsHostFields";
 import { type EditorRollback, RollbackNotice } from "@/components/host-history/RollbackNotice";
 import { type ReactNode, useActionState, useEffect, useState } from "react";
 import {
@@ -416,6 +417,8 @@ function L4HostForm({
             value={proxyProtocolReceive}
             onChange={setProxyProtocolReceive}
           />
+
+          <DynamicDnsHostFields dynamicDns={initialData?.dynamicDns} withHostnames />
         </VStack>
 
         <VStack gap={5} id={anchor("upstreams")}>
