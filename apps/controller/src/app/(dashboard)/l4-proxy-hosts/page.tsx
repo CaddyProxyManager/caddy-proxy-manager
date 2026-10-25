@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import L4ProxyHostsClient from "./L4ProxyHostsClient";
 import { HostTagSuggestions } from "@/components/proxy-hosts/HostTagsField";
 import {
@@ -5,18 +6,13 @@ import {
   countL4ProxyHosts,
   countL4ProxyHostsByProtocol,
   listL4ProxyHostTags,
-  getL4ProxyHost,
-  resolveL4ProxyHostId,
-  l4ProxyHostFromRow,
 } from "@/src/lib/models/l4-proxy-hosts";
-import { revisionForEditor } from "@/src/lib/host-history";
-import { strictId } from "@/src/lib/http/strict-id";
+import { l4EditorSectionHref } from "@/src/lib/l4/editor-sections";
 import type { L4Protocol } from "@/src/lib/models/l4-proxy-hosts";
 import { listAgentOptions } from "@/src/lib/agent/client";
 import { listL4AccessListOptions } from "@/src/lib/models/access-lists";
 import { getDnsProviderSettings, getHostDefaults } from "@/src/lib/settings";
 import { dynamicDnsProviderOptions } from "@/src/lib/dns/dynamic-dns";
-import { agentIdsForHosts } from "@/src/lib/models/host-agents";
 import { canCreate, canManage, requireReach, visibleIdFilter } from "@/src/lib/users/permissions";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
@@ -31,9 +27,8 @@ interface PageProps {
     sortDir?: string;
     protocol?: string;
     tag?: string;
-    /** A host to open the editor on. */
+    /** The editor was a dialog here; old links to it go to the host's edit page. */
     edit?: string;
-    /** With `edit`: a revision of that host to load instead, for a rollback. */
     revision?: string;
   }>;
 }
@@ -44,6 +39,12 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  // The hash, naming a section, is kept by the browser across the redirect.
+  if (params.edit) {
+    const revision = params.revision ? `?revision=${encodeURIComponent(params.revision)}` : "";
+    redirect(`${l4EditorSectionHref(encodeURIComponent(params.edit))}${revision}`);
+  }
   const access = await requireReach("hosts:read");
   const visible = visibleIdFilter(access, "l4ProxyHost");
   const visibleIds = visible === null ? null : [...visible];
@@ -54,9 +55,7 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
     sortDir: sortDirParam,
     protocol: protocolParam,
     tag: tagParam,
-    edit: editParam,
-    revision: revisionParam,
-  } = await searchParams;
+  } = params;
   const tag = tagParam?.trim().toLowerCase() || undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const search = searchParam?.trim() || undefined;
@@ -89,25 +88,6 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
       getDnsProviderSettings(),
     ]);
 
-  // The editor opened from a link, on a host that may sit on another page of the list.
-  const editId = editParam ? await resolveL4ProxyHostId(editParam) : null;
-  const editHost =
-    editId !== null && canManage(access, "l4ProxyHost", editId)
-      ? (hosts.find((h) => h.id === editId) ?? (await getL4ProxyHost(editId)))
-      : null;
-
-  // Only the hosts on this page and the one being edited - the map is for the edit dialog.
-  const assignments = await agentIdsForHosts("l4", [
-    ...hosts.map((host) => host.id),
-    ...(editHost && !hosts.includes(editHost) ? [editHost.id] : []),
-  ]).catch(() => new Map<number, number[]>());
-  const revisionId = strictId(revisionParam);
-  const rollback =
-    editHost && revisionId !== undefined
-      ? await revisionForEditor("l4", editHost.id, revisionId)
-      : null;
-  if (editHost && rollback) assignments.set(editHost.id, rollback.snapshot.agentIds);
-
   return (
     <HostTagSuggestions tags={tags}>
       <L4ProxyHostsClient
@@ -123,17 +103,8 @@ export default async function L4ProxyHostsPage({ searchParams }: PageProps) {
         accessLists={accessLists}
         hostDefaults={hostDefaults.l4ProxyHost}
         dynamicDnsProviders={dynamicDnsProviderOptions(dnsProviders)}
-        agentAssignments={Object.fromEntries(assignments)}
         canCreate={canCreate(access, "l4ProxyHost")}
         manageableIds={hosts.filter((h) => canManage(access, "l4ProxyHost", h.id)).map((h) => h.id)}
-        editTarget={
-          editHost && rollback
-            ? { ...l4ProxyHostFromRow(rollback.snapshot.row), id: editHost.id }
-            : editHost
-        }
-        rollback={
-          rollback && revisionId !== undefined ? { revisionId, missing: rollback.missing } : null
-        }
       />
     </HostTagSuggestions>
   );

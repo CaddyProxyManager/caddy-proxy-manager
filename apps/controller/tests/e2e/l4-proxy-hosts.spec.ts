@@ -146,6 +146,7 @@ test.describe('L4 Proxy Hosts page', () => {
 
   test('deletes the created L4 proxy host', async ({ page }) => {
     await page.goto('/l4-proxy-hosts');
+    await waitForHydration(page);
     await expect(page.getByRole('table').getByText('E2E Test Host', { exact: true })).toBeVisible();
 
     const row = page.locator('tr', { hasText: 'E2E Test Host' });

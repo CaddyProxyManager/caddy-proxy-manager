@@ -300,10 +300,6 @@ export const SEPARATE_DUPLICATES: readonly {
   },
   {
     reason: 'composed',
-    keys: ['hostReview.sections.http.tls', 'proxyHosts.detail.sections.tls', 'proxyHosts.tls'],
-  },
-  {
-    reason: 'composed',
     keys: [
       'hostReview.sections.http.protection',
       'hostReview.sections.l4.protection',

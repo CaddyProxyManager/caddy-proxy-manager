@@ -78,9 +78,9 @@ test.describe('Change approvals', () => {
       },
     );
 
-    await page.goto(`/proxy-hosts?edit=${hostId}`);
+    await page.goto(`/proxy-hosts/${hostId}/edit`);
     await waitForHydration(page);
-    const editor = page.getByRole('dialog', { name: 'Edit proxy host' });
+    const editor = page.getByRole('region', { name: 'Edit proxy host' });
     await expect(editor).toBeVisible({ timeout: 10_000 });
     await editor.getByLabel('Name').fill(RENAMED);
     await page.keyboard.press('ControlOrMeta+s');

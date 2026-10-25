@@ -17,10 +17,12 @@ import { Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import { Toolbar } from "@astryxdesign/core/Toolbar";
 import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 import { AppDialog } from "@/components/ui/AppDialog";
 import type { ActionState } from "@/lib/errors/action-error";
 import type { HostChangePreview, HostKind, HostPreviewResult } from "@/lib/host-review/types";
 import { EditorIssuesProvider, useEditorIssueTotals } from "./editor-issues";
+import { ActiveSectionProvider } from "./editor-section";
 import { ReviewChangesDialog } from "./ReviewChangesDialog";
 import { useUnsavedChanges } from "./useUnsavedChanges";
 
@@ -39,7 +41,7 @@ function scrollParent(element: HTMLElement | null): HTMLElement | null {
 }
 
 /**
- * The section at the top of the editor's scroll area. A jumped-to section stays selected until the
+ * The section at the top of the dialog's scroll area. A jumped-to section stays selected until the
  * user scrolls, since the last ones are too short to reach the top.
  */
 function useActiveSection(open: boolean, sections: EditorSectionLink[]) {
@@ -117,7 +119,24 @@ function isSaveShortcut(event: KeyboardEvent): boolean {
   );
 }
 
+/**
+ * An in-app link a plain click follows: the page's editor switches section on one to a section and
+ * holds the rest back over unsaved edits. The browser's own beforeunload prompt covers only a
+ * reload or another site.
+ */
+function followedLink(event: MouseEvent): URL | null {
+  if (event.defaultPrevented || event.button !== 0) return null;
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return null;
+  const link = (event.target as Element | null)?.closest?.("a[href]");
+  if (!(link instanceof HTMLAnchorElement) || link.target === "_blank" || link.download)
+    return null;
+  const url = new URL(link.href, window.location.href);
+  return url.origin === window.location.origin ? url : null;
+}
+
 type HostEditorShellProps = {
+  /** A dialog over the list, or the whole of the host's edit page. */
+  layout?: "dialog" | "page";
   open: boolean;
   onClose: () => void;
   title: string;
@@ -128,8 +147,10 @@ type HostEditorShellProps = {
   isPending: boolean;
   preview: (formData: FormData) => Promise<HostPreviewResult>;
   sections: EditorSectionLink[];
-  /** Puts a jumped-to section in the URL, where the editor can be opened on it again. */
-  onSectionLink?: (section: string) => void;
+  /** The page's address for each section, which it shows one at a time. */
+  sectionHref?: (section: string) => string;
+  /** The section the page opens on. */
+  initialSection?: string | null;
   children: ReactNode;
 };
 
@@ -149,6 +170,7 @@ export function HostEditorShell(props: HostEditorShellProps) {
 }
 
 function HostEditorFrame({
+  layout = "dialog",
   open,
   onClose,
   title,
@@ -159,7 +181,8 @@ function HostEditorFrame({
   isPending,
   preview,
   sections,
-  onSectionLink,
+  sectionHref,
+  initialSection = null,
   children,
 }: HostEditorShellProps) {
   const t = useTranslations("hostReview");
@@ -177,6 +200,16 @@ function HostEditorFrame({
   const [isLoading, setIsLoading] = useState(false);
   const [reverted, setReverted] = useState<string[]>([]);
   const [discardOpen, setDiscardOpen] = useState(false);
+  // A link the page's editor held back; followed if the edits are discarded.
+  const [leavingTo, setLeavingTo] = useState<string | null>(null);
+  const router = useRouter();
+  const isPage = layout === "page";
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const [pageSection, setPageSection] = useState(initialSection ?? sections[0]?.id ?? "");
+  // A hash from an old link names the section only after hydration.
+  useEffect(() => {
+    if (initialSection) setPageSection(initialSection);
+  }, [initialSection]);
   // The action state a save from the review started from; a newer one is that save's answer.
   const submittedFrom = useRef<ActionState | null>(null);
   const request = useRef(0);
@@ -208,8 +241,24 @@ function HostEditorFrame({
   };
 
   const openReview = () => {
-    // The browser's own checks first: a review of a form that cannot be sent helps nobody.
-    if (form()?.reportValidity() === false) return;
+    // The browser's own checks first: a review of a form that cannot be sent helps nobody. On the
+    // page the field may sit in a hidden section, which the browser cannot point at.
+    const element = form();
+    if (element && !element.checkValidity()) {
+      const invalid = [...element.elements].find(
+        (field) => field instanceof HTMLElement && field.matches(":invalid"),
+      );
+      const holder = sections.find((s) =>
+        document.getElementById(s.anchor)?.contains(invalid ?? null),
+      );
+      if (isPage && holder && holder.id !== pageSection) {
+        jump(holder);
+        setTimeout(() => form()?.reportValidity(), 50);
+      } else {
+        element.reportValidity();
+      }
+      return;
+    }
     setReverted([]);
     setResult(null);
     setReviewOpen(true);
@@ -246,10 +295,39 @@ function HostEditorFrame({
     }
   }, [state, reviewOpen]);
 
+  const isDirty = unsaved > 0 && state.status !== "success";
+
   const requestClose = () => {
-    if (unsaved > 0 && state.status !== "success") setDiscardOpen(true);
+    if (isDirty) setDiscardOpen(true);
     else onClose();
   };
+
+  // Capture on the document runs before the router's own handler on the link, so it can stop it. A
+  // section is switched in place: navigating would remount the form and drop what was typed.
+  const onLinkClick = useRef<(event: MouseEvent) => void>(() => {});
+  onLinkClick.current = (event) => {
+    const url = followedLink(event);
+    if (!url) return;
+    const section = sectionHref && sections.find((s) => sectionHref(s.id) === url.pathname);
+    if (section) {
+      event.preventDefault();
+      event.stopPropagation();
+      jump(section);
+      return;
+    }
+    const here = url.pathname === window.location.pathname;
+    if (!isDirty || (here && url.search === window.location.search)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setLeavingTo(`${url.pathname}${url.search}${url.hash}`);
+    setDiscardOpen(true);
+  };
+  useEffect(() => {
+    if (!isPage) return;
+    const onClick = (event: MouseEvent) => onLinkClick.current(event);
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [isPage]);
 
   // Only while this editor is open, so the browser keeps Ctrl+S everywhere else.
   useEffect(() => {
@@ -276,97 +354,161 @@ function HostEditorFrame({
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [open, unsaved, state.status]);
 
-  const [activeSection, selectSection] = useActiveSection(open, sections);
+  const [scrolledSection, selectSection] = useActiveSection(open && !isPage, sections);
+  const activeSection = isPage ? pageSection : scrolledSection;
+  const activeAnchor = sections.find((s) => s.id === pageSection)?.anchor ?? null;
   const isNarrow = useMediaQuery("(max-width: 767px)");
 
+  // Stuck, the page's toolbar paints over the padding above it, which unstuck holds the host's tabs.
+  useEffect(() => {
+    const bar = toolbarRef.current;
+    if (!isPage || !bar) return;
+    const root = scrollParent(bar);
+    const scroller: HTMLElement | Window = root ?? window;
+    const sync = () => {
+      const gap = root ? Number.parseFloat(getComputedStyle(root).paddingTop) || 0 : 0;
+      const edge = (root?.getBoundingClientRect().top ?? 0) + gap;
+      bar.style.setProperty("--cpm-sticky-gap", `${gap}px`);
+      bar.toggleAttribute("data-stuck", bar.getBoundingClientRect().top <= edge + 0.5);
+    };
+    sync();
+    scroller.addEventListener("scroll", sync, { passive: true });
+    return () => scroller.removeEventListener("scroll", sync);
+  }, [isPage]);
+
   const jump = (section: EditorSectionLink) => {
-    selectSection(section.id);
-    scrollToAnchor(section.anchor);
-    onSectionLink?.(section.id);
+    if (!isPage) {
+      selectSection(section.id);
+      scrollToAnchor(section.anchor);
+      return;
+    }
+    setPageSection(section.id);
+    if (sectionHref) {
+      // Replaced, not pushed: the router would answer Back with a fresh page and lose the edits.
+      const url = new URL(window.location.href);
+      url.pathname = sectionHref(section.id);
+      url.hash = "";
+      window.history.replaceState(window.history.state, "", url);
+    }
   };
+
+  // A switch made down a long section starts the next one at its top, under the toolbar.
+  const switched = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs on a switch, not on every render.
+  useEffect(() => {
+    if (!isPage) return;
+    if (!switched.current) {
+      switched.current = true;
+      return;
+    }
+    if (activeAnchor && toolbarRef.current?.hasAttribute("data-stuck")) {
+      document.getElementById(activeAnchor)?.scrollIntoView({ block: "start" });
+    }
+  }, [pageSection]);
+
+  const toolbar = (
+    <Toolbar
+      label={t("editorToolbar")}
+      size="sm"
+      dividers={["bottom"]}
+      onKeyDownCapture={crossTabStripEdge}
+      startContent={
+        sections.length > 1 ? (
+          // No role="tablist": in a dialog these scroll to a section, on the page they are links.
+          <TabList
+            aria-label={t("jumpTo")}
+            value={activeSection}
+            onChange={(id) => {
+              const section = sections.find((s) => s.id === id);
+              if (section) jump(section);
+            }}
+          >
+            {sections.map((section) => (
+              <Tab
+                key={section.id}
+                value={section.id}
+                label={t(sectionKey(section.id))}
+                href={isPage ? sectionHref?.(section.id) : undefined}
+              />
+            ))}
+          </TabList>
+        ) : undefined
+      }
+      endContent={
+        <>
+          {!isNarrow && (
+            <Text
+              type="supporting"
+              size="sm"
+              textWrap="nowrap"
+              color={unsaved > 0 ? "primary" : "secondary"}
+            >
+              {unsaved > 0 ? tCommon("unsavedChanges", { count: unsaved }) : t("noUnsaved")}
+            </Text>
+          )}
+          {/* Each count is its own sentence, so no language has to join them. */}
+          {!isNarrow && errors > 0 && (
+            <Token size="sm" color="red" label={t("errorsFound", { count: errors })} />
+          )}
+          {!isNarrow && warnings > 0 && (
+            <Token size="sm" color="yellow" label={t("warningsFound", { count: warnings })} />
+          )}
+          <Button
+            // Pink while there is something to save, so the one way out is the one that
+            // stands out.
+            variant={unsaved > 0 ? "pink" : "secondary"}
+            label={tCommon("review")}
+            tooltip={t("shortcutHint")}
+            // A phone has no room for the counts beside the tabs, so they ride on the button.
+            endContent={
+              isNarrow && unsaved + errors + warnings > 0 ? (
+                <Badge label={unsaved + errors + warnings} />
+              ) : undefined
+            }
+            aria-label={
+              isNarrow && unsaved > 0 ? t("reviewUnsaved", { count: unsaved }) : undefined
+            }
+            onClick={openReview}
+            isDisabled={isPending}
+          />
+        </>
+      }
+    />
+  );
+
+  const content = (
+    <VStack gap={4}>
+      <ActiveSectionProvider value={isPage ? activeAnchor : null}>{children}</ActiveSectionProvider>
+      {reviewOpen &&
+        reverted.map((field) => (
+          <input key={field} type="hidden" name="revertField" value={field} form={formId} />
+        ))}
+    </VStack>
+  );
 
   return (
     <>
-      <AppDialog
-        open={open}
-        onClose={requestClose}
-        title={title}
-        maxWidth="xl"
-        subheader={
-          <Toolbar
-            label={t("editorToolbar")}
-            size="sm"
-            dividers={["bottom"]}
-            onKeyDownCapture={crossTabStripEdge}
-            startContent={
-              sections.length > 1 ? (
-                // No role="tablist": these scroll to a section rather than swap a panel in.
-                <TabList
-                  aria-label={t("jumpTo")}
-                  value={activeSection}
-                  onChange={(id) => {
-                    const section = sections.find((s) => s.id === id);
-                    if (section) jump(section);
-                  }}
-                >
-                  {sections.map((section) => (
-                    <Tab key={section.id} value={section.id} label={t(sectionKey(section.id))} />
-                  ))}
-                </TabList>
-              ) : undefined
-            }
-            endContent={
-              <>
-                {!isNarrow && (
-                  <Text
-                    type="supporting"
-                    size="sm"
-                    textWrap="nowrap"
-                    color={unsaved > 0 ? "primary" : "secondary"}
-                  >
-                    {unsaved > 0 ? tCommon("unsavedChanges", { count: unsaved }) : t("noUnsaved")}
-                  </Text>
-                )}
-                {/* Each count is its own sentence, so no language has to join them. */}
-                {!isNarrow && errors > 0 && (
-                  <Token size="sm" color="red" label={t("errorsFound", { count: errors })} />
-                )}
-                {!isNarrow && warnings > 0 && (
-                  <Token size="sm" color="yellow" label={t("warningsFound", { count: warnings })} />
-                )}
-                <Button
-                  // Pink while there is something to save, so the one way out is the one that
-                  // stands out.
-                  variant={unsaved > 0 ? "pink" : "secondary"}
-                  label={tCommon("review")}
-                  tooltip={t("shortcutHint")}
-                  // A phone has no room for the counts beside the tabs, so they ride on the button.
-                  endContent={
-                    isNarrow && unsaved + errors + warnings > 0 ? (
-                      <Badge label={unsaved + errors + warnings} />
-                    ) : undefined
-                  }
-                  aria-label={
-                    isNarrow && unsaved > 0 ? t("reviewUnsaved", { count: unsaved }) : undefined
-                  }
-                  onClick={openReview}
-                  isDisabled={isPending}
-                />
-              </>
-            }
-          />
-        }
-        // No footer: the review is the only way to save, and closing is the header's X.
-        actions={null}
-      >
-        <VStack gap={4}>
-          {children}
-          {reviewOpen &&
-            reverted.map((field) => (
-              <input key={field} type="hidden" name="revertField" value={field} form={formId} />
-            ))}
+      {isPage ? (
+        <VStack as="section" aria-label={title} gap={4} className="cpm-host-editor-page">
+          {/* Sticky, so the section jumps and Review stay in reach down a long form. */}
+          <VStack ref={toolbarRef} className="cpm-host-editor-toolbar sticky top-0 z-4 shrink-0">
+            {toolbar}
+          </VStack>
+          {content}
         </VStack>
-      </AppDialog>
+      ) : (
+        <AppDialog
+          open={open}
+          onClose={requestClose}
+          title={title}
+          maxWidth="xl"
+          subheader={toolbar}
+          // No footer: the review is the only way to save, and closing is the header's X.
+          actions={null}
+        >
+          {content}
+        </AppDialog>
+      )}
 
       <ReviewChangesDialog
         open={reviewOpen}
@@ -391,14 +533,18 @@ function HostEditorFrame({
 
       <AlertDialog
         isOpen={discardOpen}
-        onOpenChange={setDiscardOpen}
+        onOpenChange={(isOpen) => {
+          setDiscardOpen(isOpen);
+          if (!isOpen) setLeavingTo(null);
+        }}
         title={t("discardTitle")}
         description={t("discardDescription", { count: unsaved })}
         actionLabel={t("discardAction")}
         cancelLabel={t("keepEditing")}
         onAction={() => {
           setDiscardOpen(false);
-          onClose();
+          if (leavingTo) router.push(leavingTo);
+          else onClose();
         }}
       />
     </>

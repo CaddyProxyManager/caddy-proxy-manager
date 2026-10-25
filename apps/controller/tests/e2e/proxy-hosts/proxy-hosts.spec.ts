@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { goToSetting } from '../../helpers/settings-nav';
 import { applyStagedChanges, expectStaged } from '../../helpers/staged-settings';
 import { waitForHydration } from '../../helpers/hydration';
-import { saveThroughReview } from '../../helpers/host-editor';
+import { saveThroughReview, showEditorSection } from '../../helpers/host-editor';
 import { PROXY_HOSTS_NEWEST_FIRST } from '../../helpers/proxy-api';
 
 const API_PROXY_HOSTS = 'http://localhost:3000/api/v1/proxy-hosts';
@@ -95,10 +95,11 @@ test.describe('Proxy hosts', () => {
       const row = page.locator('tr', { hasText: 'Advanced Options Test' });
       await row.getByRole('button', { name: /^Actions for / }).click();
       await page.getByRole('menuitem', { name: /edit/i }).click();
-      await expect(page.getByRole('dialog')).toBeVisible();
 
       // Via the hidden _present inputs, which are unique where ancestor divs are not.
-      const dialog = page.getByRole('dialog');
+      const dialog = page.getByRole('region', { name: 'Edit proxy host' });
+      await expect(dialog).toBeVisible({ timeout: 10_000 });
+      await showEditorSection(page, 'Upstreams');
       const hstsSwitch = dialog
         .locator('div:has(> input[name="hstsSubdomainsPresent"])')
         .getByRole('switch');
@@ -116,7 +117,9 @@ test.describe('Proxy hosts', () => {
       await expect(skipSwitch).toBeChecked();
 
       await saveThroughReview(page, dialog);
-      await expect(page.locator('dialog[open]')).toHaveCount(0, { timeout: 10000 });
+      await expect(page).toHaveURL(new RegExp(`/proxy-hosts/${created!.uuid}$`), {
+        timeout: 10_000,
+      });
 
       const afterResp = await page.request.get(`${API_PROXY_HOSTS}/${created!.uuid}`);
       const after = (await afterResp.json()) as {
@@ -126,11 +129,9 @@ test.describe('Proxy hosts', () => {
       expect(after.hstsSubdomains).toBe(true);
       expect(after.skipHttpsHostnameValidation).toBe(true);
 
-      await row.getByRole('button', { name: /^Actions for / }).click();
-      await page.getByRole('menuitem', { name: /edit/i }).click();
-      await expect(page.getByRole('dialog')).toBeVisible();
-
-      const dialog2 = page.getByRole('dialog');
+      await page.goto(`/proxy-hosts/${created!.uuid}/edit/upstreams`);
+      const dialog2 = page.getByRole('region', { name: 'Edit proxy host' });
+      await expect(dialog2).toBeVisible({ timeout: 10_000 });
       const hstsSwitch2 = dialog2
         .locator('div:has(> input[name="hstsSubdomainsPresent"])')
         .getByRole('switch');
@@ -140,11 +141,6 @@ test.describe('Proxy hosts', () => {
 
       await expect(hstsSwitch2).toBeChecked();
       await expect(skipSwitch2).toBeChecked();
-
-      await dialog2
-        .getByRole('button', { name: /cancel|close/i })
-        .first()
-        .click();
     } finally {
       const listResp2 = await page.request.get(API_PROXY_HOSTS);
       const hosts2 = (await listResp2.json()) as Array<{ uuid: string; name: string }>;
@@ -331,8 +327,9 @@ test.describe('Proxy hosts', () => {
       await row.getByRole('button', { name: /^Actions for / }).click();
       await page.getByRole('menuitem', { name: 'Edit' }).click();
 
-      const dialog = page.getByRole('dialog');
-      await expect(dialog).toBeVisible();
+      const dialog = page.getByRole('region', { name: 'Edit proxy host' });
+      await expect(dialog).toBeVisible({ timeout: 10_000 });
+      await showEditorSection(page, 'Access');
 
       const authentikSection = dialog.locator('div:has(> input[name="authentikPresent"])');
       const authentikSwitch = authentikSection.getByRole('switch', {
@@ -423,8 +420,9 @@ test.describe('Proxy hosts', () => {
       await row.getByRole('button', { name: /^Actions for / }).click();
       await page.getByRole('menuitem', { name: 'Edit' }).click();
 
-      const dialog = page.getByRole('dialog');
-      await expect(dialog).toBeVisible();
+      const dialog = page.getByRole('region', { name: 'Edit proxy host' });
+      await expect(dialog).toBeVisible({ timeout: 10_000 });
+      await showEditorSection(page, 'Access');
 
       // Already enabled, so the fields are visible without touching the switch.
       await expect(dialog.locator('input[name="authentikOutpostDomain"]')).toHaveValue(
@@ -489,17 +487,17 @@ test.describe('Proxy hosts', () => {
     const row = page.locator('tr', { hasText: 'Geoblock Override Host' });
     await row.getByRole('button', { name: /^Actions for / }).click();
     await page.getByRole('menuitem', { name: /edit/i }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
+    const editor = page.getByRole('region', { name: 'Edit proxy host' });
+    await expect(editor).toBeVisible({ timeout: 10_000 });
+    await showEditorSection(page, 'Protection');
 
-    const editGeoCard = page
-      .getByRole('dialog')
-      .locator('div:has(> input[name="geoblockPresent"])');
+    const editGeoCard = editor.locator('div:has(> input[name="geoblockPresent"])');
     // The radiogroup's state, not a highlight class, which the design system no longer emits.
     await expect(editGeoCard.getByRole('radio', { name: 'Override global' })).toBeChecked();
 
     await editGeoCard.getByRole('radio', { name: 'Merge with global' }).click();
-    await saveThroughReview(page, page.getByRole('dialog', { name: 'Edit proxy host' }));
-    await expect(page.locator('dialog[open]')).toHaveCount(0, { timeout: 10000 });
+    await saveThroughReview(page, editor);
+    await expect(page).toHaveURL(new RegExp(`/proxy-hosts/${created!.uuid}$`), { timeout: 10_000 });
 
     const listResp2 = await page.request.get(API_PROXY_HOSTS);
     const hosts2 = (await listResp2.json()) as Array<{ name: string; geoblockMode: string }>;

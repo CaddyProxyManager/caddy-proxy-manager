@@ -10,3 +10,12 @@ export async function saveThroughReview(page: Page, editor: Locator): Promise<vo
   await expect(review).toBeVisible({ timeout: 10_000 });
   await review.getByRole('button', { name: /^(Save|Create|Submit)$/ }).click();
 }
+
+/** The edit page shows one section at a time; this switches to one by its tab. */
+export async function showEditorSection(page: Page, label: string): Promise<void> {
+  await page
+    .locator('.cpm-host-editor-toolbar')
+    .getByRole('link', { name: label, exact: true })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/edit/${label.toLowerCase()}$`));
+}

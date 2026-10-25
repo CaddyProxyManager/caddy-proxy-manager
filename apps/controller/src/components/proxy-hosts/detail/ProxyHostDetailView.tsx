@@ -6,15 +6,7 @@
  * the docs can render it with sample data; the route gathers everything in lib/proxy-hosts/detail.
  */
 
-import {
-  ArrowLeft,
-  BarChart2,
-  History,
-  ListChecks,
-  Pencil,
-  Server,
-  TriangleAlert,
-} from "lucide-react";
+import { BarChart2, History, ListChecks, Server, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Button } from "@astryxdesign/core/Button";
@@ -31,11 +23,9 @@ import { useTranslations } from "next-intl";
 import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { AttentionList } from "@/components/attention/AttentionList";
 import { hasAttentionToShow } from "@/lib/attention/types";
-import { HostTagList } from "@/components/proxy-hosts/HostTagsField";
 import {
   CertificateDaysCell,
   HostProtectionBadges,
-  HostStatusCell,
 } from "@/components/proxy-hosts/HostInsightCells";
 import { UpstreamHealthPanel } from "@/components/proxy-hosts/upstreams/UpstreamHealthPanel";
 import { StatTiles } from "@/components/ui/StatTiles";
@@ -48,6 +38,7 @@ import type { ProxyHostDetail } from "@/lib/proxy-hosts/detail-types";
 import type { HostPathRow, HostStatusRow } from "@/lib/clickhouse/host-traffic";
 import type { SectionFact } from "@/lib/proxy-hosts/section-summary";
 import { HostTrafficChart } from "./HostTrafficChart";
+import { ProxyHostHeader } from "./ProxyHostHeader";
 
 export type HostAuditRow = {
   id: number;
@@ -110,7 +101,6 @@ export function ProxyHostDetailView({
   const t = useTranslations("proxyHosts.detail");
   const tOverview = useTranslations("overview");
   const tAttention = useTranslations("attention");
-  const tNav = useTranslations("nav");
   const tAuditLog = useTranslations("auditLog");
   const tCommon = useTranslations("common");
   const tProxyHosts = useTranslations("proxyHosts");
@@ -212,50 +202,26 @@ export function ProxyHostDetailView({
 
   return (
     <VStack gap={5}>
-      <VStack gap={2}>
-        <HStack>
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={<ArrowLeft />}
-            label={tNav("proxyHosts")}
-            href="/proxy-hosts"
-          />
-        </HStack>
-        <HStack justify="between" vAlign="center" gap={4} wrap="wrap">
-          <VStack gap={1}>
-            <HStack gap={3} vAlign="center" wrap="wrap">
-              <Heading level={1}>{host.name}</Heading>
-              <HostStatusCell status={detail.status} />
-            </HStack>
-            <Text type="code" size="sm" color="secondary">
-              {host.domains.join(", ")}
-            </Text>
-            <HostTagList tags={host.tags} />
-          </VStack>
-          <HStack gap={2} wrap="wrap">
-            {analyticsHref && (
-              <Button variant="secondary" label={tNav("analytics")} href={analyticsHref} />
-            )}
-            {logsHref && <Button variant="secondary" label={tNav("logs")} href={logsHref} />}
-            {canManage && (
-              <Button
-                variant="primary"
-                icon={<Pencil />}
-                label={tCommon("edit")}
-                href={editorSectionHref(host.uuid)}
-              />
-            )}
-          </HStack>
-        </HStack>
-        {historyHref && (
-          <HostPageTabs
-            active="overview"
-            overviewHref={proxyHostDetailHref(host.uuid)}
-            historyHref={historyHref}
-          />
-        )}
-      </VStack>
+      <ProxyHostHeader
+        header={{
+          name: host.name,
+          domains: host.domains,
+          tags: host.tags,
+          status: detail.status,
+          analyticsHref,
+          logsHref,
+        }}
+        tabs={
+          historyHref && (
+            <HostPageTabs
+              active="overview"
+              overviewHref={proxyHostDetailHref(host.uuid)}
+              editHref={editorSectionHref(host.uuid)}
+              historyHref={historyHref}
+            />
+          )
+        }
+      />
 
       {hasAttentionToShow(detail.attention) && (
         <SectionCard icon={TriangleAlert} title={tAttention("title")}>

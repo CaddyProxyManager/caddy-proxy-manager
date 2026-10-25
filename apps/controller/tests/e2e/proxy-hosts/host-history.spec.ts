@@ -60,7 +60,7 @@ test.describe('Proxy host history', () => {
       await expect(page).toHaveURL(new RegExp(`to=${first.id}`));
       await comparison.getByTestId('rollback-revision').click();
 
-      const editor = page.getByRole('dialog', { name: 'Edit proxy host' });
+      const editor = page.getByRole('region', { name: 'Edit proxy host' });
       await expect(editor).toBeVisible({ timeout: 10_000 });
       await expect(editor.getByTestId('rollback-notice')).toContainText(`#${first.id}`);
       await editor.getByRole('button', { name: 'Review' }).click();

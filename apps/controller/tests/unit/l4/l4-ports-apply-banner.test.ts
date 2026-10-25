@@ -53,10 +53,6 @@ describe('L4ProxyHostsClient banner integration', () => {
     expect(client).toMatch(/CreateL4HostDialog[\s\S]{0,400}signalBannerRefresh/);
   });
 
-  it('increments bannerRefresh when edit dialog closes', () => {
-    expect(client).toMatch(/EditL4HostDialog[\s\S]{0,400}signalBannerRefresh/);
-  });
-
   it('increments bannerRefresh when delete dialog closes', () => {
     expect(client).toMatch(/DeleteL4HostDialog[\s\S]{0,400}signalBannerRefresh/);
   });

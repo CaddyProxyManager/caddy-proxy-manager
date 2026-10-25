@@ -228,3 +228,39 @@
     }
   }
 }
+
+/* A host's page tabs are its navigation, so they read as headings rather than a filter strip. The
+   hidden sizer keeps a tab's width while its label changes weight, so it gets the selected weight. */
+@layer astryx-theme {
+  .cpm-page-tabs .astryx-tab {
+    font-size: var(--text-large-size);
+    font-weight: var(--font-weight-medium);
+  }
+
+  .cpm-page-tabs .astryx-tab[data-selected],
+  .cpm-page-tabs .astryx-tab [aria-hidden="true"] {
+    font-weight: var(--font-weight-bold);
+  }
+
+  /* A toolbar bleeds into its container's padding, as a dialog header wants. On the editor page it
+     would cover the host's tabs and overhang the form, so it stays in the column; stuck, a shadow
+     paints the padding above it instead, where the form would otherwise show through. */
+  .cpm-host-editor-toolbar > * {
+    margin: 0;
+  }
+
+  .cpm-host-editor-toolbar[data-stuck] > * {
+    background-color: var(--color-background-body);
+    box-shadow: 0 calc(-1 * var(--cpm-sticky-gap, 0px)) 0 var(--color-background-body);
+  }
+
+  /* The edit page shows one section; the rest stay in the form, hidden. */
+  .cpm-host-editor-page [data-section-hidden] {
+    display: none;
+  }
+
+  /* Lands a jumped-to section just under that toolbar: its small size, padding and divider. */
+  .cpm-host-editor-page :is([id^="host-section-"], [id^="l4-section-"]) {
+    scroll-margin-top: calc(var(--size-element-sm) + var(--spacing-4) + 1px);
+  }
+}

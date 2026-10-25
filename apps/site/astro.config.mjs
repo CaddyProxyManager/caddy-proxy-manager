@@ -201,10 +201,6 @@ export default defineConfig({
           find: /^@\/src\/app\/\(dashboard\)\/l4-proxy-hosts\/actions$/,
           replacement: fileURLToPath(new URL("./src/demos/shims/l4-actions.ts", import.meta.url)),
         },
-        {
-          find: /^@\/components\/host-review\/section-link$/,
-          replacement: fileURLToPath(new URL("./src/demos/shims/section-link.ts", import.meta.url)),
-        },
         { find: /^@\/components\//, replacement: `${controller("src/components")}/` },
         { find: /^@\/lib\//, replacement: `${controller("src/lib")}/` },
         { find: /^@\/src\//, replacement: `${controller("src")}/` },

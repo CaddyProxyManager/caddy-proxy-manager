@@ -134,7 +134,7 @@ describe('diffHostFields', () => {
     const before = { name: 'db', listenAddress: ':5432', accessListId: 'office' };
     const after = { ...before, listenAddress: ':5433', accessListId: null };
     expect(diffHostFields('l4', before, after, {}).map((c) => [c.field, c.section])).toEqual([
-      ['listenAddress', 'listener'],
+      ['listenAddress', 'general'],
       ['accessListId', 'protection'],
     ]);
   });

@@ -53,7 +53,7 @@ configuration, busiest first:
   CrowdSec and bot challenge, whichever the host has on.
 
 Without analytics the list keeps its plain columns. Click a row, or the host's name, to open its
-page; **Edit** stays in the row menu.
+page; **Edit** in the row menu opens its edit page.
 
 <Demo title="The proxy host list" note="Busiest first. Sort by requests, domain or status, switch to the enabled or disabled hosts, pick a tag, or hover the note on staging. Grafana is in maintenance mode. Tick a few rows to disable them together.">
   <ProxyHostsTableDemo client:visible />
@@ -68,12 +68,15 @@ Each host has a page at `/proxy-hosts/<id>`:
   bandwidth, a chart of served and 5xx responses every half hour with the 5xx share as a line, its
   busiest paths with their 5xx counts, and its status codes;
 - its upstreams with their [live health](#live-upstream-health) and health-check settings;
-- a line for each part of the editor (General, Upstreams, TLS, Access, Protection, Routing,
-  Advanced) that opens the editor at that part;
+- a line for each part of the editor (General, Upstreams, Access, Protection, Routing, Advanced)
+  that opens the editor at that part. The certificate is under General, beside the domains it
+  covers, and client certificates (mTLS) under Access;
 - for administrators, its recent changes from the [audit log](../audit-log/).
 
-An operator sees the page for a host their groups grant, without the recent changes; the edit links
-need a manage grant.
+Tabs under the host's name lead to its **Edit** page, `/proxy-hosts/<id>/edit/general`, and its
+**History**.
+An operator sees the page for a host their groups grant, without the recent changes; the tabs and
+the edit links need a manage grant.
 
 <Demo title="A host's page" note="Sample data: a 5xx burst still going on, which the status, the attention list and the chart all show.">
   <ProxyHostDetailDemo client:visible />
@@ -85,11 +88,13 @@ need a manage grant.
 
 ## Reviewing a change before saving
 
-The editor is grouped into the same parts as the host's page. The bar under the title holds tabs
-that jump to each part and follow the scroll, and at its end a count of the fields you have changed
-beside **Review**; on a phone the count rides on the button. The arrow keys move along the
-bar, from the last tab on to the button. In an existing host's editor a jump also lands in the
-address bar, as `/proxy-hosts?edit=<id>#protection`, so the link opens the editor there again.
+The editor is grouped into the same parts as the host's page. The bar at its top holds a tab for
+each part, and at its end a count of the fields you have changed beside **Review**; on a phone the
+count rides on the button. The arrow keys move along the bar, from the last tab on to the button.
+In the new-host dialog a tab jumps to its part of one long form. A host's edit page shows one part
+at a time, each at its own address, such as `/proxy-hosts/<id>/edit/protection`; switching parts
+keeps what you typed in the others, and **Review** covers them all. Links to the old
+`/proxy-hosts?edit=<id>` still land on the editor.
 
 **Review**, or Ctrl+S (Cmd+S on a Mac) anywhere in the open editor, asks the server what the save
 would do without saving anything. The answer runs every check the save runs, so a refusal shows
@@ -112,8 +117,9 @@ here first, and lists:
   certificate that does not cover a domain, and a host being disabled or put into maintenance.
 
 **Save** in the review saves what it shows; Ctrl+S there saves too. The save button in the
-editor's footer still saves straight away. Closing the editor, or the browser tab, with unsaved
-changes asks first. Notes and tags reach no Caddy config, so a change to only those reloads nothing.
+editor's footer still saves straight away. Closing the editor, leaving its page or closing the
+browser tab with unsaved changes asks first. Notes and tags reach no Caddy config, so a change to
+only those reloads nothing.
 
 The same preview is in the [API](../api/#previewing-a-change).
 

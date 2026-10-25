@@ -5,7 +5,7 @@ import { HostHistoryScreen } from "@/src/components/host-history/HostHistoryScre
 import { deletedHostIdForUuid } from "@/src/lib/host-history";
 import { loadHostHistory } from "@/src/lib/host-history/page";
 import { getL4ProxyHost, resolveL4ProxyHostId } from "@/src/lib/models/l4-proxy-hosts";
-import { l4ProxyHostHistoryHref } from "@/src/lib/l4/editor-sections";
+import { l4EditorSectionHref, l4ProxyHostHistoryHref } from "@/src/lib/l4/editor-sections";
 import { canManage, requireReach, can } from "@/src/lib/users/permissions";
 import { restoreL4ProxyHostAction } from "../../actions";
 
@@ -37,6 +37,7 @@ export default async function L4ProxyHostHistoryPage({ params, searchParams }: P
       listHref="/l4-proxy-hosts"
       listLabel={tNav("l4ProxyHosts")}
       overviewHref={null}
+      editHref={host ? l4EditorSectionHref(host.uuid) : null}
       historyHref={l4ProxyHostHistoryHref(raw)}
       view={{
         live: host !== null,
@@ -49,7 +50,7 @@ export default async function L4ProxyHostHistoryPage({ params, searchParams }: P
         selection: data.selection,
         comparison: data.comparison,
         showConfig: data.showConfig,
-        rollbackHref: host ? `/l4-proxy-hosts?edit=${host.uuid}&revision=` : null,
+        rollbackHref: host ? `${l4EditorSectionHref(host.uuid)}?revision=` : null,
         restore:
           !host && can(access, "hosts:write")
             ? {

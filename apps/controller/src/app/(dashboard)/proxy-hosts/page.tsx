@@ -1,13 +1,10 @@
+import { redirect } from "next/navigation";
 import ProxyHostsClient from "./ProxyHostsClient";
-import { revisionForEditor } from "@/src/lib/host-history";
-import { strictId } from "@/src/lib/http/strict-id";
+import { editorSectionHref } from "@/src/lib/proxy-hosts/editor-sections";
 import { HostTagSuggestions } from "@/components/proxy-hosts/HostTagsField";
 import {
   listProxyHostsPaginated,
   countProxyHostsByState,
-  getProxyHost,
-  resolveProxyHostId,
-  proxyHostFromRow,
   getProxyHostsByIds,
   listProxyHostDomainRefs,
   listProxyHostTags,
@@ -22,14 +19,7 @@ import {
 import { listCertificateSummaries } from "@/src/lib/models/certificates";
 import { listAgentOptions } from "@/src/lib/agent/client";
 import { agentIdsForHosts } from "@/src/lib/models/host-agents";
-import {
-  canCreate,
-  canManage,
-  canView,
-  requireReach,
-  visibleIdFilter,
-  can,
-} from "@/src/lib/users/permissions";
+import { canCreate, canManage, requireReach, visibleIdFilter } from "@/src/lib/users/permissions";
 import type { Metadata } from "next";
 import { toCertificatePickerOption } from "@/src/lib/certificates/api";
 import { getTranslations } from "next-intl/server";
@@ -44,9 +34,8 @@ interface PageProps {
     sortDir?: string;
     state?: string;
     tag?: string;
-    /** A host to open the editor on, from its page's section links. */
+    /** The editor was a dialog here; old links to it go to the host's edit page. */
     edit?: string;
-    /** With `edit`: a revision of that host to load instead, for a rollback. */
     revision?: string;
   }>;
 }
@@ -57,6 +46,12 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function ProxyHostsPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  // The hash, naming a section, is kept by the browser across the redirect.
+  if (params.edit) {
+    const revision = params.revision ? `?revision=${encodeURIComponent(params.revision)}` : "";
+    redirect(`${editorSectionHref(encodeURIComponent(params.edit))}${revision}`);
+  }
   // Operators see hosts per grant. Null from visibleIdFilter means admin, hence not `?? []`.
   const access = await requireReach("hosts:read");
   const visible = visibleIdFilter(access, "proxyHost");
@@ -68,9 +63,7 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     sortDir: sortDirParam,
     state: stateParam,
     tag: tagParam,
-    edit: editParam,
-    revision: revisionParam,
-  } = await searchParams;
+  } = params;
   const tag = tagParam?.trim().toLowerCase() || undefined;
   // Filtered in the query: client-side, "Disabled 2" shows nothing when both sit on a later page.
   const enabled = stateParam === "enabled" ? true : stateParam === "disabled" ? false : undefined;
@@ -82,7 +75,6 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
   // filtered set and paged after.
   const analyticsOn = await isAnalyticsEnabled().catch(() => false);
   const sortBy = sortByParam || (analyticsOn ? "requests" : undefined);
-  const editId = editParam ? await resolveProxyHostId(editParam) : null;
 
   // Everything independent starts now; the insights' slow inputs (signals, the agents' certificate
   // inventory) run under their budgets alongside the list rather than after it.
@@ -121,33 +113,18 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
     : await (pageByCreated ?? listed());
   const total = enabled === undefined ? counts.total : enabled ? counts.enabled : counts.disabled;
 
-  // The editor opened from a host's page, which may sit on another page of the list.
-  const editHost =
-    editId !== null
-      ? (hosts.find((h) => h.id === editId) ??
-        (canView(access, "proxyHost", editId) ? await getProxyHost(editId) : null))
-      : null;
-  const dialogHosts = editHost && !hosts.includes(editHost) ? [...hosts, editHost] : hosts;
-  const managed = editHost && canManage(access, "proxyHost", editHost.id) ? editHost : null;
-  const revisionId = strictId(revisionParam);
-  const rollback =
-    managed && revisionId !== undefined
-      ? await revisionForEditor("http", managed.id, revisionId)
-      : null;
-
   // Assignments for this page's hosts only, not the fleet. Insights are best-effort: unavailable
   // analytics drops the columns instead of failing the list.
   const [assignments, insights] = await Promise.all([
     agentIdsForHosts(
       "http",
-      dialogHosts.map((host) => host.id),
+      hosts.map((host) => host.id),
     ).catch(() => new Map<number, number[]>()),
     listInsights({ pageHosts: hosts, traffic, certificates, inputs: insightInputs }).catch(
       () => ({ available: false }) as const,
     ),
   ]);
   const agentAssignments = Object.fromEntries(assignments);
-  if (managed && rollback) agentAssignments[managed.id] = rollback.snapshot.agentIds;
 
   return (
     <HostTagSuggestions tags={tags}>
@@ -167,19 +144,8 @@ export default async function ProxyHostsPage({ searchParams }: PageProps) {
         agentAssignments={agentAssignments}
         counts={counts}
         insights={insights}
-        editTarget={
-          managed && rollback
-            ? { ...proxyHostFromRow(rollback.snapshot.row), id: managed.id }
-            : managed
-        }
-        rollback={
-          rollback && revisionId !== undefined ? { revisionId, missing: rollback.missing } : null
-        }
         canCreate={canCreate(access, "proxyHost")}
-        manageableIds={dialogHosts
-          .filter((h) => canManage(access, "proxyHost", h.id))
-          .map((h) => h.id)}
-        canEditRawConfig={can(access, "settings:write")}
+        manageableIds={hosts.filter((h) => canManage(access, "proxyHost", h.id)).map((h) => h.id)}
       />
     </HostTagSuggestions>
   );

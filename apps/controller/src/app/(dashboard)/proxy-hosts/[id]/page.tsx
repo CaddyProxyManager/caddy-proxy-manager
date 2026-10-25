@@ -5,11 +5,10 @@ import { inArray } from "drizzle-orm";
 import db from "@/src/lib/db";
 import { users } from "@/src/lib/db/schema";
 import { auditSummaryText } from "@/src/lib/audit/summary";
-import { DEFAULT_EXPLORE_STATE, serializeExploreState } from "@/src/lib/analytics/explore-state";
 import { getProxyHost, resolveProxyHostId } from "@/src/lib/models/proxy-hosts";
 import { getProxyHostDetail } from "@/src/lib/proxy-hosts/detail";
 import { proxyHostHistoryHref } from "@/src/lib/proxy-hosts/editor-sections";
-import { hostTrafficNames } from "@/src/lib/proxy-hosts/traffic-status";
+import { proxyHostHeaderLinks } from "@/src/lib/proxy-hosts/header";
 import { canManage, canView, requireReach, can } from "@/src/lib/users/permissions";
 import { ProxyHostDetailView } from "@/src/components/proxy-hosts/detail/ProxyHostDetailView";
 import { requestMemo } from "@/src/lib/request-memo";
@@ -53,14 +52,7 @@ export default async function ProxyHostDetailPage({ params }: PageProps) {
           .where(inArray(users.id, actorIds));
   const actorNames = new Map(actors.map((a) => [a.id, a.name ?? a.email]));
 
-  const primaryName = hostTrafficNames(host.domains)[0];
-  const analyticsHref =
-    can(access, "analytics:read") && detail.traffic && primaryName
-      ? `/analytics?${serializeExploreState({
-          ...DEFAULT_EXPLORE_STATE,
-          filters: [{ field: "host", op: "is", value: primaryName }],
-        }).toString()}`
-      : null;
+  const { analyticsHref, logsHref } = proxyHostHeaderLinks(access, host, detail.traffic !== null);
 
   return (
     <ProxyHostDetailView
@@ -68,11 +60,7 @@ export default async function ProxyHostDetailPage({ params }: PageProps) {
       canManage={canManage(access, "proxyHost", host.id)}
       historyHref={canManage(access, "proxyHost", host.id) ? proxyHostHistoryHref(host.uuid) : null}
       analyticsHref={analyticsHref}
-      logsHref={
-        can(access, "logs:read") && primaryName
-          ? `/logs?source=access&host=${encodeURIComponent(primaryName)}`
-          : null
-      }
+      logsHref={logsHref}
       auditRows={
         can(access, "audit:read")
           ? audit.map((event) => ({

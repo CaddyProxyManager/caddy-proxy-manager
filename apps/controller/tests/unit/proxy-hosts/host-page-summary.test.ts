@@ -8,6 +8,7 @@ import { SETTINGS_LINKS } from '@/src/lib/attention/providers';
 import type { ProxyHost } from '@/src/lib/models/proxy-hosts';
 import {
   EDITOR_SECTIONS,
+  editorSectionFromLink,
   editorSectionHref,
   isEditorSection,
 } from '@/src/lib/proxy-hosts/editor-sections';
@@ -90,9 +91,8 @@ describe('sectionSummaries', () => {
     const summaries = sectionSummaries(host(), LOOKUPS);
     expect(summaries.map((s) => s.section)).toEqual([...EDITOR_SECTIONS]);
     expect(codes(host())).toEqual({
-      general: ['domains'],
+      general: ['domains', 'certificateManaged'],
       upstreams: ['upstreams', 'noHealthChecks'],
-      tls: ['certificateManaged'],
       access: ['openAccess'],
       protection: ['noProtection'],
       routing: ['defaultRouting'],
@@ -111,6 +111,7 @@ describe('sectionSummaries', () => {
       redirects: [{ from: '/a', to: '/b', status: 301 }] as ProxyHost['redirects'],
       maintenance: { enabled: true, retryAfter: null, bypassCidrs: [], body: null },
       accessListId: 4,
+      mtls: { enabled: true } as ProxyHost['mtls'],
     });
     const found = codes(configured, {
       certificateName: null,
@@ -118,10 +119,10 @@ describe('sectionSummaries', () => {
       agentNames: ['edge-1'],
       crowdsecActive: true,
     });
-    expect(found.general).toEqual(['domains', 'tags']);
+    expect(found.general).toEqual(['domains', 'tags', 'certificateManaged']);
     expect(found.upstreams).toEqual(['upstreams', 'httpsForced', 'hstsOn', 'noHealthChecks']);
-    expect(found.tls).toEqual(['certificateManaged']);
-    expect(found.access).toEqual(['accessList', 'signInCpm']);
+    // Client certificates gate who connects, so they sit with the other access controls.
+    expect(found.access).toEqual(['accessList', 'signInCpm', 'mtls']);
     expect(found.protection).toEqual(['waf', 'crowdsec', 'rateLimit']);
     expect(found.routing).toEqual(['redirects']);
     expect(found.advanced).toEqual(['pinnedAgents', 'maintenanceOn']);
@@ -159,11 +160,17 @@ describe('hostProtections', () => {
 });
 
 describe('editor sections', () => {
-  it('links to the list page editor, scrolled by the hash', () => {
-    expect(editorSectionHref(5)).toBe('/proxy-hosts?edit=5');
-    expect(editorSectionHref(5, 'tls')).toBe('/proxy-hosts?edit=5#tls');
+  it('links to the edit page, one address per section', () => {
+    expect(editorSectionHref(5)).toBe('/proxy-hosts/5/edit/general');
+    expect(editorSectionHref(5, 'access')).toBe('/proxy-hosts/5/edit/access');
     expect(isEditorSection('routing')).toBe(true);
     expect(isEditorSection('nope')).toBe(false);
+  });
+
+  it('sends a link to a merged section to the one that took it in', () => {
+    expect(editorSectionFromLink('tls')).toBe('general');
+    expect(editorSectionFromLink('access')).toBe('access');
+    expect(editorSectionFromLink('nope')).toBeNull();
   });
 });
 

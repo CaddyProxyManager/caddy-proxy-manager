@@ -22,9 +22,9 @@ test.describe('Proxy host review before save', () => {
   test('review lists the changes, undo keeps a field, save writes the rest', async ({ page }) => {
     const id = await createHost(page, 'Review E2E', 'review-e2e.local');
     try {
-      await page.goto(`/proxy-hosts?edit=${id}#upstreams`);
+      await page.goto(`/proxy-hosts/${id}/edit/general`);
       await waitForHydration(page);
-      const editor = page.getByRole('dialog', { name: 'Edit proxy host' });
+      const editor = page.getByRole('region', { name: 'Edit proxy host' });
       await expect(editor).toBeVisible({ timeout: 10_000 });
       await expect(editor.getByText('No unsaved changes')).toBeVisible();
       // No footer: the review is the only way to save, and it stays plain until something changes.
@@ -65,29 +65,31 @@ test.describe('Proxy host review before save', () => {
     }
   });
 
-  test('closing over unsaved edits asks first', async ({ page }) => {
+  test('leaving over unsaved edits asks first', async ({ page }) => {
     const id = await createHost(page, 'Review E2E discard', 'review-e2e-discard.local');
     try {
-      await page.goto(`/proxy-hosts?edit=${id}`);
+      await page.goto(`/proxy-hosts/${id}/edit`);
       await waitForHydration(page);
-      const editor = page.getByRole('dialog', { name: 'Edit proxy host' });
+      const editor = page.getByRole('region', { name: 'Edit proxy host' });
       await expect(editor).toBeVisible({ timeout: 10_000 });
 
       await editor.getByLabel('Name').fill('Never saved');
       await expect(editor.getByText('1 unsaved change')).toBeVisible({ timeout: 5_000 });
-      await editor.getByRole('button', { name: 'Close' }).click();
+      const overview = page.locator('.cpm-page-tabs').getByRole('link', { name: 'Overview' });
+      await overview.click();
 
       const prompt = page.getByRole('alertdialog', { name: 'Discard unsaved changes?' });
       await expect(prompt).toBeVisible();
       await prompt.getByRole('button', { name: 'Keep editing' }).click();
       await expect(editor).toBeVisible();
 
-      await editor.getByRole('button', { name: 'Close' }).click();
+      await overview.click();
       await page
         .getByRole('alertdialog', { name: 'Discard unsaved changes?' })
         .getByRole('button', { name: 'Discard changes' })
         .click();
-      await expect(editor).not.toBeVisible({ timeout: 10_000 });
+      await expect(page).toHaveURL(new RegExp(`/proxy-hosts/${id}$`), { timeout: 10_000 });
+      await expect(editor).not.toBeVisible();
 
       const host = (await (await page.request.get(`${API_PROXY_HOSTS}/${id}`)).json()) as {
         name: string;

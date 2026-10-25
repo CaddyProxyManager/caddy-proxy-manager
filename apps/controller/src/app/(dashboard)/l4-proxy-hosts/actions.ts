@@ -18,7 +18,9 @@ import { parseL4CreateForm, parseL4UpdateForm } from "@/src/lib/l4/form";
 import { revertedFields, withoutReverted } from "@/src/lib/host-review/diff";
 import { previewL4HostChange } from "@/src/lib/host-review";
 import type { HostPreviewResult } from "@/src/lib/host-review/types";
-import { rollbackRevisionFrom } from "@/src/lib/host-history";
+import { revisionForEditor, rollbackRevisionFrom } from "@/src/lib/host-history";
+import { l4ProxyHostFromRow, type L4ProxyHost } from "@/src/lib/models/l4-proxy-hosts";
+import type { EditorRollback } from "@/src/components/host-history/RollbackNotice";
 
 export async function createL4ProxyHostAction(
   _prevState: ActionState = INITIAL_ACTION_STATE,
@@ -200,5 +202,41 @@ export async function restoreL4ProxyHostAction(
     const t = await getTranslations();
     logWriteFailure(error, "Failed to restore L4 proxy host:", revisionId);
     return actionError(t, error, t("errors.restoreHostFailed"));
+  }
+}
+
+/**
+ * A revision for the edit page to roll back to, parsed as a stored host is, so the browser never
+ * sees a stored row. The page's layout cannot read the query string that names it. Null when the
+ * revision is not this host's, and the editor opens on the stored host.
+ */
+export async function l4ProxyHostRollbackAction(
+  id: number,
+  revisionId: number,
+): Promise<
+  | {
+      ok: true;
+      rollback: { host: L4ProxyHost; notice: EditorRollback; agentIds: number[] } | null;
+    }
+  | { ok: false; message: string }
+> {
+  try {
+    const access = await requireReach("hosts:read");
+    assertCanManage(access, "l4ProxyHost", id);
+    const found = await revisionForEditor("l4", id, revisionId);
+    if (!found) return { ok: true, rollback: null };
+    return {
+      ok: true,
+      rollback: {
+        host: { ...l4ProxyHostFromRow(found.snapshot.row), id },
+        notice: { revisionId, missing: found.missing },
+        agentIds: found.snapshot.agentIds,
+      },
+    };
+  } catch (error) {
+    unstable_rethrow(error);
+    const t = await getTranslations();
+    console.error("Failed to load a revision for rollback:", id, revisionId, error);
+    return { ok: false, message: extractErrorMessage(t, error, t("errors.loadRevisionFailed")) };
   }
 }

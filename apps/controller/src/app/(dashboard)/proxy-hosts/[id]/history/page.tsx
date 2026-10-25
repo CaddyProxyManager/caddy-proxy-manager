@@ -5,7 +5,12 @@ import { HostHistoryScreen } from "@/src/components/host-history/HostHistoryScre
 import { deletedHostIdForUuid } from "@/src/lib/host-history";
 import { loadHostHistory } from "@/src/lib/host-history/page";
 import { getProxyHost, resolveProxyHostId } from "@/src/lib/models/proxy-hosts";
-import { proxyHostDetailHref, proxyHostHistoryHref } from "@/src/lib/proxy-hosts/editor-sections";
+import {
+  editorSectionHref,
+  proxyHostDetailHref,
+  proxyHostHistoryHref,
+} from "@/src/lib/proxy-hosts/editor-sections";
+import { loadProxyHostHeader } from "@/src/lib/proxy-hosts/header";
 import { canManage, requireReach, can } from "@/src/lib/users/permissions";
 import { restoreProxyHostAction } from "../../actions";
 
@@ -27,7 +32,10 @@ export default async function ProxyHostHistoryPage({ params, searchParams }: Pag
   const access = await requireReach("hosts:read");
   const host = await getProxyHost(id);
   if (host ? !canManage(access, "proxyHost", id) : !can(access, "hosts:write")) notFound();
-  const data = await loadHostHistory("http", id, await searchParams);
+  const [data, hostHeader] = await Promise.all([
+    loadHostHistory("http", id, await searchParams),
+    host ? loadProxyHostHeader(host, access) : null,
+  ]);
   if (!host && data.latest === 0) notFound();
   const tNav = await getTranslations("nav");
 
@@ -37,7 +45,9 @@ export default async function ProxyHostHistoryPage({ params, searchParams }: Pag
       listHref="/proxy-hosts"
       listLabel={tNav("proxyHosts")}
       overviewHref={host ? proxyHostDetailHref(host.uuid) : null}
+      editHref={host ? editorSectionHref(host.uuid) : null}
       historyHref={proxyHostHistoryHref(raw)}
+      hostHeader={hostHeader}
       view={{
         live: host !== null,
         revisions: data.revisions,
@@ -49,7 +59,7 @@ export default async function ProxyHostHistoryPage({ params, searchParams }: Pag
         selection: data.selection,
         comparison: data.comparison,
         showConfig: data.showConfig,
-        rollbackHref: host ? `/proxy-hosts?edit=${host.uuid}&revision=` : null,
+        rollbackHref: host ? `${editorSectionHref(host.uuid)}?revision=` : null,
         restore:
           !host && can(access, "hosts:write")
             ? {

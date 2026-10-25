@@ -27,10 +27,11 @@ import { parseProxyHostCreateForm, parseProxyHostUpdateForm } from "@/src/lib/pr
 import { revertedFields } from "@/src/lib/host-review/diff";
 import { previewProxyHostChange, revertProxyHostInput } from "@/src/lib/host-review";
 import type { HostPreviewResult } from "@/src/lib/host-review/types";
-import { rollbackRevisionFrom } from "@/src/lib/host-history";
+import { revisionForEditor, rollbackRevisionFrom } from "@/src/lib/host-history";
+import { proxyHostFromRow, type ProxyHost } from "@/src/lib/models/proxy-hosts";
+import type { EditorRollback } from "@/src/components/host-history/RollbackNotice";
 import {
   type HostEditorOptions,
-  loadForwardAuthAccess,
   loadHostEditorOptions,
 } from "@/src/lib/proxy-hosts/editor-options";
 
@@ -227,27 +228,6 @@ export async function hostEditorOptionsAction(): Promise<
   }
 }
 
-/** A host's forward-auth grants, read as its editor opens; seeing the host is enough. */
-export async function hostForwardAuthAccessAction(
-  id: number,
-): Promise<
-  { ok: true; access: { userIds: number[]; groupIds: number[] } } | { ok: false; message: string }
-> {
-  try {
-    const access = await requireReach("hosts:read");
-    assertCanView(access, "proxyHost", id);
-    return { ok: true, access: await loadForwardAuthAccess(id) };
-  } catch (error) {
-    unstable_rethrow(error);
-    const t = await getTranslations();
-    console.error("Failed to read forward auth access:", id, error);
-    return {
-      ok: false,
-      message: extractErrorMessage(t, error, t("errors.hostEditorOptionsFailed")),
-    };
-  }
-}
-
 /** Read-only, so viewing the host is enough: anyone who can see its upstreams sees their health. */
 export async function proxyHostUpstreamHealthAction(
   id: number,
@@ -327,5 +307,41 @@ export async function restoreProxyHostAction(
     const t = await getTranslations();
     logWriteFailure(error, "Failed to restore proxy host:", revisionId);
     return actionError(t, error, t("errors.restoreHostFailed"));
+  }
+}
+
+/**
+ * A revision for the edit page to roll back to, parsed as a stored host is, so the browser never
+ * sees a stored row. The page's layout cannot read the query string that names it. Null when the
+ * revision is not this host's, and the editor opens on the stored host.
+ */
+export async function proxyHostRollbackAction(
+  id: number,
+  revisionId: number,
+): Promise<
+  | {
+      ok: true;
+      rollback: { host: ProxyHost; notice: EditorRollback; agentIds: number[] } | null;
+    }
+  | { ok: false; message: string }
+> {
+  try {
+    const access = await requireReach("hosts:read");
+    assertCanManage(access, "proxyHost", id);
+    const found = await revisionForEditor("http", id, revisionId);
+    if (!found) return { ok: true, rollback: null };
+    return {
+      ok: true,
+      rollback: {
+        host: { ...proxyHostFromRow(found.snapshot.row), id },
+        notice: { revisionId, missing: found.missing },
+        agentIds: found.snapshot.agentIds,
+      },
+    };
+  } catch (error) {
+    unstable_rethrow(error);
+    const t = await getTranslations();
+    console.error("Failed to load a revision for rollback:", id, revisionId, error);
+    return { ok: false, message: extractErrorMessage(t, error, t("errors.loadRevisionFailed")) };
   }
 }

@@ -1,7 +1,5 @@
 "use client";
 
-import type { EditorRollback } from "@/components/host-history/RollbackNotice";
-import { clearEditorLink } from "@/components/host-review/section-link";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
@@ -42,11 +40,7 @@ import {
   HostStatusCell,
 } from "@/components/proxy-hosts/HostInsightCells";
 import type { ListInsights } from "@/lib/proxy-hosts/list-insights";
-import {
-  isEditorSection,
-  proxyHostDetailHref,
-  type EditorSection,
-} from "@/lib/proxy-hosts/editor-sections";
+import { editorSectionHref, proxyHostDetailHref } from "@/lib/proxy-hosts/editor-sections";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
 import type { CertificatePickerOption } from "@/lib/certificates/api";
@@ -86,15 +80,9 @@ type Props = {
   counts: { total: number; enabled: number; disabled: number };
   /** Traffic columns, last 24h; unavailable when analytics is off or unreachable. */
   insights: ListInsights;
-  /** Opened in the editor on arrival, from a section link on the host's page. */
-  editTarget?: ProxyHost | null;
-  /** Set when `editTarget` is a revision loaded for a rollback rather than the stored host. */
-  rollback?: EditorRollback | null;
   activeState: "all" | "enabled" | "disabled";
   /** False for an operator: grants name existing hosts. Duplicating goes with it. */
   canCreate?: boolean;
-  /** Custom Caddyfile and raw JSON; admin-only, enforced by the proxy host model. */
-  canEditRawConfig?: boolean;
   /** This page's hosts the viewer may change; the rest get a disabled checkbox. */
   manageableIds?: number[];
 };
@@ -291,11 +279,8 @@ export default function ProxyHostsClient({
   agentAssignments,
   counts,
   insights,
-  editTarget = null,
-  rollback = null,
   activeState,
   canCreate = true,
-  canEditRawConfig = false,
   manageableIds = [],
 }: Props) {
   const t = useTranslations("proxyHosts");
@@ -305,8 +290,6 @@ export default function ProxyHostsClient({
   const emptyValue = useEmptyValue();
   const [createOpen, setCreateOpen] = useState(false);
   const [duplicateHost, setDuplicateHost] = useState<ProxyHost | null>(null);
-  const [editHost, setEditHost] = useState<ProxyHost | null>(editTarget);
-  const [editSection, setEditSection] = useState<EditorSection | null>(null);
   const [deleteHost, setDeleteHost] = useState<ProxyHost | null>(null);
   const [checkingHost, setCheckingHost] = useState<ProxyHost | null>(null);
   // Remounts CreateHostDialog on each open, resetting useFormState.
@@ -320,12 +303,11 @@ export default function ProxyHostsClient({
   const showBulkBar = selectedHosts.length > 0 && !isNarrow;
   // Mounted from the first open on, so a closing dialog still animates out.
   const [editorsUsed, setEditorsUsed] = useState(false);
-  if (!editorsUsed && (createOpen || editHost !== null || deleteHost !== null)) {
+  if (!editorsUsed && (createOpen || deleteHost !== null)) {
     setEditorsUsed(true);
   }
-  const editorOptions = useHostEditorOptions(createOpen || editHost !== null || showBulkBar, () => {
+  const editorOptions = useHostEditorOptions(createOpen || showBulkBar, () => {
     setCreateOpen(false);
-    setEditHost(null);
   });
 
   const router = useRouter();
@@ -336,28 +318,6 @@ export default function ProxyHostsClient({
   useEffect(() => {
     setSearchTerm(initialSearch);
   }, [initialSearch]);
-
-  // The section rides in the hash, which the server never sees.
-  useEffect(() => {
-    if (!editTarget) return;
-    const hash = window.location.hash.slice(1);
-    setEditSection(isEditorSection(hash) ? hash : null);
-    setEditHost(editTarget);
-  }, [editTarget]);
-
-  function closeEditor() {
-    setEditHost(null);
-    setEditSection(null);
-    if (!searchParams.has("edit")) {
-      clearEditorLink();
-      return;
-    }
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("edit");
-    params.delete("revision");
-    const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname);
-  }
 
   function handleSearchChange(value: string) {
     setSearchTerm(value);
@@ -529,7 +489,7 @@ export default function ProxyHostsClient({
           host={host}
           onToggle={(enabled) => handleToggleEnabled(host.id, enabled)}
           onMaintenance={(enabled) => handleMaintenance(host.id, enabled)}
-          onEdit={() => setEditHost(host)}
+          onEdit={() => router.push(editorSectionHref(host.uuid))}
           onDuplicate={() => openDuplicate(host)}
           onTestReachability={() => setCheckingHost(host)}
           canCreate={canCreate}
@@ -652,7 +612,7 @@ export default function ProxyHostsClient({
           host={host}
           onToggle={(enabled) => handleToggleEnabled(host.id, enabled)}
           onMaintenance={(enabled) => handleMaintenance(host.id, enabled)}
-          onEdit={() => setEditHost(host)}
+          onEdit={() => router.push(editorSectionHref(host.uuid))}
           onDuplicate={() => openDuplicate(host)}
           onTestReachability={() => setCheckingHost(host)}
           canCreate={canCreate}
@@ -781,15 +741,9 @@ export default function ProxyHostsClient({
             setCreateOpen(false);
             setTimeout(() => setDuplicateHost(null), 200);
           }}
-          editHost={editHost}
-          editRollback={rollback && editHost === editTarget ? rollback : null}
-          editSection={editSection}
-          onCloseEdit={closeEditor}
           deleteHost={deleteHost}
           onCloseDelete={() => setDeleteHost(null)}
           agents={agents ?? []}
-          agentAssignments={agentAssignments ?? {}}
-          canEditRawConfig={canEditRawConfig}
         />
       )}
 

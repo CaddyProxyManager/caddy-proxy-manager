@@ -1664,6 +1664,7 @@
     "upstreamTargetAdminOnly": "Only an administrator can point an upstream at Caddy's admin port, a unix socket or a placeholder",
     "rebuildCaddyFailed": "Failed to trigger a Caddy rebuild",
     "restoreRevisionFailed": "Failed to restore the revision",
+    "loadRevisionFailed": "Could not load that revision into the editor. Try rolling back again.",
     "revisionNotFound": "Revision #{revision} does not exist",
     "revisionNotRecorded": "Revision #{revision} cannot be restored: a later revision was applied before values were recorded",
     "hostRevisionNotFound": "Host revision #{revision} does not exist",
@@ -2163,6 +2164,7 @@
     "pageTitle": "History of {name}",
     "approvedIn": "Change request #{id}",
     "overviewTab": "Overview",
+    "loadingRevision": "Loading the revision",
     "subtitle": "A revision is kept after every save, maintenance switch, bulk change, import and deletion, newest first. Compare any two, or load one into the editor and roll back to it.",
     "deletedTitle": "This host was deleted",
     "deletedDescription": "Its history is kept. Restoring brings it back under its old id, as the selected revision had it.",
@@ -2261,7 +2263,6 @@
       "http": {
         "general": "General",
         "upstreams": "Upstreams",
-        "tls": "TLS",
         "access": "Access",
         "protection": "Protection",
         "routing": "Routing",
@@ -2269,7 +2270,6 @@
       },
       "l4": {
         "general": "General",
-        "listener": "Listener",
         "upstreams": "Upstreams",
         "protection": "Protection"
       }
@@ -2928,7 +2928,6 @@
       "sections": {
         "general": "General",
         "upstreams": "Upstreams",
-        "tls": "TLS",
         "access": "Access",
         "protection": "Protection",
         "routing": "Routing",

@@ -11,7 +11,7 @@ import {
 } from "@/src/app/(dashboard)/l4-proxy-hosts/actions";
 import { HostEditorShell } from "@/components/host-review/HostEditorShell";
 import { useCloseOnSuccess } from "@/components/host-review/useCloseOnSuccess";
-import { linkEditorSection } from "@/components/host-review/section-link";
+import { EditorSectionBlock } from "@/components/host-review/editor-section";
 import {
   L4_EDITOR_SECTIONS,
   type L4EditorSection,
@@ -312,7 +312,7 @@ function L4HostForm({
           />
         )}
 
-        <VStack gap={5} id={anchor("general")}>
+        <EditorSectionBlock anchor={anchor("general")}>
           <input type="hidden" name="enabledPresent" value="1" />
           {/* Empty, not "off": the parser reads anything but on/true/1 as false. */}
           <input type="hidden" name="enabled" value={enabled ? "on" : ""} />
@@ -349,9 +349,7 @@ function L4HostForm({
           <HostNotesField value={text.description} onChange={set("description")} />
 
           <HostTagsField initial={initialData?.tags} />
-        </VStack>
 
-        <VStack gap={5} id={anchor("listener")}>
           <Selector
             label={tProxyHosts("protocol")}
             htmlName="protocol"
@@ -419,9 +417,9 @@ function L4HostForm({
           />
 
           <DynamicDnsHostFields dynamicDns={initialData?.dynamicDns} withHostnames />
-        </VStack>
+        </EditorSectionBlock>
 
-        <VStack gap={5} id={anchor("upstreams")}>
+        <EditorSectionBlock anchor={anchor("upstreams")}>
           <input type="hidden" name="upstreamPortMode" value={samePort ? "same" : "fixed"} />
           <Switch
             label={t("samePortUpstream")}
@@ -645,9 +643,9 @@ function L4HostForm({
               onChange={setUpstreamDnsFamily}
             />
           </Section>
-        </VStack>
+        </EditorSectionBlock>
 
-        <VStack gap={5} id={anchor("protection")}>
+        <EditorSectionBlock anchor={anchor("protection")}>
           <Selector
             label={tProxyHosts("accessList")}
             htmlName="accessListId"
@@ -795,7 +793,7 @@ function L4HostForm({
               description={t("geoblockClientIpDescription")}
             />
           </Section>
-        </VStack>
+        </EditorSectionBlock>
       </VStack>
     </form>
   );
@@ -858,6 +856,8 @@ export function CreateL4HostDialog({
 }
 
 export function EditL4HostDialog({
+  layout = "dialog",
+  sectionHref,
   open,
   host,
   onClose,
@@ -867,12 +867,16 @@ export function EditL4HostDialog({
   initialSection = null,
   rollback = null,
 }: {
+  /** A dialog over the list, or the host's edit page. */
+  layout?: "dialog" | "page";
+  /** The page's address for each section, which it shows one at a time. */
+  sectionHref?: (section: string) => string;
   open: boolean;
   host: L4ProxyHost;
   onClose: () => void;
   /** The editor holds this revision rather than the stored host. */
   rollback?: EditorRollback | null;
-  /** Scrolled to on open, from the hash of an `?edit=` link. */
+  /** Scrolled to on open, from the hash of a link to the edit page. */
   initialSection?: L4EditorSection | null;
   agents?: AgentOption[];
   accessLists?: L4AccessListOption[];
@@ -887,17 +891,19 @@ export function EditL4HostDialog({
   useCloseOnSuccess(state, onClose);
 
   useEffect(() => {
-    if (!open || !initialSection) return;
+    // The page shows the section rather than scrolling to it.
+    if (!open || !initialSection || layout === "page") return;
     const frame = requestAnimationFrame(() => {
       document
         .getElementById(l4EditorSectionAnchor(initialSection))
         ?.scrollIntoView({ block: "start" });
     });
     return () => cancelAnimationFrame(frame);
-  }, [open, initialSection]);
+  }, [open, initialSection, layout]);
 
   return (
     <HostEditorShell
+      layout={layout}
       open={open}
       onClose={onClose}
       title={t("editL4ProxyHost")}
@@ -908,7 +914,8 @@ export function EditL4HostDialog({
       isPending={isPending}
       preview={(data) => previewL4ProxyHostAction(host.id, data)}
       sections={l4SectionLinks("")}
-      onSectionLink={(section) => linkEditorSection(host.uuid, section)}
+      sectionHref={sectionHref}
+      initialSection={initialSection}
     >
       {rollback && <RollbackNotice rollback={rollback} formId="edit-l4-host-form" />}
       <L4HostForm

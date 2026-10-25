@@ -2,7 +2,6 @@
 
 import { DynamicDnsProvidersProvider } from "@/components/dns/DynamicDnsHostFields";
 import type { DynamicDnsProviderOptions } from "@/lib/dns/dynamic-dns";
-import type { EditorRollback } from "@/components/host-history/RollbackNotice";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Network, ArrowRight, Shield } from "lucide-react";
@@ -29,23 +28,14 @@ import { DataTable, type Column, useRowSelection } from "@/components/ui/DataTab
 import { L4HostBulkActions } from "@/components/l4-proxy-hosts/L4HostBulkActions";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { StatusChip } from "@/components/ui/StatusChip";
-import {
-  CreateL4HostDialog,
-  EditL4HostDialog,
-  DeleteL4HostDialog,
-} from "@/components/l4-proxy-hosts/L4HostDialogs";
+import { CreateL4HostDialog, DeleteL4HostDialog } from "@/components/l4-proxy-hosts/L4HostDialogs";
 import { L4PortsApplyBanner } from "@/components/l4-proxy-hosts/L4PortsApplyBanner";
 import { useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { Banner } from "@astryxdesign/core/Banner";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
 import type { AgentOption } from "@/components/agents/AgentAssignmentFields";
 import { useTranslations } from "next-intl";
-import { clearEditorLink } from "@/components/host-review/section-link";
-import {
-  type L4EditorSection,
-  isL4EditorSection,
-  l4ProxyHostHistoryHref,
-} from "@/src/lib/l4/editor-sections";
+import { l4EditorSectionHref, l4ProxyHostHistoryHref } from "@/src/lib/l4/editor-sections";
 
 type Props = {
   hosts: L4ProxyHost[];
@@ -63,16 +53,10 @@ type Props = {
   /** What a new host's form starts with. */
   hostDefaults?: L4ProxyHostDefaults | null;
   dynamicDnsProviders?: DynamicDnsProviderOptions;
-  /** A host absent from here is served by every agent. */
-  agentAssignments?: Record<number, number[]>;
   /** False for an operator - see ProxyHostsClient. */
   canCreate?: boolean;
   /** This page's hosts the viewer may change; the rest get a disabled checkbox. */
   manageableIds?: number[];
-  /** A host to open the editor on, from an `?edit=` link. */
-  editTarget?: L4ProxyHost | null;
-  /** Set when `editTarget` is a revision loaded for a rollback rather than the stored host. */
-  rollback?: EditorRollback | null;
 };
 
 function formatMatcher(
@@ -187,11 +171,8 @@ export default function L4ProxyHostsClient({
   accessLists = [],
   hostDefaults = null,
   dynamicDnsProviders = { choices: [], default: null },
-  agentAssignments,
   canCreate = true,
   manageableIds = [],
-  editTarget = null,
-  rollback = null,
 }: Props) {
   const t = useTranslations("l4ProxyHosts");
   const tNav = useTranslations("nav");
@@ -199,8 +180,6 @@ export default function L4ProxyHostsClient({
   const tProxyHosts = useTranslations("proxyHosts");
   const [createOpen, setCreateOpen] = useState(false);
   const [duplicateHost, setDuplicateHost] = useState<L4ProxyHost | null>(null);
-  const [editHost, setEditHost] = useState<L4ProxyHost | null>(editTarget);
-  const [editSection, setEditSection] = useState<L4EditorSection | null>(null);
   const [deleteHost, setDeleteHost] = useState<L4ProxyHost | null>(null);
   // Bumped on every open so CreateL4HostDialog remounts and its useActionState starts clean -
   // otherwise the previous save's "success" state closes the freshly reopened dialog (#241).
@@ -224,30 +203,6 @@ export default function L4ProxyHostsClient({
   useEffect(() => {
     setSearchTerm(initialSearch);
   }, [initialSearch]);
-
-  // The section rides in the hash, which the server never sees.
-  useEffect(() => {
-    if (!editTarget) return;
-    const hash = window.location.hash.slice(1);
-    setEditSection(isL4EditorSection(hash) ? hash : null);
-    setEditHost(editTarget);
-  }, [editTarget]);
-
-  function closeEditor() {
-    setEditHost(null);
-    setEditSection(null);
-    if (searchParams.has("edit")) {
-      const params = new URLSearchParams(searchParams.toString());
-      params.delete("edit");
-      params.delete("revision");
-      const query = params.toString();
-      router.replace(query ? `${pathname}?${query}` : pathname);
-      return;
-    }
-    clearEditorLink();
-    // revalidatePath alone leaves this client tree on its old props (#241).
-    router.refresh();
-  }
 
   function handleSearchChange(value: string) {
     setSearchTerm(value);
@@ -301,7 +256,7 @@ export default function L4ProxyHostsClient({
     <HostActions
       host={host}
       onToggle={(enabled) => handleToggleEnabled(host.id, enabled)}
-      onEdit={() => setEditHost(host)}
+      onEdit={() => router.push(l4EditorSectionHref(host.uuid))}
       onDuplicate={() => openDuplicate(host)}
       onDelete={() => setDeleteHost(host)}
       canCreate={canCreate}
@@ -529,22 +484,6 @@ export default function L4ProxyHostsClient({
           agents={agents ?? []}
           accessLists={accessLists}
         />
-
-        {editHost && (
-          <EditL4HostDialog
-            open={!!editHost}
-            host={editHost}
-            rollback={rollback && editHost === editTarget ? rollback : null}
-            initialSection={editSection}
-            onClose={() => {
-              signalBannerRefresh();
-              closeEditor();
-            }}
-            agents={agents ?? []}
-            accessLists={accessLists}
-            assignedAgentIds={agentAssignments?.[editHost.id] ?? []}
-          />
-        )}
       </DynamicDnsProvidersProvider>
 
       {deleteHost && (

@@ -35,9 +35,9 @@ the `bulkL4ProxyHosts` mutation.
   <L4HostEditorDemo client:visible />
 </Demo>
 
-The editor is in four parts - General, Listener, Upstreams and Protection - with tabs under the title
-to jump between them; an existing host's editor puts the part in the address bar, as
-`/l4-proxy-hosts?edit=<id>#upstreams`. It has the same
+The editor is in three parts - General (with the listener), Upstreams and Protection - with tabs at its top
+to switch between them. An existing host is edited on its own page beside its **History**, one part
+at a time, each at its own address, such as `/l4-proxy-hosts/<id>/edit/upstreams`. It has the same
 [review step](../reverse-proxy/#reviewing-a-change-before-saving) as an HTTP host: an
 unsaved-change count at the end of the tab bar, **Review** beside it (or Ctrl+S, Cmd+S on a Mac) listing each
 changed field before and after with Undo, the agents that reload and whether the host is pinned,
@@ -47,7 +47,7 @@ notes that the port is published only when the agent recreates Caddy, from the b
 
 ## Dynamic DNS
 
-An L4 host has no domains of its own, so **Dynamic DNS** under Listener lists the hostnames to keep
+An L4 host has no domains of its own, so **Dynamic DNS** under General lists the hostnames to keep
 pointed at the Caddy serving it, such as `play.example.com` for a game server behind a home
 connection. Otherwise it works as for a [proxy host](../reverse-proxy/#dynamic-dns).
 

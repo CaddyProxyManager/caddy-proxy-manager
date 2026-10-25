@@ -73,7 +73,6 @@ export function sectionSummaries(host: ProxyHost, lookups: Lookups): SectionSumm
   const facts: Record<EditorSection, SectionFact[]> = {
     general: [],
     upstreams: [],
-    tls: [],
     access: [],
     protection: [],
     routing: [],
@@ -82,6 +81,11 @@ export function sectionSummaries(host: ProxyHost, lookups: Lookups): SectionSumm
 
   facts.general.push(fact("domains", { count: host.domains.length }));
   if (host.tags.length > 0) facts.general.push(fact("tags", { count: host.tags.length }));
+  facts.general.push(
+    lookups.certificateName
+      ? fact("certificateImported", { name: lookups.certificateName })
+      : fact("certificateManaged"),
+  );
 
   facts.upstreams.push(fact("upstreams", { count: host.upstreams.length }));
   // The host options card sits under the upstream list in the editor.
@@ -102,13 +106,6 @@ export function sectionSummaries(host: ProxyHost, lookups: Lookups): SectionSumm
   }
   if (host.dnsResolver?.enabled) facts.upstreams.push(fact("dnsResolver"));
 
-  facts.tls.push(
-    lookups.certificateName
-      ? fact("certificateImported", { name: lookups.certificateName })
-      : fact("certificateManaged"),
-  );
-  if (host.mtls?.enabled) facts.tls.push(fact("mtls"));
-
   const protections = hostProtections(host, lookups.crowdsecActive);
   if (lookups.accessListName) {
     facts.access.push(fact("accessList", { name: lookups.accessListName }));
@@ -117,6 +114,7 @@ export function sectionSummaries(host: ProxyHost, lookups: Lookups): SectionSumm
   if (protections.signIn === "authentik") facts.access.push(fact("signInAuthentik"));
   if (protections.signIn === "forwardAuth") facts.access.push(fact("signInForwardAuth"));
   if (host.tailscale?.serve) facts.access.push(fact("tailnet"));
+  if (host.mtls?.enabled) facts.access.push(fact("mtls"));
   if (facts.access.length === 0) facts.access.push(fact("openAccess"));
 
   for (const key of ["waf", "geo", "crowdsec", "botChallenge"] as const) {

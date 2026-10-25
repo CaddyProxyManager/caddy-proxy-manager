@@ -65,7 +65,7 @@ import {
 } from "@/lib/proxy-hosts/editor-sections";
 import { HostEditorShell } from "@/components/host-review/HostEditorShell";
 import { useCloseOnSuccess } from "@/components/host-review/useCloseOnSuccess";
-import { linkEditorSection } from "@/components/host-review/section-link";
+import { EditorSectionBlock } from "@/components/host-review/editor-section";
 
 type ForwardAuthUser = { id: number; email: string; name: string | null; role: string };
 type ForwardAuthGroup = {
@@ -166,7 +166,7 @@ export function CreateHostDialog({
       <form id="create-host-form" action={formAction}>
         <VStack gap={5}>
           <ActionStatus status={state.status} message={state.message} />
-          <VStack gap={5} id={anchor("general")}>
+          <EditorSectionBlock anchor={anchor("general")}>
             <SettingsToggles part="enabled" enabled={true} />
             <TextInput
               label={tCommon("name")}
@@ -190,8 +190,15 @@ export function CreateHostDialog({
               description={t("domainsHelp")}
             />
             <DynamicDnsHostFields dynamicDns={initialData?.dynamicDns} />
-          </VStack>
-          <VStack gap={5} id={anchor("upstreams")}>
+            <Selector
+              label={t("certificate")}
+              htmlName="certificateId"
+              options={toOptions(certificates, t("managedByCaddyAuto"))}
+              value={certificateId}
+              onChange={(next) => setCertificateId(next as string)}
+            />
+          </EditorSectionBlock>
+          <EditorSectionBlock anchor={anchor("upstreams")}>
             <UpstreamInput defaultUpstreams={initialData?.upstreams} />
             <SettingsToggles
               part="options"
@@ -213,23 +220,8 @@ export function CreateHostDialog({
             <UpstreamDnsResolutionFields
               upstreamDnsResolution={initialData?.upstreamDnsResolution}
             />
-          </VStack>
-          <VStack gap={5} id={anchor("tls")}>
-            <Selector
-              label={t("certificate")}
-              htmlName="certificateId"
-              options={toOptions(certificates, t("managedByCaddyAuto"))}
-              value={certificateId}
-              onChange={(next) => setCertificateId(next as string)}
-            />
-            <MtlsFields
-              value={initialData?.mtls}
-              caCertificates={caCertificates}
-              mtlsRoles={mtlsRoles}
-              issuedClientCerts={issuedClientCerts}
-            />
-          </VStack>
-          <VStack gap={5} id={anchor("access")}>
+          </EditorSectionBlock>
+          <EditorSectionBlock anchor={anchor("access")}>
             <Selector
               label={t("accessList")}
               htmlName="accessListId"
@@ -237,6 +229,12 @@ export function CreateHostDialog({
               value={accessListId}
               onChange={(next) => setAccessListId(next as string)}
               status={accessListStatus(accessLists, accessListId, t)}
+            />
+            <MtlsFields
+              value={initialData?.mtls}
+              caCertificates={caCertificates}
+              mtlsRoles={mtlsRoles}
+              issuedClientCerts={issuedClientCerts}
             />
             <AuthentikFields defaults={authentikDefaults} authentik={initialData?.authentik} />
             <ForwardAuthFields
@@ -249,15 +247,15 @@ export function CreateHostDialog({
               groups={forwardAuthGroups}
             />
             <TailscaleFields tailscale={initialData?.tailscale} defaults={tailscaleDefaults} />
-          </VStack>
-          <VStack gap={5} id={anchor("protection")}>
+          </EditorSectionBlock>
+          <EditorSectionBlock anchor={anchor("protection")}>
             <RateLimitFields rateLimit={initialData?.rateLimit} />
             <GeoBlockFields />
             <CrowdSecFields enabled={initialData?.crowdsec ?? preset?.crowdsecEnabled} />
             <AnubisFields anubis={initialData?.anubis} />
             <WafFields value={preset?.wafEnabled ? { enabled: true } : initialData?.waf} />
-          </VStack>
-          <VStack gap={5} id={anchor("routing")}>
+          </EditorSectionBlock>
+          <EditorSectionBlock anchor={anchor("routing")}>
             <RedirectsFields initialData={initialData?.redirects} />
             <LocationRulesFields
               initialData={initialData?.locationRules}
@@ -268,13 +266,13 @@ export function CreateHostDialog({
             <PathBlocksFields initialData={initialData?.pathBlocks} />
             <PathRewritesFields initialData={initialData?.pathRewrites} />
             <ErrorPagesFields initialData={initialData?.errorPages} />
-          </VStack>
-          <VStack gap={5} id={anchor("advanced")}>
+          </EditorSectionBlock>
+          <EditorSectionBlock anchor={anchor("advanced")}>
             <AgentAssignmentFields agents={agents} selected={[]} />
             <CacheFields cache={initialData?.cache} />
             <MaintenanceFields maintenance={initialData?.maintenance} />
             <AdvancedConfigFields host={initialData} />
-          </VStack>
+          </EditorSectionBlock>
         </VStack>
       </form>
     </HostEditorShell>
@@ -282,6 +280,8 @@ export function CreateHostDialog({
 }
 
 export function EditHostDialog({
+  layout = "dialog",
+  sectionHref,
   open,
   host,
   onClose,
@@ -302,6 +302,10 @@ export function EditHostDialog({
   initialSection = null,
   rollback = null,
 }: {
+  /** A dialog over the list, or the host's edit page. */
+  layout?: "dialog" | "page";
+  /** The page's address for each section, which it shows one at a time. */
+  sectionHref?: (section: string) => string;
   open: boolean;
   host: ProxyHost;
   onClose: () => void;
@@ -343,17 +347,19 @@ export function EditHostDialog({
 
   // After the dialog has laid out; the anchor is inside it.
   useEffect(() => {
-    if (!open || !initialSection) return;
+    // The page shows the section rather than scrolling to it.
+    if (!open || !initialSection || layout === "page") return;
     const frame = requestAnimationFrame(() => {
       document
         .getElementById(editorSectionAnchor(initialSection))
         ?.scrollIntoView({ block: "start" });
     });
     return () => cancelAnimationFrame(frame);
-  }, [open, initialSection]);
+  }, [open, initialSection, layout]);
 
   return (
     <HostEditorShell
+      layout={layout}
       open={open}
       onClose={onClose}
       title={t("editProxyHost")}
@@ -364,14 +370,15 @@ export function EditHostDialog({
       isPending={isPending}
       preview={(data) => previewProxyHostAction(host.id, data)}
       sections={sectionLinks("")}
-      onSectionLink={(section) => linkEditorSection(host.uuid, section)}
+      sectionHref={sectionHref}
+      initialSection={initialSection}
     >
       <form id="edit-host-form" action={formAction}>
         {/* Grouped by the sections the host's page links to (lib/proxy-hosts/editor-sections). */}
         <VStack gap={5}>
           <ActionStatus status={state.status} message={state.message} />
           {rollback && <RollbackNotice rollback={rollback} />}
-          <VStack gap={5} id={editorSectionAnchor("general")}>
+          <EditorSectionBlock anchor={editorSectionAnchor("general")}>
             <SettingsToggles part="enabled" enabled={host.enabled} />
             <TextInput
               label={tCommon("name")}
@@ -392,8 +399,15 @@ export function EditHostDialog({
               description={t("domainsHelp")}
             />
             <DynamicDnsHostFields dynamicDns={host.dynamicDns} />
-          </VStack>
-          <VStack gap={5} id={editorSectionAnchor("upstreams")}>
+            <Selector
+              label={t("certificate")}
+              htmlName="certificateId"
+              options={toOptions(certificates, t("managedByCaddyAuto"))}
+              value={certificateId}
+              onChange={(next) => setCertificateId(next as string)}
+            />
+          </EditorSectionBlock>
+          <EditorSectionBlock anchor={editorSectionAnchor("upstreams")}>
             <UpstreamInput defaultUpstreams={host.upstreams} />
             <SettingsToggles
               part="options"
@@ -412,24 +426,8 @@ export function EditHostDialog({
             <DnsResolverFields dnsResolver={host.dnsResolver} />
             <UpstreamTimeoutsFields upstreamTimeouts={host.upstreamTimeouts} />
             <UpstreamDnsResolutionFields upstreamDnsResolution={host.upstreamDnsResolution} />
-          </VStack>
-          <VStack gap={5} id={editorSectionAnchor("tls")}>
-            <Selector
-              label={t("certificate")}
-              htmlName="certificateId"
-              options={toOptions(certificates, t("managedByCaddyAuto"))}
-              value={certificateId}
-              onChange={(next) => setCertificateId(next as string)}
-            />
-            <MtlsFields
-              value={host.mtls}
-              caCertificates={caCertificates}
-              proxyHostUuid={host.uuid}
-              mtlsRoles={mtlsRoles}
-              issuedClientCerts={issuedClientCerts}
-            />
-          </VStack>
-          <VStack gap={5} id={editorSectionAnchor("access")}>
+          </EditorSectionBlock>
+          <EditorSectionBlock anchor={editorSectionAnchor("access")}>
             <Selector
               label={t("accessList")}
               htmlName="accessListId"
@@ -437,6 +435,13 @@ export function EditHostDialog({
               value={accessListId}
               onChange={(next) => setAccessListId(next as string)}
               status={accessListStatus(accessLists, accessListId, t)}
+            />
+            <MtlsFields
+              value={host.mtls}
+              caCertificates={caCertificates}
+              proxyHostUuid={host.uuid}
+              mtlsRoles={mtlsRoles}
+              issuedClientCerts={issuedClientCerts}
             />
             <AuthentikFields authentik={host.authentik} defaults={authentikDefaults} />
             <ForwardAuthFields forwardAuth={host.forwardAuth} defaults={forwardAuthDefaults} />
@@ -447,8 +452,8 @@ export function EditHostDialog({
               currentAccess={forwardAuthAccess}
             />
             <TailscaleFields tailscale={host.tailscale} defaults={tailscaleDefaults} />
-          </VStack>
-          <VStack gap={5} id={editorSectionAnchor("protection")}>
+          </EditorSectionBlock>
+          <EditorSectionBlock anchor={editorSectionAnchor("protection")}>
             <RateLimitFields rateLimit={host.rateLimit} />
             <GeoBlockFields
               initialValues={{
@@ -459,8 +464,8 @@ export function EditHostDialog({
             <CrowdSecFields enabled={host.crowdsec} />
             <AnubisFields anubis={host.anubis} />
             <WafFields value={host.waf} />
-          </VStack>
-          <VStack gap={5} id={editorSectionAnchor("routing")}>
+          </EditorSectionBlock>
+          <EditorSectionBlock anchor={editorSectionAnchor("routing")}>
             <RedirectsFields initialData={host.redirects} />
             <LocationRulesFields initialData={host.locationRules} accessLists={accessLists} />
             <RewriteFields initialData={host.rewrite} />
@@ -468,13 +473,13 @@ export function EditHostDialog({
             <PathBlocksFields initialData={host.pathBlocks} />
             <PathRewritesFields initialData={host.pathRewrites} />
             <ErrorPagesFields initialData={host.errorPages} />
-          </VStack>
-          <VStack gap={5} id={editorSectionAnchor("advanced")}>
+          </EditorSectionBlock>
+          <EditorSectionBlock anchor={editorSectionAnchor("advanced")}>
             <AgentAssignmentFields agents={agents} selected={assignedAgentIds} />
             <CacheFields cache={host.cache} />
             <MaintenanceFields maintenance={host.maintenance} />
             {canEditRawConfig && <AdvancedConfigFields host={host} />}
-          </VStack>
+          </EditorSectionBlock>
         </VStack>
       </form>
     </HostEditorShell>

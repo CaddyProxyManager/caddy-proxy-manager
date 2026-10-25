@@ -105,12 +105,17 @@ describe('browser secret boundaries', () => {
       'utf8',
     );
     expect(view).not.toContain('snapshot');
-    // The editor gets the revision parsed, as it gets a stored host.
-    const listPage = readFileSync(
-      join(process.cwd(), 'src/app/(dashboard)/proxy-hosts/page.tsx'),
-      'utf8',
-    );
-    expect(listPage).toContain('proxyHostFromRow(rollback.snapshot.row)');
-    expect(listPage).not.toMatch(/rollback=\{rollback\}/);
+    // The editor gets the revision parsed, as it gets a stored host, through the page's action.
+    for (const [page, parse] of [
+      ['proxy-hosts', 'proxyHostFromRow'],
+      ['l4-proxy-hosts', 'l4ProxyHostFromRow'],
+    ]) {
+      const actions = readFileSync(
+        join(process.cwd(), `src/app/(dashboard)/${page}/actions.ts`),
+        'utf8',
+      );
+      expect(actions).toContain(`${parse}(found.snapshot.row)`);
+      expect(actions).not.toMatch(/snapshot: found/);
+    }
   });
 });
