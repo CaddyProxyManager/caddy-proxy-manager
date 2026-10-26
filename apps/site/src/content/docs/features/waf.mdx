@@ -115,7 +115,10 @@ Presets**, reuse on another host or delete. A change-approval policy that covers
 this like any other preset.
 
 Override mode needs the host's WAF on and blocking, and analytics on, since the result is read
-from the event log. The anomaly decision rules never appear in the list. A session that was never
+from the event log. A loopback address - `127.0.0.1`, `::1`, or either mapped into IPv6 - is
+refused: it is the proxy's or the machine's own, so letting it through would exempt the host
+itself rather than you. Where the address the controller sees is loopback, the card asks for
+yours instead. The anomaly decision rules never appear in the list. A session that was never
 applied can be discarded, and a new one started.
 
 ## Presets

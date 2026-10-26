@@ -22,6 +22,7 @@ import {
   type WafOverrideRule,
   type WafOverrideSession,
   collectOverrideRules,
+  isLoopbackIp,
   isWafOverrideActive,
   normalizeOverrideRuleIds,
   overridePresetDirectives,
@@ -119,6 +120,9 @@ export async function startWafOverride(
   }
   if (!clientIp || !isIP(clientIp)) {
     throw domainError("wafOverrideAddressUnknown", {}, { status: 400 });
+  }
+  if (isLoopbackIp(clientIp)) {
+    throw domainError("wafOverrideAddressLoopback", { ip: clientIp }, { status: 400 });
   }
   const now = Date.now();
   const current = await getWafOverride(proxyHostId);

@@ -30,6 +30,42 @@ export type WafOverrideSession = {
   presetId: number | null;
 };
 
+/** The 8 hextets of an IPv6 address, a trailing dotted IPv4 included; null if it is not one. */
+function ipv6Hextets(address: string): number[] | null {
+  let text = address.toLowerCase().replace(/%.*$/, "");
+  const dotted = /^(.*:)(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(text);
+  if (dotted) {
+    const [a, b, c, d] = dotted.slice(2).map(Number);
+    text = `${dotted[1]}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+  const halves = text.split("::");
+  if (halves.length > 2) return null;
+  const parse = (part: string) => (part ? part.split(":") : []);
+  const head = parse(halves[0]);
+  const tail = halves.length === 2 ? parse(halves[1]) : [];
+  const fill = halves.length === 2 ? 8 - head.length - tail.length : 0;
+  if (fill < 0 || (halves.length === 1 && head.length !== 8)) return null;
+  const groups = [...head, ...Array<string>(fill).fill("0"), ...tail];
+  if (groups.some((g) => !/^[0-9a-f]{1,4}$/.test(g))) return null;
+  return groups.map((g) => Number.parseInt(g, 16));
+}
+
+/**
+ * 127.0.0.0/8, ::1, and either mapped into IPv6: the proxy's own address or the machine's,
+ * never a tester's. Wider than console-command's check, which reads a socket's spelling; a typed
+ * address can be `0:0:0:0:0:0:0:1` or `::ffff:7f00:1`.
+ */
+export function isLoopbackIp(address: string): boolean {
+  const text = address.trim();
+  if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(text)) return true;
+  const hextets = ipv6Hextets(text);
+  if (!hextets) return false;
+  const zeroes = (n: number) => hextets.slice(0, n).every((h) => h === 0);
+  if (zeroes(7) && hextets[7] === 1) return true;
+  // ::ffff:127.x.x.x, and the deprecated ::127.x.x.x
+  return zeroes(5) && (hextets[5] === 0xffff || hextets[5] === 0) && hextets[6] >> 8 === 127;
+}
+
 export function isWafOverrideActive(session: WafOverrideSession, now = Date.now()): boolean {
   return session.endedAt === null && Date.parse(session.expiresAt) > now;
 }

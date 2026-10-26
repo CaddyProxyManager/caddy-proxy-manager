@@ -3,6 +3,7 @@ import {
   WAF_OVERRIDE_RULE_ID_BASE,
   WAF_OVERRIDE_RULES_PER_SESSION,
   collectOverrideRules,
+  isLoopbackIp,
   isWafOverrideActive,
   normalizeOverrideRuleIds,
   overridePresetDirectives,
@@ -177,5 +178,41 @@ describe('isWafOverrideActive', () => {
     expect(isWafOverrideActive({ ...session, endedAt: '2026-10-26T10:01:00.000Z' }, during)).toBe(
       false,
     );
+  });
+});
+
+describe('isLoopbackIp', () => {
+  it('knows loopback however it is spelt', () => {
+    for (const ip of [
+      '127.0.0.1',
+      '127.255.10.2',
+      '::1',
+      '0:0:0:0:0:0:0:1',
+      '0000:0000:0000:0000:0000:0000:0000:0001',
+      '::ffff:127.0.0.1',
+      '::FFFF:7f00:1',
+      '::127.0.0.1',
+      '::1%lo0',
+    ]) {
+      expect([ip, isLoopbackIp(ip)]).toEqual([ip, true]);
+    }
+  });
+
+  it('lets every other address through', () => {
+    for (const ip of [
+      '203.0.113.9',
+      '10.0.0.1',
+      '128.0.0.1',
+      '1.127.0.0',
+      '::2',
+      '2001:db8::1',
+      'fe80::1',
+      '::ffff:203.0.113.9',
+      '0.0.0.0',
+      'localhost',
+      '',
+    ]) {
+      expect([ip, isLoopbackIp(ip)]).toEqual([ip, false]);
+    }
   });
 });

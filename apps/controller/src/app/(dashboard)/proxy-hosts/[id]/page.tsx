@@ -17,9 +17,15 @@ import { getClientIp } from "@/src/lib/http/client-ip";
 import { getWafOverride } from "@/src/lib/models/waf-overrides";
 import { getWafSettings } from "@/src/lib/settings";
 import { resolveEffectiveWaf } from "@/src/lib/waf/caddy";
+import { isLoopbackIp } from "@/src/lib/waf/override";
 import { requestMemo } from "@/src/lib/request-memo";
 
 type PageProps = { params: Promise<{ id: string }> };
+
+/** A loopback address is the proxy's or the machine's, never the tester's: ask instead. */
+function usableAddress(ip: string | null): string | null {
+  return ip && !isLoopbackIp(ip) ? ip : null;
+}
 
 /** Once for the metadata and the page both. */
 async function viewableHost(raw: string) {
@@ -70,7 +76,7 @@ export default async function ProxyHostDetailPage({ params }: PageProps) {
         hostId={host.id}
         hostName={host.name}
         initialSession={await getWafOverride(host.id)}
-        detectedIp={await getClientIp(await headers())}
+        detectedIp={usableAddress(await getClientIp(await headers()))}
         canApply={can(access, "security:write")}
       />
     ) : null;
