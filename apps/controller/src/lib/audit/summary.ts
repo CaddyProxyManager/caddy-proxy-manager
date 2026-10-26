@@ -35,6 +35,25 @@ function lifecycle(entityType: string, noun: string, messagePrefix: string): Aud
 
 export const AUDIT_SUMMARY_PATTERNS: readonly AuditSummaryPattern[] = [
   ...lifecycle("proxy_host", "proxy host", "proxyHost"),
+  // models/waf-overrides.ts
+  {
+    entityType: "proxy_host",
+    action: "waf_override_started",
+    message: "wafOverrideStarted",
+    pattern: /^Started WAF override mode on proxy host (?<name>.+)$/s,
+  },
+  {
+    entityType: "proxy_host",
+    action: "waf_override_finished",
+    message: "wafOverrideFinished",
+    pattern: /^Finished WAF override mode on proxy host (?<name>.+)$/s,
+  },
+  {
+    entityType: "proxy_host",
+    action: "waf_override_applied",
+    message: "wafOverrideApplied",
+    pattern: /^Applied WAF override mode results on proxy host (?<name>.+)$/s,
+  },
   ...lifecycle("l4_proxy_host", "L4 proxy host", "l4ProxyHost"),
   ...lifecycle("certificate", "certificate", "certificate"),
   ...lifecycle("ca_certificate", "CA certificate", "caCertificate"),

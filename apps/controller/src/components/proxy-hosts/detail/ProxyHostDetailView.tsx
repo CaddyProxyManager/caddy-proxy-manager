@@ -6,7 +6,7 @@
  * the docs can render it with sample data; the route gathers everything in lib/proxy-hosts/detail.
  */
 
-import { BarChart2, History, ListChecks, Server, TriangleAlert } from "lucide-react";
+import { BarChart2, FlaskConical, History, ListChecks, Server, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Button } from "@astryxdesign/core/Button";
@@ -87,6 +87,7 @@ export function ProxyHostDetailView({
   analyticsHref,
   logsHref,
   historyHref = null,
+  wafOverride = null,
 }: {
   detail: Omit<ProxyHostDetail, "audit">;
   auditRows: HostAuditRow[] | null;
@@ -97,6 +98,8 @@ export function ProxyHostDetailView({
   logsHref: string | null;
   /** Those who may manage the host; its revisions name who changed it. */
   historyHref?: string | null;
+  /** The WAF override panel, for a manager of a host whose WAF blocks; the route owns it. */
+  wafOverride?: ReactNode;
 }) {
   const t = useTranslations("proxyHosts.detail");
   const tOverview = useTranslations("overview");
@@ -343,6 +346,12 @@ export function ProxyHostDetailView({
           </VStack>
         </SectionCard>
       </Grid>
+
+      {wafOverride && (
+        <SectionCard icon={FlaskConical} title={tProxyHosts("wafOverride.title")}>
+          {wafOverride}
+        </SectionCard>
+      )}
 
       {traffic && (
         <Grid columns={{ minWidth: 360, max: 2 }} gap={4}>

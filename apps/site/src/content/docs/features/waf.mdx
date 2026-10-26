@@ -96,6 +96,28 @@ exclusions when the controller starts, with the same effect, and shown as moved 
 version. `excluded_rule_ids` is still accepted by the REST API and applied, and moved on the next
 start; use the [GraphQL](../api/) exclusion mutations instead.
 
+## Override mode
+
+Setting up a new app behind the rule set usually means a round of blocked requests, each one
+an event to read and an exclusion to write. Override mode does the round for you. On a host's
+page, **WAF override mode → Start** switches that host's WAF to detection for your own address -
+the one the controller sees this request from - for five minutes, or until you press **Finish**.
+Requests from that address are logged, not blocked; everyone else is still protected, since the
+host gets a second copy of its WAF that only your address is routed to. The event log keeps every
+request a rule matched, whatever the response status.
+
+Once the session ends, the page lists the rules you tripped: id, message, severity, how many
+requests tripped it, the variable and data each matched and the paths it was seen on. Choose which
+to exclude - all of them to begin with - give the preset a name, and **Apply**. The chosen rules
+go into a **new preset**, which the host then selects beside whatever it already had; the host's
+own directives are never touched, so the result is one named thing to review under **WAF →
+Presets**, reuse on another host or delete. A change-approval policy that covers WAF presets holds
+this like any other preset.
+
+Override mode needs the host's WAF on and blocking, and analytics on, since the result is read
+from the event log. The anomaly decision rules never appear in the list. A session that was never
+applied can be discarded, and a new one started.
+
 ## Presets
 
 An application that trips the CRS usually needs the same handful of exclusions everywhere it runs.

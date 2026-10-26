@@ -1204,7 +1204,12 @@ export const SEPARATE_DUPLICATES: readonly {
   },
   { reason: 'sense', keys: ['accessLists.ipNote', 'accessReviews.note'] },
   { reason: 'sense', keys: ['settings.configTransfer.export', 'accessReviews.export'] },
-  { reason: 'sense', keys: ['setup.migrate.confirmStart', 'accessReviews.start'] },
+  {
+    reason: 'sense',
+    keys: ['setup.migrate.confirmStart', 'accessReviews.start', 'proxyHosts.wafOverride.start'],
+  },
+  { reason: 'role', keys: ['setup.finish', 'proxyHosts.wafOverride.finish'] },
+  { reason: 'role', keys: ['alerts.history.refresh', 'proxyHosts.wafOverride.refresh'] },
   {
     reason: 'role',
     keys: [

@@ -89,6 +89,7 @@ export const MIGRATION_GROUPS: MigrationGroup[] = [
       "l4_proxy_host_agents",
       // With the hosts: a cleared host reference would widen an exclusion to every host.
       "waf_exclusions",
+      "waf_override_sessions",
       "upstream_error_counts",
       // With the hosts, whose ids its revisions name. Claimed for coverage: a legacy source has none.
       "host_revisions",

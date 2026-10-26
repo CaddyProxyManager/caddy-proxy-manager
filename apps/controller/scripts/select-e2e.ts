@@ -201,6 +201,7 @@ export const RULES: readonly Rule[] = [
       `${APP}api/waf-events/`,
       `${MODELS}waf-events.ts`,
       `${MODELS}waf-presets.ts`,
+      `${MODELS}waf-overrides.ts`,
       `${MODELS}crs-plugins.ts`,
       `${V1}waf-presets/`,
       `${V1}crs-plugins/`,

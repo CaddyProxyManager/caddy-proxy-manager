@@ -37,6 +37,7 @@ export const CHANGE_KINDS = [
   "wafExclusionCreate",
   "wafExclusionUpdate",
   "wafExclusionDelete",
+  "wafOverrideApply",
   "crsPluginInstall",
   "crsPluginUpdate",
   "crsPluginConfig",

@@ -11,6 +11,12 @@ import { proxyHostHistoryHref } from "@/src/lib/proxy-hosts/editor-sections";
 import { proxyHostHeaderLinks } from "@/src/lib/proxy-hosts/header";
 import { canManage, canView, requireReach, can } from "@/src/lib/users/permissions";
 import { ProxyHostDetailView } from "@/src/components/proxy-hosts/detail/ProxyHostDetailView";
+import { WafOverridePanel } from "@/src/components/proxy-hosts/waf/WafOverridePanel";
+import { headers } from "next/headers";
+import { getClientIp } from "@/src/lib/http/client-ip";
+import { getWafOverride } from "@/src/lib/models/waf-overrides";
+import { getWafSettings } from "@/src/lib/settings";
+import { resolveEffectiveWaf } from "@/src/lib/waf/caddy";
 import { requestMemo } from "@/src/lib/request-memo";
 
 type PageProps = { params: Promise<{ id: string }> };
@@ -54,11 +60,27 @@ export default async function ProxyHostDetailPage({ params }: PageProps) {
 
   const { analyticsHref, logsHref } = proxyHostHeaderLinks(access, host, detail.traffic !== null);
 
+  // Offered where it can do something: a manager, and a WAF that blocks. The panel itself says
+  // why a start is refused (analytics off, say), so nothing else is checked here.
+  const manages = canManage(access, "proxyHost", host.id);
+  const effectiveWaf = manages ? resolveEffectiveWaf(await getWafSettings(), host.waf) : null;
+  const wafOverride =
+    effectiveWaf?.enabled && effectiveWaf.mode === "On" ? (
+      <WafOverridePanel
+        hostId={host.id}
+        hostName={host.name}
+        initialSession={await getWafOverride(host.id)}
+        detectedIp={await getClientIp(await headers())}
+        canApply={can(access, "security:write")}
+      />
+    ) : null;
+
   return (
     <ProxyHostDetailView
       detail={detail}
-      canManage={canManage(access, "proxyHost", host.id)}
-      historyHref={canManage(access, "proxyHost", host.id) ? proxyHostHistoryHref(host.uuid) : null}
+      canManage={manages}
+      wafOverride={wafOverride}
+      historyHref={manages ? proxyHostHistoryHref(host.uuid) : null}
       analyticsHref={analyticsHref}
       logsHref={logsHref}
       auditRows={

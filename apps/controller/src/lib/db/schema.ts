@@ -80,6 +80,7 @@ export const {
   crsPlugins,
   wafExclusions,
   wafEventReviews,
+  wafOverrideSessions,
   blockedSources,
   backupDestinations,
   backupSchedules,

@@ -295,6 +295,13 @@
       "when": 1791645323003,
       "tag": "0041_audit_indexes_drop_oauth_scratch",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "6",
+      "when": 1793024646893,
+      "tag": "0042_waf_override_sessions",
+      "breakpoints": true
     }
   ]
 }

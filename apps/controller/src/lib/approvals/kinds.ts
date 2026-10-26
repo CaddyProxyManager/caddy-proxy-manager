@@ -18,6 +18,7 @@ import type { L4ProxyHostInput } from "../models/l4-proxy-hosts";
 import type { MtlsAccessRuleInput } from "../models/mtls-access-rules";
 import type { ProxyHostInput } from "../models/proxy-hosts";
 import type { WafExclusionInput } from "../models/waf-exclusions";
+import type { WafOverrideApplyInput } from "../models/waf-overrides";
 import type { WafPresetInput } from "../models/waf-presets";
 import type { ForwardAuthAccessInput } from "../proxy-hosts/form";
 import { parseStoredTags } from "../proxy-hosts/tags";
@@ -51,6 +52,7 @@ const load = {
   mtls: () => import("../models/mtls-access-rules"),
   proxyHosts: () => import("../models/proxy-hosts"),
   wafExclusions: () => import("../models/waf-exclusions"),
+  wafOverrides: () => import("../models/waf-overrides"),
   wafPresets: () => import("../models/waf-presets"),
   settingsApply: () => import("../settings/apply"),
   settingsApi: () => import("../settings/api"),
@@ -715,6 +717,31 @@ export const CHANGE_KIND_DEFINITIONS = {
       await (await load.wafExclusions()).deleteWafExclusion(p.id, actor.userId);
       return true;
     },
+  }),
+  // The host's change, and a preset's: whoever may do both may do this.
+  wafOverrideApply: define({
+    area: "waf",
+    needs: (p: WafOverrideApplyInput & { hostId: number }) => [
+      manageHost("http", p.hostId),
+      { capability: "security:write" },
+    ],
+    target: async (p) => hostTarget("http", p.hostId),
+    tags: async (p) => hostTags("http", [p.hostId]),
+    // The session row: a second apply, or a discard, invalidates a pending one.
+    state: async (p) =>
+      (await load.wafOverrides()).getWafOverrideResult(p.sessionId).then((r) => r.session),
+    preview: async (p) =>
+      fields(
+        diffAuditRecords(null, {
+          preset: p.name,
+          ruleIds: p.ruleIds.map(String),
+        }),
+      ),
+    apply: async (p, actor) =>
+      (await load.wafOverrides()).applyWafOverride(
+        { sessionId: p.sessionId, name: p.name, ruleIds: p.ruleIds },
+        actor.userId,
+      ),
   }),
   crsPluginInstall: define({
     area: "waf",

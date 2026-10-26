@@ -638,6 +638,31 @@ export const wafEventReviews = sqliteTable(
   }),
 );
 
+/**
+ * A host's WAF switched to detection for one address while someone exercises an app against it;
+ * what it trips is then read back from the event log. Ends on Finish, or when the sweep finds it
+ * expired. The preset the chosen rules went into is kept so the result can still be shown.
+ */
+export const wafOverrideSessions = sqliteTable(
+  "waf_override_sessions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    proxyHostId: integer("proxyHostId")
+      .notNull()
+      .references(() => proxyHosts.id, { onDelete: "cascade" }),
+    clientIp: text("clientIp").notNull(),
+    startedBy: integer("startedBy").references(() => users.id, { onDelete: "set null" }),
+    startedAt: text("startedAt").notNull(),
+    expiresAt: text("expiresAt").notNull(),
+    /** Null while it runs. */
+    endedAt: text("endedAt"),
+    presetId: integer("presetId").references(() => wafPresets.id, { onDelete: "set null" }),
+  },
+  (table) => ({
+    hostIdx: index("waf_override_sessions_host_idx").on(table.proxyHostId),
+  }),
+);
+
 /** The global deny list, checked before every other handler on HTTP hosts. */
 export const blockedSources = sqliteTable(
   "blocked_sources",

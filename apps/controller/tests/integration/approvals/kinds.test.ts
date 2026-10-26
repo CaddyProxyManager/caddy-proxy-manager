@@ -53,6 +53,7 @@ type Fixtures = {
   rule: number;
   deletedRevision: number;
   revision: number;
+  override: number;
 };
 
 async function fixtures(): Promise<Fixtures> {
@@ -107,6 +108,16 @@ async function fixtures(): Promise<Fixtures> {
     .insert(schema.mtlsAccessRules)
     .values({ proxyHostId: host.id, pathPattern: '/admin', createdAt: now, updatedAt: now })
     .returning();
+  const [override] = await ctx.db
+    .insert(schema.wafOverrideSessions)
+    .values({
+      proxyHostId: host.id,
+      clientIp: '203.0.113.9',
+      startedAt: now,
+      expiresAt: now,
+      endedAt: now,
+    })
+    .returning();
   const revisions = await ctx.db.select().from(schema.hostRevisions);
   const deletedRevision = revisions.filter((row) => row.hostId === gone.id).at(-1)!.id;
   const revision = revisions.find((row) => row.hostId === host.id)!.id;
@@ -122,6 +133,7 @@ async function fixtures(): Promise<Fixtures> {
     rule: rule.id,
     deletedRevision,
     revision,
+    override: override.id,
   };
 }
 
@@ -162,6 +174,12 @@ function changeOf(kind: ChangeKind, f: Fixtures): Change {
     wafExclusionCreate: { input: { ruleId: 941100, reason: 'rich text' } },
     wafExclusionUpdate: { id: f.exclusion, input: { ruleId: 942100, reason: 'search' } },
     wafExclusionDelete: { id: f.exclusion },
+    wafOverrideApply: {
+      hostId: f.host,
+      sessionId: f.override,
+      name: 'shop override',
+      ruleIds: [942100, 920350],
+    },
     crsPluginInstall: { registryId: 'none', name: 'not-a-plugin' },
     crsPluginUpdate: { id: f.plugin },
     crsPluginConfig: { id: f.plugin, config: 'SecAction "id:9507010,phase:1,pass,nolog"' },
@@ -181,6 +199,7 @@ const MAY_FAIL: readonly ChangeKind[] = [
   'wafPresetUpdate',
   'wafExclusionCreate',
   'wafExclusionUpdate',
+  'wafOverrideApply',
   'crsPluginInstall',
   'crsPluginUpdate',
   'crsPluginConfig',
@@ -189,6 +208,7 @@ const MAY_FAIL: readonly ChangeKind[] = [
 beforeEach(async () => {
   for (const table of [
     schema.changeRequests,
+    schema.wafOverrideSessions,
     schema.mtlsAccessRules,
     schema.wafExclusions,
     schema.wafPresets,

@@ -62,6 +62,7 @@ async function labelsFor(domain: string, options: Record<string, unknown>) {
 
 beforeEach(async () => {
   await ctx.db.delete(schema.blockedSources);
+  await ctx.db.delete(schema.wafOverrideSessions);
   await ctx.db.delete(schema.wafExclusions);
   await ctx.db.delete(schema.proxyHosts);
   await ctx.db.delete(schema.users).catch(() => {});
@@ -191,5 +192,49 @@ describe('WAF exclusions in the build', () => {
     expect(directives).toContain('SecRuleRemoveById 942100');
     expect(directives).toContain('"@streq /upload"');
     expect(directives).toContain('ctl:ruleRemoveById=941100');
+  });
+});
+
+describe('WAF override mode in the build', () => {
+  async function overrideHost(session: { expiresAt: string; endedAt?: string | null }) {
+    const host = await createProxyHost(
+      { name: 'tune', domains: ['tune.example.com'], upstreams: [UPSTREAM], waf: WAF },
+      1,
+    );
+    await ctx.db.insert(schema.wafOverrideSessions).values({
+      proxyHostId: host.id,
+      clientIp: '203.0.113.9',
+      startedAt: NOW,
+      endedAt: null,
+      ...session,
+    });
+    return chainsTo(await buildCaddyDocument(), UPSTREAM);
+  }
+
+  it('routes the tester to a detecting copy of the WAF while a session runs', async () => {
+    const chains = await overrideHost({ expiresAt: new Date(Date.now() + 60_000).toISOString() });
+    const subroute = chains
+      .flat()
+      .find((h) => h.handler === 'subroute' && JSON.stringify(h).includes('client_ip'));
+    expect(subroute).toBeDefined();
+    const routes = (
+      subroute!.routes as { match?: unknown; handle: Handler[]; terminal?: boolean }[]
+    ).map((route) => ({ ...route, handle: withoutMarkers(route.handle) }));
+    expect(routes[0].match).toEqual([{ client_ip: { ranges: ['203.0.113.9'] } }]);
+    expect(routes[0].terminal).toBe(true);
+    const detecting = String(routes[0].handle[0].directives);
+    expect(detecting).toContain('SecRuleEngine DetectionOnly');
+    expect(detecting).toContain('SecAuditLogRelevantStatus ".*"');
+    expect(String(routes[1].handle[0].directives)).toContain('SecRuleEngine On');
+    // The WAF handler itself is not duplicated at the chain's top level.
+    expect(chains.flat().filter((h) => h.handler === 'waf')).toHaveLength(0);
+  });
+
+  it('builds the plain handler once the session has ended or expired', async () => {
+    const chains = await overrideHost({
+      expiresAt: new Date(Date.now() - 1000).toISOString(),
+    });
+    expect(JSON.stringify(chains)).not.toContain('client_ip');
+    expect(chains.flat().filter((h) => h.handler === 'waf')).toHaveLength(1);
   });
 });

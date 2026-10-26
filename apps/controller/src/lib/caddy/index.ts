@@ -131,8 +131,10 @@ import { getAccessRulesForHosts } from "../models/mtls-access-rules";
 import { getWafPresetDirectives } from "../models/waf-presets";
 import { getCrsPluginRules } from "../models/crs-plugins";
 import { listWafExclusionRules } from "../models/waf-exclusions";
+import { activeWafOverridesByHost } from "../models/waf-overrides";
 import { listActiveBlockedSources } from "../models/blocked-sources";
 import { type WafExclusionRule, dashboardExclusions, exclusionsFor } from "../waf/exclusions";
+import { wafOverrideRoute } from "../waf/override";
 import { type ActiveBlockedSource, buildBlockedSourceHandlers } from "./blocked-sources";
 import { loadWithCrsPluginRecovery } from "../waf/crs-plugins/recovery";
 import {
@@ -980,6 +982,8 @@ type CaddyBuildContext = {
   crsPlugins?: ReadonlyMap<number, CrsPluginRules>;
   /** Every WAF exclusion; each host's handler takes the global ones and its own. */
   wafExclusions?: readonly WafExclusionRule[];
+  /** Hosts in WAF override mode, by id, with the address their WAF only detects for. */
+  wafOverrides?: ReadonlyMap<number, string>;
   /** The global deny list, unexpired entries only. */
   blockedSources?: readonly ActiveBlockedSource[];
   /** Zones a host may inherit, and the addresses no zone counts. */
@@ -1761,17 +1765,31 @@ async function buildProxyRoutes(context: CaddyBuildContext): Promise<ProxyRouteS
     if (effectiveWaf?.enabled && effectiveWaf.mode !== "Off" && wafUsable) {
       // WebSocket upgrades included: routing them around the WAF let any request claiming to be
       // one skip inspection (#195). coraza-caddy >= 2.6 passes the 101 hijack through.
+      const source = wafDirectiveSource(
+        context.globalWaf ?? null,
+        meta.waf,
+        `proxy host "${row.name}" (${domains.join(", ")})`,
+      );
+      const wafHandler = buildWafHandler(
+        effectiveWaf,
+        context.wafPresets,
+        context.crsPlugins,
+        source,
+      );
+      const overrideIp = context.wafOverrides?.get(row.id);
       handlers.push(
-        buildWafHandler(
-          effectiveWaf,
-          context.wafPresets,
-          context.crsPlugins,
-          wafDirectiveSource(
-            context.globalWaf ?? null,
-            meta.waf,
-            `proxy host "${row.name}" (${domains.join(", ")})`,
-          ),
-        ),
+        overrideIp && effectiveWaf.mode !== "DetectionOnly"
+          ? wafOverrideRoute(
+              wafHandler,
+              buildWafHandler(
+                { ...effectiveWaf, mode: "DetectionOnly" },
+                context.wafPresets,
+                context.crsPlugins,
+                source,
+              ),
+              overrideIp,
+            )
+          : wafHandler,
       );
     }
 
@@ -3587,6 +3605,7 @@ export async function buildCaddyDocument(
     blockedSources,
     globalRateLimit,
     dynamicDnsSettings,
+    wafOverrides,
   ] = await Promise.all([
     getAccessRulesForHosts(enabledProxyHostIds),
     getGeneralSettings(),
@@ -3616,6 +3635,7 @@ export async function buildCaddyDocument(
     listActiveBlockedSources(),
     getRateLimitSettings(),
     getDynamicDnsSettings(),
+    activeWafOverridesByHost(),
   ]);
 
   if (
@@ -3797,6 +3817,7 @@ export async function buildCaddyDocument(
     wafPresets,
     crsPlugins: crsPluginRules,
     wafExclusions,
+    wafOverrides,
     blockedSources,
     blockedSourcesTrustedProxies: accessListTrustedProxies,
     globalRateLimit,
