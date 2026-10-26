@@ -144,7 +144,8 @@ A branch that grows a second subject is renamed with `git branch -m` so the name
 everything on it; the type usually survives and the slug widens. Check `git branch --show-current`
 against the pattern before the first push or a pull request. Never a tool- or session-derived name
 (`claude/...`, `claude-...`): an environment that checked you out on one gets renamed before
-anything is pushed.
+anything is pushed. A worktree is no exception - the branch a worktree is created on follows the
+same pattern, so rename it (`git branch -m`) as the first step of work in one, not at push time.
 
 ## Commits
 
