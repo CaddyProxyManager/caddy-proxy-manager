@@ -149,7 +149,8 @@ export default function LogsClient({
   if (readable.length === 0) {
     return (
       <VStack gap={4} padding={padding}>
-        {heading}
+        {/* A tab's title would only head the empty state's own. */}
+        {!title && heading}
         <EmptyState
           headingLevel={2}
           title={t("noAgentTitle")}
