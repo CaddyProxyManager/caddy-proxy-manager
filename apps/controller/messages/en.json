@@ -2386,7 +2386,19 @@
   },
   "l4ProxyHosts": {
     "detail": {
-      "activeChecks": "{port, select, none {Active health checks every {interval}} other {Active health checks on port {port}, every {interval}}}"
+      "activeChecks": "{port, select, none {Active health checks every {interval}} other {Active health checks on port {port}, every {interval}}}",
+      "tileConnections": "Connections, last 24 hours",
+      "avgDuration": "{duration} on average",
+      "tileReceived": "Received from clients",
+      "tileSentToClients": "Sent to clients",
+      "chartTitle": "Connections every 30 minutes",
+      "chartEmpty": "No connections in the last 24 hours",
+      "chartConnections": "Connections",
+      "clientsTitle": "Busiest clients",
+      "clientsTraffic": "Traffic",
+      "sharedPort": "{count, plural, one {# other host listens on this port, so these numbers include its connections.} other {# other hosts listen on this port, so these numbers include their connections.}}",
+      "offTitle": "Connections are not recorded",
+      "offDescription": "Turn on analytics, then Log L4 connections under Logging, to see this host's connections here."
     },
     "acceptInboundProxyProtocol": "Accept inbound PROXY protocol",
     "accessListNone": "None",
@@ -4014,6 +4026,8 @@
     "dnsResolversInfoTitle": "When to use custom resolvers",
     "enableAccessLogging": "Enable access logging",
     "enableCustomDnsResolvers": "Enable custom DNS resolvers",
+    "enableL4ConnectionLogging": "Log L4 connections",
+    "l4ConnectionLoggingHelp": "One line per connection to an L4 host, which gives each one its connection statistics. Needs analytics on.",
     "enableMetricsEndpoint": "Enable metrics endpoint",
     "enableStrictTrustedProxies": "Enable strict trusted proxies",
     "enableUpstreamDnsPinning": "Enable upstream DNS pinning",

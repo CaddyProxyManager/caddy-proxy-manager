@@ -3976,6 +3976,22 @@ export async function buildCaddyDocument(
       include: ["http.log.access", "http.handlers.blocker"],
     };
   }
+  // caddy-l4 has no access log: its per-connection stats are a debug line from the server's own
+  // logger. Its handlers and matchers log at debug too, and only add noise.
+  if (loggingSettings?.l4Connections && l4Servers) {
+    loggingLogs.l4_connections = {
+      writer: {
+        output: "file",
+        filename: "/logs/l4-connections.log",
+        mode: "0640",
+        ...rollSettings,
+      },
+      encoder: { format: "json" },
+      include: ["layer4"],
+      exclude: ["layer4.handlers", "layer4.matchers"],
+      level: "DEBUG",
+    };
+  }
   const loggingApp = { logging: { logs: loggingLogs } };
 
   const l4App = l4Servers ? { layer4: { servers: l4Servers } } : {};

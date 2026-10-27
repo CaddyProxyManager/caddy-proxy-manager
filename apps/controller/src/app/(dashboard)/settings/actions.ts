@@ -1390,6 +1390,7 @@ async function updateLoggingSettingsActionUnlocked(
     await saveLoggingSettings({
       enabled,
       format: format as "json" | "console",
+      l4Connections: formData.get("l4Connections") === "on",
     });
 
     try {

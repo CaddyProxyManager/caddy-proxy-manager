@@ -4875,6 +4875,10 @@ const spec = {
         properties: {
           enabled: { type: "boolean" },
           format: { type: "string", enum: ["json", "console"] },
+          l4Connections: {
+            type: "boolean",
+            description: "Log each L4 connection, for the L4 hosts' statistics.",
+          },
         },
         required: ["enabled"],
       },

@@ -155,7 +155,7 @@ describe('clickhouse client analytics enablement', () => {
     const modifies = commands.filter((q) =>
       /ALTER TABLE \w+ MODIFY TTL ts \+ INTERVAL 7 DAY DELETE/.test(q),
     );
-    expect(modifies).toHaveLength(2);
+    expect(modifies).toHaveLength(3);
   });
 
   // An unusable value is a warning, not fatal: a typo in one variable must not stop the proxy.

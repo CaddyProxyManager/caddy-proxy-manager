@@ -348,9 +348,12 @@ function validateMetrics(value: Record<string, unknown>): void {
 }
 
 function validateLogging(value: Record<string, unknown>): void {
-  onlyKeys(value, ["enabled", "format"], "logging settings");
+  onlyKeys(value, ["enabled", "format", "l4Connections"], "logging settings");
   booleanValue(required(value, "enabled", "logging settings"), "logging.enabled");
   optionalOneOf(value.format, ["json", "console"], "logging.format");
+  if (value.l4Connections !== undefined) {
+    booleanValue(value.l4Connections, "logging.l4Connections");
+  }
 }
 
 function validateTrustedProxies(value: Record<string, unknown>): void {

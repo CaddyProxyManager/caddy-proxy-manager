@@ -223,7 +223,9 @@ async function seedTraffic(domains: string[]): Promise<void> {
   const { clearAnalyticsEvents, initClickHouse, isAnalyticsEnabled } = await import(
     "../src/lib/clickhouse/client"
   );
-  const { trafficShares, writeDemoTraffic } = await import("../src/lib/demo/traffic");
+  const { servedL4Ports, trafficShares, writeDemoTraffic } = await import(
+    "../src/lib/demo/traffic"
+  );
   if (!(await isAnalyticsEnabled())) {
     console.log("Analytics are off, so no traffic was written.");
     return;
@@ -233,9 +235,14 @@ async function seedTraffic(domains: string[]): Promise<void> {
   if (RESET) await clearAnalyticsEvents();
 
   const now = Math.floor(Date.now() / 1000);
-  const written = await writeDemoTraffic(now - DAYS * 86400, now, trafficShares(domains));
+  const written = await writeDemoTraffic(
+    now - DAYS * 86400,
+    now,
+    trafficShares(domains),
+    await servedL4Ports(),
+  );
   console.log(
-    `Seeded ${written.traffic} traffic events and ${written.waf} WAF events over ${DAYS} days`,
+    `Seeded ${written.traffic} traffic events, ${written.waf} WAF events and ${written.l4} L4 connections over ${DAYS} days`,
   );
 }
 
@@ -257,6 +264,13 @@ async function enableAnalytics(): Promise<void> {
   });
 }
 
+/** So the L4 hosts' pages have connections to show; access logging is left as it was. */
+async function logL4Connections(): Promise<void> {
+  const { getLoggingSettings, setSetting } = await import("../src/lib/settings");
+  const current = (await getLoggingSettings()) ?? { enabled: false };
+  await setSetting("logging", { ...current, l4Connections: true });
+}
+
 const actor = await actorId();
 if (RESET) await reset(actor);
 
@@ -264,6 +278,7 @@ await seedPeople(actor);
 const hosts = await seedHosts(actor);
 
 await enableAnalytics();
+await logL4Connections();
 await seedTraffic(hosts);
 
 console.log("Demo data ready.");

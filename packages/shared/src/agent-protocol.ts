@@ -365,6 +365,12 @@ export type FleetConfig = {
   upstreamErrors?: boolean;
 
   /**
+   * Read Caddy's layer 4 connection log and relay each connection (`l4`). Absent from an older
+   * controller, which would refuse the kind; an older agent never reads the file.
+   */
+  l4Connections?: boolean;
+
+  /**
    * How often the agent parses its logs and relays the rows, which is how soon the dashboard sees a
    * request. Absent from an older controller, and an older agent ignores it: both keep 30 seconds.
    */
@@ -461,6 +467,21 @@ export type WafEventRow = {
   uri: string;
 };
 
+/** One layer 4 connection, from caddy-l4's "connection stats" line. No host: its port says which. */
+export type L4ConnectionRow = {
+  ts: number;
+  network: "tcp" | "udp";
+  /** The port Caddy accepted it on. */
+  port: number;
+  client_ip: string;
+  country_code: string | null;
+  /** From the client. */
+  bytes_in: number;
+  /** To the client. */
+  bytes_out: number;
+  duration_ms: number;
+};
+
 /** The answers a dead or overloaded upstream gets a proxy to give. */
 export const UPSTREAM_ERROR_STATUSES = [502, 503, 504] as const;
 
@@ -514,8 +535,8 @@ export const AGENT_OPERATIONS = {
     "mutation AgentCertificateFiles($results: [JSON!]!) { agentCertificateFiles(results: $results) }",
 } as const;
 
-/** `upstream-errors` goes only to a controller that set `FleetConfig.upstreamErrors`. */
-export const AGENT_ANALYTICS_KINDS = ["traffic", "waf", "upstream-errors"] as const;
+/** `upstream-errors` and `l4` go only to a controller that set their `FleetConfig` flag. */
+export const AGENT_ANALYTICS_KINDS = ["traffic", "waf", "upstream-errors", "l4"] as const;
 export type AgentAnalyticsKind = (typeof AGENT_ANALYTICS_KINDS)[number];
 
 /** A malformed row is dropped, not fatal. */

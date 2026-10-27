@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import type { TrafficOutcome } from "@cpm/shared";
+import type { L4ConnectionRow, TrafficOutcome } from "@cpm/shared";
 import { userAgentFamily } from "../analytics/user-agent";
 import { onAnnouncement } from "../cluster/announcements";
 import { isDemoMode } from "../demo/mode";
@@ -207,6 +207,25 @@ TTL ts + INTERVAL ${retentionDays} DAY DELETE
 SETTINGS index_granularity = 8192
 `;
 
+/** One row per L4 connection; the port says which host, as caddy-l4 logs no name. */
+const l4EventsDdl = (retentionDays: number) => `
+CREATE TABLE IF NOT EXISTS l4_events (
+    ts           DateTime          CODEC(Delta, ZSTD),
+    network      LowCardinality(String),
+    port         UInt16,
+    client_ip    String            CODEC(ZSTD(3)),
+    country_code LowCardinality(Nullable(String)),
+    bytes_in     UInt64            DEFAULT 0 CODEC(Delta, ZSTD),
+    bytes_out    UInt64            DEFAULT 0 CODEC(Delta, ZSTD),
+    duration_ms  UInt32            DEFAULT 0,
+    agent_id     LowCardinality(String) DEFAULT ''
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMM(ts)
+ORDER BY (port, ts)
+TTL ts + INTERVAL ${retentionDays} DAY DELETE
+SETTINGS index_granularity = 8192
+`;
+
 // Migrations applied to existing tables on startup, each idempotent.
 const TRAFFIC_EVENTS_MIGRATIONS = [
   `ALTER TABLE traffic_events MODIFY COLUMN ts DateTime CODEC(Delta, ZSTD)`,
@@ -238,7 +257,7 @@ const WAF_EVENTS_MIGRATIONS = [
   `ALTER TABLE waf_events ADD COLUMN IF NOT EXISTS agent_id LowCardinality(String) DEFAULT ''`,
 ];
 
-const RETENTION_TABLES = ["traffic_events", "waf_events"] as const;
+const RETENTION_TABLES = ["traffic_events", "waf_events", "l4_events"] as const;
 
 /** Extract the retention (in days) from a table's TTL clause, if present. */
 function ttlDaysFromCreateQuery(createQuery: string): number | null {
@@ -385,6 +404,7 @@ async function createSchema(): Promise<void> {
   await ch.command({ query: `CREATE DATABASE IF NOT EXISTS ${database}` });
   await ch.command({ query: trafficEventsDdl(retentionDays) });
   await ch.command({ query: wafEventsDdl(retentionDays) });
+  await ch.command({ query: l4EventsDdl(retentionDays) });
   for (const q of [...TRAFFIC_EVENTS_MIGRATIONS, ...WAF_EVENTS_MIGRATIONS]) {
     await ch.command({ query: q });
   }
@@ -402,7 +422,7 @@ export async function closeClickHouse(): Promise<void> {
   }
 }
 
-/** Empty both event tables, wherever they are. For the demo seed, whose data is not incremental. */
+/** Empty the event tables, wherever they are. For the demo seed, whose data is not incremental. */
 export async function clearAnalyticsEvents(): Promise<void> {
   const { enabled, sqlite } = await chConfig();
   if (!enabled) return;
@@ -512,6 +532,31 @@ export async function insertWafEvents(rows: WafEventRow[], agentId = ""): Promis
   await withSchema((ch) =>
     ch.insert({
       table: "waf_events",
+      values,
+      format: "JSONEachRow",
+      clickhouse_settings: FLUSHED_INSERT,
+    }),
+  );
+}
+
+export async function insertL4Events(rows: L4ConnectionRow[], agentId = ""): Promise<void> {
+  if (rows.length === 0 || !(await isAnalyticsEnabled())) return;
+  if ((await chConfig()).sqlite) {
+    sqliteStore.insertIntoSqliteStore(
+      "l4_events",
+      rows.map((r) => ({ ...r, agent_id: agentId })),
+    );
+    return;
+  }
+  await ensureSchema();
+  const values = rows.map((r) => ({
+    ...r,
+    ts: new Date(r.ts * 1000).toISOString().replace("T", " ").slice(0, 19),
+    agent_id: agentId,
+  }));
+  await withSchema((ch) =>
+    ch.insert({
+      table: "l4_events",
       values,
       format: "JSONEachRow",
       clickhouse_settings: FLUSHED_INSERT,

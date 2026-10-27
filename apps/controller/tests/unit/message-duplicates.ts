@@ -667,6 +667,11 @@ export const SEPARATE_DUPLICATES: readonly {
     keys: ['settings.blocks.ssoEnforcement.name', 'settings.stagedLabels.ssoEnforcement'],
   },
   { reason: 'sense', keys: ['settings.ldap.emailAttribute', 'settings.saml.emailAttribute'] },
+  // A count of an L4 host's connections, and a heading over the outbound ones the app opens.
+  {
+    reason: 'sense',
+    keys: ['l4ProxyHosts.detail.chartConnections', 'settings.outbound.listTitle'],
+  },
   { reason: 'sense', keys: ['settings.ldap.nameAttribute', 'settings.saml.nameAttribute'] },
   { reason: 'composed', keys: ['settings.health.metrics.name', 'settings.stagedLabels.metrics'] },
   {

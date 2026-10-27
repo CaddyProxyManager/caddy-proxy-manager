@@ -24,6 +24,9 @@ vi.mock('@/src/lib/clickhouse/client', () => ({
   insertWafEvents: async (rows: unknown[], agentId: string) => {
     ctx.writes.push({ table: 'waf', rows, agentId });
   },
+  insertL4Events: async (rows: unknown[], agentId: string) => {
+    ctx.writes.push({ table: 'l4', rows, agentId });
+  },
 }));
 
 const { bareHost, ingestAnalytics, parseTrafficRow, parseWafRow } = await import(

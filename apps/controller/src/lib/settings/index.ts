@@ -123,6 +123,8 @@ export type MetricsSettings = {
 export type LoggingSettings = {
   enabled: boolean;
   format?: "json" | "console"; // Log format (default: json)
+  /** caddy-l4's per-connection log, for the L4 hosts' statistics. Read only with analytics on. */
+  l4Connections?: boolean;
 };
 
 export type TrustedProxiesSettings = {
@@ -377,6 +379,11 @@ export async function getLoggingSettings(): Promise<LoggingSettings | null> {
 
 export async function saveLoggingSettings(settings: LoggingSettings): Promise<void> {
   await setSetting("logging", settings);
+  // The agents start or stop reading the L4 connection log from their fleet config; a staged
+  // save pushes again on apply.
+  void import("../agent/fleet-config")
+    .then(({ pushFleetConfig }) => pushFleetConfig())
+    .catch(() => {});
 }
 
 export async function getTrustedProxiesSettings(): Promise<TrustedProxiesSettings | null> {

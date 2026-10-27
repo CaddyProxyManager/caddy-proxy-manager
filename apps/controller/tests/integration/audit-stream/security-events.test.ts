@@ -21,6 +21,7 @@ vi.mock('@/src/lib/clickhouse/client', () => ({
   isAnalyticsEnabled: async () => true,
   insertTrafficEvents: async () => {},
   insertWafEvents: async () => {},
+  insertL4Events: async () => {},
 }));
 
 const { ingestAnalytics } = await import('@/src/lib/agent/analytics-ingest');

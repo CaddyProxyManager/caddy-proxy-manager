@@ -21,6 +21,11 @@ export function logsDir(): string {
   return dirname(accessLogPath());
 }
 
+/** Beside the access log; the controller names the same file in Caddy's config. */
+export function l4ConnectionLogPath(): string {
+  return join(logsDir(), "l4-connections.log");
+}
+
 /** The agent is not root, so its own volume is where it can write; Caddy mounts it read-only. */
 export function geoipDir(): string {
   return process.env.GEOIP_DIR || join(process.env.DATA_DIR || "/data", "geoip");

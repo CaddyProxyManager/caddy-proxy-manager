@@ -130,8 +130,8 @@ async function commitSettings(
     const { pushDesiredState } = await import("../agent/desired-state");
     await pushDesiredState();
   }
-  // Agents decide whether they may build Caddy from their desired state.
-  if (keys.includes("config:offline_mode")) {
+  // Agents decide whether they may build Caddy, and read the L4 connection log, from it.
+  if (keys.includes("config:offline_mode") || keys.includes("logging")) {
     const { pushFleetConfig } = await import("../agent/fleet-config");
     await pushFleetConfig();
   }

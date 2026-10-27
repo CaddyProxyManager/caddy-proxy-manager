@@ -70,6 +70,11 @@ async function initGeoIP(): Promise<void> {
   }
 }
 
+/** For the L4 connection parser, which may run without this one: loads unless already loaded. */
+export async function ensureGeoIP(): Promise<void> {
+  if (!geoReader) await initGeoIP();
+}
+
 /** Optional on top: without it rows carry no ASN, and nothing else changes. */
 async function initAsn(): Promise<void> {
   const asnDatabase = geoipAsnDb();
@@ -81,7 +86,7 @@ async function initAsn(): Promise<void> {
   }
 }
 
-function lookupCountry(ip: string): string | null {
+export function lookupCountry(ip: string): string | null {
   if (!geoReader) return null;
   if (geoCache.has(ip)) return geoCache.get(ip)!;
   if (geoCache.size > 10_000) geoCache.clear();

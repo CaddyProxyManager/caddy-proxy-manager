@@ -39,6 +39,18 @@ CREATE TABLE IF NOT EXISTS waf_events (
   agent_id TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS waf_events_ts ON waf_events (ts);
+CREATE TABLE IF NOT EXISTS l4_events (
+  ts INTEGER NOT NULL,
+  network TEXT NOT NULL DEFAULT '',
+  port INTEGER NOT NULL DEFAULT 0,
+  client_ip TEXT NOT NULL DEFAULT '',
+  country_code TEXT,
+  bytes_in INTEGER NOT NULL DEFAULT 0,
+  bytes_out INTEGER NOT NULL DEFAULT 0,
+  duration_ms INTEGER NOT NULL DEFAULT 0,
+  agent_id TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS l4_events_port_ts ON l4_events (port, ts);
 `;
 
 /** Added after the first demos shipped, so an existing store gets them by ALTER. */
@@ -62,7 +74,7 @@ function addMissingColumns(database: Database): void {
   }
 }
 
-export const ANALYTICS_TABLES = ["traffic_events", "waf_events"] as const;
+export const ANALYTICS_TABLES = ["traffic_events", "waf_events", "l4_events"] as const;
 
 /** Beside the app's SQLite file, so a demo resets in one directory; memory on PostgreSQL. */
 export function sqliteStorePath(env: Record<string, string | undefined> = process.env): string {

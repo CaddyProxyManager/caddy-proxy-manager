@@ -5,6 +5,7 @@
 
 import {
   type AgentAnalyticsKind,
+  type L4ConnectionRow,
   MAX_ANALYTICS_REQUEST_BYTES,
   type TrafficEventRow,
   type UpstreamErrorRow,
@@ -20,6 +21,7 @@ const ENVELOPE_BYTES = 4 * 1024;
 let sink: AnalyticsSink | null = null;
 let analyticsOn = false;
 let upstreamErrorsOn = false;
+let l4ConnectionsOn = false;
 
 /** Traffic and WAF events: everything below is a no-op for them when it is off. */
 export function analyticsEnabled(): boolean {
@@ -31,10 +33,15 @@ export function upstreamErrorsEnabled(): boolean {
   return sink !== null && upstreamErrorsOn;
 }
 
+/** Layer 4 connections, which the controller stores only with analytics on. */
+export function l4ConnectionsEnabled(): boolean {
+  return sink !== null && l4ConnectionsOn;
+}
+
 /** A sink alone is analytics, as before upstream error counts existed. */
 export function configureAnalytics(
   next: AnalyticsSink | null,
-  wanted: { analytics: boolean; upstreamErrors: boolean } = {
+  wanted: { analytics: boolean; upstreamErrors: boolean; l4Connections?: boolean } = {
     analytics: next !== null,
     upstreamErrors: false,
   },
@@ -47,6 +54,7 @@ export function configureAnalytics(
   sink = next;
   analyticsOn = analytics;
   upstreamErrorsOn = next !== null && wanted.upstreamErrors;
+  l4ConnectionsOn = next !== null && wanted.l4Connections === true;
 }
 
 /** A row that can never fit is dropped and counted, or the parser would never get past it. */
@@ -81,7 +89,9 @@ export function chunkBySize<T>(
 async function relay(kind: AgentAnalyticsKind, rows: readonly unknown[]): Promise<void> {
   const target = sink;
   if (!target || rows.length === 0) return;
-  if (kind === "upstream-errors" ? !upstreamErrorsOn : !analyticsOn) return;
+  const on =
+    kind === "upstream-errors" ? upstreamErrorsOn : kind === "l4" ? l4ConnectionsOn : analyticsOn;
+  if (!on) return;
 
   const { chunks, oversized } = chunkBySize(rows, MAX_ANALYTICS_REQUEST_BYTES - ENVELOPE_BYTES);
   if (oversized > 0) {
@@ -105,4 +115,8 @@ export function relayWafEvents(rows: WafEventRow[]): Promise<void> {
 
 export function relayUpstreamErrors(rows: UpstreamErrorRow[]): Promise<void> {
   return relay("upstream-errors", rows);
+}
+
+export function relayL4Connections(rows: L4ConnectionRow[]): Promise<void> {
+  return relay("l4", rows);
 }

@@ -9,13 +9,18 @@ import { geoipFleetConfig } from "./geoip";
 import { pushDesiredState } from "./desired-state";
 
 export async function currentFleetConfig(): Promise<FleetConfig> {
-  const { upstreamErrorsWanted } = await import("../notifications/upstream-errors");
-  const [analytics, geoip, upstreamErrors, offline, buildTimeout] = await Promise.all([
+  // Imported here: lib/settings reaches most of the app, and a test mocking ClickHouse with it.
+  const [{ upstreamErrorsWanted }, { getLoggingSettings }] = await Promise.all([
+    import("../notifications/upstream-errors"),
+    import("../settings"),
+  ]);
+  const [analytics, geoip, upstreamErrors, offline, buildTimeout, logging] = await Promise.all([
     isAnalyticsEnabled(),
     geoipFleetConfig(),
     upstreamErrorsWanted().catch(() => false),
     offlineModeEnabled(),
     getSetting(caddyBuildTimeout),
+    getLoggingSettings().catch(() => null),
   ]);
   // Agents relay analytics rather than writing to ClickHouse, so no credential goes out here.
   return {
@@ -23,6 +28,8 @@ export async function currentFleetConfig(): Promise<FleetConfig> {
     analytics,
     geoip,
     upstreamErrors,
+    // Stored in the analytics tables, so without them there is nowhere to send a row.
+    l4Connections: analytics && logging?.l4Connections === true,
     offline,
     analyticsIntervalSeconds: LIVE_ANALYTICS_INTERVAL_SECONDS,
     caddyBuildTimeoutSeconds: buildTimeout,

@@ -19,6 +19,7 @@ vi.mock('../../../src/lib/db', () => dbModuleMock(() => ctx.db));
 vi.mock('../../../src/lib/audit', () => ({ logAuditEvent: vi.fn() }));
 
 import { buildCaddyDocument } from '../../../src/lib/caddy';
+import * as schema from '../../../src/lib/db/schema';
 import { saveLoggingSettings } from '../../../src/lib/settings';
 
 const ROLL_FIELDS = {
@@ -48,6 +49,38 @@ describe('Caddy log writer rotation settings', () => {
     const doc = await buildCaddyDocument();
     const writer = loggingLogs(doc).http_access?.writer;
     expect(writer).toMatchObject(ROLL_FIELDS);
+  });
+
+  it('logs L4 connections only when asked, and only with an L4 host to log', async () => {
+    await saveLoggingSettings({ enabled: false, l4Connections: true });
+    expect(loggingLogs(await buildCaddyDocument()).l4_connections).toBeUndefined();
+
+    const now = new Date().toISOString();
+    await ctx.db.insert(schema.l4ProxyHosts).values({
+      name: 'db',
+      protocol: 'tcp',
+      listenAddress: ':5432',
+      upstreams: JSON.stringify(['db:5432']),
+      matcherType: 'none',
+      matcherValue: null,
+      tlsTermination: false,
+      proxyProtocolVersion: null,
+      proxyProtocolReceive: false,
+      meta: null,
+      enabled: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+    expect(loggingLogs(await buildCaddyDocument()).l4_connections).toMatchObject({
+      writer: { filename: '/logs/l4-connections.log', ...ROLL_FIELDS },
+      include: ['layer4'],
+      exclude: ['layer4.handlers', 'layer4.matchers'],
+      level: 'DEBUG',
+    });
+
+    await saveLoggingSettings({ enabled: false });
+    expect(loggingLogs(await buildCaddyDocument()).l4_connections).toBeUndefined();
+    await ctx.db.delete(schema.l4ProxyHosts);
   });
 
   it('does not omit any roll field (would silently fall back to Caddy defaults)', async () => {

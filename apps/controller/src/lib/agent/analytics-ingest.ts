@@ -7,6 +7,7 @@ import {
   AGENT_ANALYTICS_KINDS,
   type AgentAnalyticsKind,
   type AgentAnalyticsResult,
+  type L4ConnectionRow,
   type TrafficEventRow,
   type WafEventRow,
   isTrafficOutcome,
@@ -18,9 +19,15 @@ import {
   wafSecurityBody,
 } from "../audit-stream/security";
 import type { SecurityRecordBody } from "../audit-stream/records";
-import { insertTrafficEvents, insertWafEvents, isAnalyticsEnabled } from "../clickhouse/client";
+import {
+  insertL4Events,
+  insertTrafficEvents,
+  insertWafEvents,
+  isAnalyticsEnabled,
+} from "../clickhouse/client";
+import { splitHostPortRange } from "../caddy/utils";
 import db from "../db";
-import { proxyHosts } from "../db/schema";
+import { l4ProxyHosts, proxyHosts } from "../db/schema";
 import { listHostAssignments, servedByAgent } from "../models/host-agents";
 import { onAnnouncement } from "../cluster/announcements";
 import { publishLive } from "../live/bus";
@@ -155,6 +162,68 @@ export function parseWafRow(value: unknown): WafEventRow | null {
   });
 }
 
+const MAX_DURATION_MS = MAX_UINT32;
+
+export function parseL4Row(value: unknown): L4ConnectionRow | null {
+  if (!isFields(value)) return null;
+  const row = value;
+  if (
+    !isTimestamp(row.ts) ||
+    (row.network !== "tcp" && row.network !== "udp") ||
+    !isWhole(row.port, 1, 65_535) ||
+    !isText(row.client_ip, 64) ||
+    !isOptionalText(row.country_code, 8) ||
+    !isWhole(row.bytes_in, 0, Number.MAX_SAFE_INTEGER) ||
+    !isWhole(row.bytes_out, 0, Number.MAX_SAFE_INTEGER) ||
+    !isWhole(row.duration_ms, 0, MAX_DURATION_MS)
+  ) {
+    return null;
+  }
+  return {
+    ts: Math.floor(row.ts),
+    network: row.network,
+    port: row.port,
+    client_ip: row.client_ip,
+    country_code: row.country_code,
+    bytes_in: row.bytes_in,
+    bytes_out: row.bytes_out,
+    duration_ms: row.duration_ms,
+  };
+}
+
+/** Whether a connection is on a port of an L4 host this agent serves, by protocol. */
+export function agentL4PortFilter(
+  agentRowId: number,
+): Promise<(row: Pick<L4ConnectionRow, "network" | "port">) => boolean> {
+  return processMemo(`${L4_PORT_FILTERS}:${agentRowId}`, () => loadL4PortFilter(agentRowId));
+}
+
+const L4_PORT_FILTERS = "agent_l4_port_filter";
+onAnnouncement("proxy-hosts", () => dropProcessMemo(L4_PORT_FILTERS));
+
+async function loadL4PortFilter(
+  agentRowId: number,
+): Promise<(row: Pick<L4ConnectionRow, "network" | "port">) => boolean> {
+  const [rows, assignments] = await Promise.all([
+    db
+      .select({
+        id: l4ProxyHosts.id,
+        protocol: l4ProxyHosts.protocol,
+        listenAddress: l4ProxyHosts.listenAddress,
+      })
+      .from(l4ProxyHosts),
+    listHostAssignments("l4"),
+  ]);
+  const ranges = rows.flatMap((row) => {
+    const range = servedByAgent(assignments, row.id, agentRowId)
+      ? splitHostPortRange(row.listenAddress)
+      : null;
+    return range ? [{ protocol: row.protocol, start: range.start, end: range.end }] : [];
+  });
+  return (row) =>
+    ranges.some((r) => r.protocol === row.network && row.port >= r.start && row.port <= r.end);
+}
+
 /** `host:port` and `[v6]:port` to the bare, lower-cased name, so a port cannot split a group. */
 export function bareHost(host: string): string {
   const lower = host.trim().toLowerCase();
@@ -235,6 +304,15 @@ export async function ingestAnalytics(
   }
   if (!(await isAnalyticsEnabled())) {
     throw new AnalyticsIngestError("ANALYTICS_DISABLED", "Analytics are switched off.");
+  }
+  if (kind === "l4") {
+    const serves = await agentL4PortFilter(agentRowId);
+    const valid = rows
+      .map(parseL4Row)
+      .filter((row): row is L4ConnectionRow => row !== null && serves(row));
+    await insertL4Events(valid, agentId);
+    if (valid.length > 0) publishLive("analytics");
+    return { accepted: valid.length, rejected: rows.length - valid.length };
   }
 
   const serves = await agentHostFilter(agentRowId);

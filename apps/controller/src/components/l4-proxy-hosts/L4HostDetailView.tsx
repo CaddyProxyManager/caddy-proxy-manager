@@ -1,12 +1,11 @@
 "use client";
 
 /**
- * An L4 host's page: its upstreams, a line per editor section linking into the editor, and its
+ * An L4 host's page: its last day of connections, its upstreams, a line per editor section linking into the editor, and its
  * recent changes. Presentational; the route gathers everything in lib/l4/detail.
  */
 
 import { ListChecks, Server } from "lucide-react";
-import type { ReactNode } from "react";
 import { Button } from "@astryxdesign/core/Button";
 import { Grid } from "@astryxdesign/core/Grid";
 import { List, ListItem } from "@astryxdesign/core/List";
@@ -25,6 +24,7 @@ import {
 } from "@/lib/l4/editor-sections";
 import type { HostAuditRow } from "@/lib/proxy-hosts/detail-types";
 import type { SectionFact } from "@/lib/proxy-hosts/section-summary";
+import { L4TrafficSection } from "./L4TrafficSection";
 
 type DynamicTranslate = (key: string, values?: Record<string, string | number>) => string;
 
@@ -32,13 +32,10 @@ export function L4HostDetailView({
   detail,
   auditRows,
   canManage,
-  traffic = null,
 }: {
   detail: L4HostDetail;
   auditRows: HostAuditRow[] | null;
   canManage: boolean;
-  /** Its connections, where L4 traffic monitoring is on. */
-  traffic?: ReactNode;
 }) {
   const t = useTranslations("proxyHosts.detail");
   const tL4 = useTranslations("l4ProxyHosts.detail");
@@ -67,7 +64,7 @@ export function L4HostDetailView({
         }
       />
 
-      {traffic}
+      <L4TrafficSection traffic={detail.traffic} />
 
       <Grid columns={{ minWidth: 360, max: 2 }} gap={4}>
         <SectionCard

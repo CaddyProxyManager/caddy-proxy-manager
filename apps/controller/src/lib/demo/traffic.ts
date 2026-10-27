@@ -2,6 +2,7 @@
  * Invented demo traffic: a seeded month, then live minutes, so every range has data. Shaped, not
  * uniform, because a flat chart teaches nobody what the dashboard is for.
  */
+import type { L4ConnectionRow } from "@cpm/shared";
 import type { TrafficEventRow, WafEventRow } from "../clickhouse/client";
 
 export type TrafficShare = { domain: string; share: number };
@@ -165,6 +166,42 @@ function status(): number {
   return 200;
 }
 
+/** An L4 host's listen port, which is all its connections are known by. */
+export type DemoL4Port = { protocol: "tcp" | "udp"; port: number };
+
+/** Connections an hour at the peak, per port: far fewer than requests, and far longer. */
+const L4_PEAK_PER_HOUR = 40;
+
+export function generateL4Connections(
+  from: number,
+  to: number,
+  ports: readonly DemoL4Port[],
+): L4ConnectionRow[] {
+  const rows: L4ConnectionRow[] = [];
+  for (let start = from; start < to; start += 3600) {
+    const span = Math.min(3600, to - start);
+    for (const { protocol, port } of ports) {
+      const expected = L4_PEAK_PER_HOUR * busyness(new Date(start * 1000)) * (span / 3600);
+      const count = Math.floor(expected) + (Math.random() < expected % 1 ? 1 : 0);
+      for (let i = 0; i < count; i++) {
+        // A few regulars hold most of the sessions, as a game server or a replica's clients do.
+        const ip = Math.random() < 0.7 ? pick(VISITOR_IPS.slice(0, 8)) : visitorIp();
+        rows.push({
+          ts: start + Math.floor(Math.random() * span),
+          network: protocol,
+          port,
+          client_ip: ip,
+          country_code: weighted(COUNTRIES),
+          bytes_in: Math.floor(2_000 + Math.random() * 400_000),
+          bytes_out: Math.floor(20_000 + Math.random() * 8_000_000),
+          duration_ms: Math.floor(1_000 + Math.random() * 1_800_000),
+        });
+      }
+    }
+  }
+  return rows;
+}
+
 export function trafficShares(domains: string[]): TrafficShare[] {
   return domains.map((domain) => ({ domain, share: DEMO_HOST_SHARES[domain] ?? DEFAULT_SHARE }));
 }
@@ -268,15 +305,22 @@ export async function writeDemoTraffic(
   from: number,
   to: number,
   hosts: TrafficShare[],
-): Promise<{ traffic: number; waf: number }> {
-  const { insertTrafficEvents, insertWafEvents } = await import("../clickhouse/client");
-  const written = { traffic: 0, waf: 0 };
+  l4Ports: readonly DemoL4Port[] = [],
+): Promise<{ traffic: number; waf: number; l4: number }> {
+  const { insertL4Events, insertTrafficEvents, insertWafEvents } = await import(
+    "../clickhouse/client"
+  );
+  const written = { traffic: 0, waf: 0, l4: 0 };
   for (let start = from; start < to; start += 3600) {
-    const { traffic, waf } = generateTraffic(start, Math.min(start + 3600, to), hosts);
+    const end = Math.min(start + 3600, to);
+    const { traffic, waf } = generateTraffic(start, end, hosts);
+    const l4 = generateL4Connections(start, end, l4Ports);
     await insertTrafficEvents(traffic, "demo");
     await insertWafEvents(waf, "demo");
+    await insertL4Events(l4, "demo");
     written.traffic += traffic.length;
     written.waf += waf.length;
+    written.l4 += l4.length;
   }
   return written;
 }
@@ -285,6 +329,18 @@ async function servedDomains(): Promise<string[]> {
   const { listProxyHosts } = await import("../models/proxy-hosts");
   const hosts = await listProxyHosts();
   return hosts.filter((host) => host.enabled).flatMap((host) => host.domains);
+}
+
+/** Each enabled L4 host's first port: a range's others would only repeat it. */
+export async function servedL4Ports(): Promise<DemoL4Port[]> {
+  const [{ listL4ProxyHosts }, { splitHostPortRange }] = await Promise.all([
+    import("../models/l4-proxy-hosts"),
+    import("../caddy/utils"),
+  ]);
+  return (await listL4ProxyHosts()).flatMap((host) => {
+    const range = host.enabled ? splitHostPortRange(host.listenAddress) : null;
+    return range ? [{ protocol: host.protocol, port: range.start }] : [];
+  });
 }
 
 const TICK_MS = 60_000;
@@ -307,7 +363,12 @@ export async function startLiveDemoTraffic(): Promise<void> {
   if (latest === null || latest < last) {
     const from =
       latest === null ? last - MAX_BACKFILL_S : Math.max(latest + 1, last - MAX_BACKFILL_S);
-    const written = await writeDemoTraffic(from, last, trafficShares(await servedDomains()));
+    const written = await writeDemoTraffic(
+      from,
+      last,
+      trafficShares(await servedDomains()),
+      await servedL4Ports(),
+    );
     if (written.traffic > 0)
       console.log(`Demo traffic: filled ${written.traffic} events since the last run`);
   }
@@ -316,8 +377,8 @@ export async function startLiveDemoTraffic(): Promise<void> {
     const now = Math.floor(Date.now() / 1000);
     const from = last;
     last = now;
-    void servedDomains()
-      .then((domains) => writeDemoTraffic(from, now, trafficShares(domains)))
+    void Promise.all([servedDomains(), servedL4Ports()])
+      .then(([domains, ports]) => writeDemoTraffic(from, now, trafficShares(domains), ports))
       .catch((error) => console.warn("Demo traffic tick failed:", error));
   }, TICK_MS);
   global.__CPM_DEMO_TRAFFIC__.unref?.();

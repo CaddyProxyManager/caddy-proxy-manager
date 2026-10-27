@@ -3082,6 +3082,7 @@ function LoggingSection({
   const t = useTranslations("settings");
   const [enabled, setEnabled] = useState(logging?.enabled ?? false);
   const [format, setFormat] = useState<string>(logging?.format ?? "json");
+  const [l4Connections, setL4Connections] = useState(logging?.l4Connections ?? false);
 
   return (
     <>
@@ -3108,6 +3109,13 @@ function LoggingSection({
               value={format}
               onChange={setFormat}
               width={280}
+            />
+            <Switch
+              label={t("enableL4ConnectionLogging")}
+              description={t("l4ConnectionLoggingHelp")}
+              htmlName="l4Connections"
+              value={l4Connections}
+              onChange={setL4Connections}
             />
           </VStack>
         </form>

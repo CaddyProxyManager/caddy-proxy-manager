@@ -48,3 +48,19 @@ PARTITION BY toYYYYMM(ts)
 ORDER BY (host, ts)
 TTL ts + INTERVAL 30 DAY DELETE
 SETTINGS index_granularity = 8192;
+
+CREATE TABLE IF NOT EXISTS l4_events (
+    ts           DateTime          CODEC(Delta, ZSTD),
+    network      LowCardinality(String),
+    port         UInt16,
+    client_ip    String            CODEC(ZSTD(3)),
+    country_code LowCardinality(Nullable(String)),
+    bytes_in     UInt64            DEFAULT 0 CODEC(Delta, ZSTD),
+    bytes_out    UInt64            DEFAULT 0 CODEC(Delta, ZSTD),
+    duration_ms  UInt32            DEFAULT 0,
+    agent_id     LowCardinality(String) DEFAULT ''
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMM(ts)
+ORDER BY (port, ts)
+TTL ts + INTERVAL 30 DAY DELETE
+SETTINGS index_granularity = 8192;

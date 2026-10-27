@@ -16,6 +16,7 @@ import {
   type AnalyticsSink,
   analyticsEnabled,
   configureAnalytics,
+  l4ConnectionsEnabled,
   upstreamErrorsEnabled,
 } from "./relay";
 import { geoipControllerUrl, syncGeoipDatabases } from "./geoip";
@@ -25,6 +26,12 @@ import {
   stopLogParser,
   bindStore as bindTrafficStore,
 } from "./log-parser";
+import {
+  initL4LogParser,
+  parseNewL4LogEntries,
+  stopL4LogParser,
+  bindStore as bindL4Store,
+} from "./l4-log-parser";
 import {
   initWafLogParser,
   parseNewWafLogEntries,
@@ -49,6 +56,7 @@ export function parseIntervalFor(seconds: unknown): number {
 
 let accessTimer: NodeJS.Timeout | null = null;
 let wafTimer: NodeJS.Timeout | null = null;
+let l4Timer: NodeJS.Timeout | null = null;
 
 /** MaxMind publishes a couple of times a week. */
 const GEOIP_REFRESH_MS = 24 * 60 * 60_000;
@@ -66,15 +74,21 @@ export async function applyFleetConfig(
 ): Promise<void> {
   bindTrafficStore(store);
   bindWafStore(store);
+  bindL4Store(store);
 
   const analytics = config.analytics === true;
   const upstreamErrors = config.upstreamErrors === true;
-  configureAnalytics(analytics || upstreamErrors ? analyticsSink(store, controllerId) : null, {
-    analytics,
-    upstreamErrors,
-  });
+  const l4Connections = config.l4Connections === true;
+  configureAnalytics(
+    analytics || upstreamErrors || l4Connections ? analyticsSink(store, controllerId) : null,
+    { analytics, upstreamErrors, l4Connections },
+  );
   parseIntervalMs = parseIntervalFor(config.analyticsIntervalSeconds);
-  await syncParsers(analyticsEnabled() || upstreamErrorsEnabled(), analyticsEnabled());
+  await syncParsers(
+    analyticsEnabled() || upstreamErrorsEnabled(),
+    analyticsEnabled(),
+    l4ConnectionsEnabled(),
+  );
 
   scheduleGeoipSync(store, config, controllerId);
 }
@@ -134,13 +148,15 @@ function parseEvery(label: string, parse: () => Promise<void>): NodeJS.Timeout {
 /** The interval the running timers were made with, to notice a pushed change. */
 let timersMs = 0;
 
-async function syncParsers(access: boolean, waf: boolean): Promise<void> {
-  if (timersMs !== parseIntervalMs && (accessTimer || wafTimer)) {
+async function syncParsers(access: boolean, waf: boolean, l4: boolean): Promise<void> {
+  if (timersMs !== parseIntervalMs && (accessTimer || wafTimer || l4Timer)) {
     // Same parsers and offsets, a new cadence.
     if (accessTimer) clearInterval(accessTimer);
     if (wafTimer) clearInterval(wafTimer);
+    if (l4Timer) clearInterval(l4Timer);
     accessTimer = accessTimer ? parseEvery("access", parseNewLogEntries) : null;
     wafTimer = wafTimer ? parseEvery("WAF", parseNewWafLogEntries) : null;
+    l4Timer = l4Timer ? parseEvery("L4", parseNewL4LogEntries) : null;
     console.log(`[analytics] parsing every ${parseIntervalMs / 1000}s`);
   }
   timersMs = parseIntervalMs;
@@ -164,6 +180,16 @@ async function syncParsers(access: boolean, waf: boolean): Promise<void> {
     stopWafLogParser();
     console.log("[analytics] WAF log parser stopped");
   }
+  if (l4 && !l4Timer) {
+    await initL4LogParser();
+    l4Timer = parseEvery("L4", parseNewL4LogEntries);
+    console.log("[analytics] L4 connection log parser started");
+  } else if (!l4 && l4Timer) {
+    clearInterval(l4Timer);
+    l4Timer = null;
+    stopL4LogParser();
+    console.log("[analytics] L4 connection log parser stopped");
+  }
 }
 
 export async function stop(): Promise<void> {
@@ -171,7 +197,7 @@ export async function stop(): Promise<void> {
     clearInterval(geoipTimer);
     geoipTimer = null;
   }
-  await syncParsers(false, false);
+  await syncParsers(false, false, false);
   configureAnalytics(null);
 }
 
