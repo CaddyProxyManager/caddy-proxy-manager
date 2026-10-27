@@ -6,15 +6,13 @@
  * the docs can render it with sample data; the route gathers everything in lib/proxy-hosts/detail.
  */
 
-import { BarChart2, FlaskConical, History, ListChecks, Server, TriangleAlert } from "lucide-react";
+import { BarChart2, FlaskConical, ListChecks, Server, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Grid } from "@astryxdesign/core/Grid";
-import { Heading } from "@astryxdesign/core/Heading";
-import { Icon } from "@astryxdesign/core/Icon";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Table, pixel, proportional, type TableColumn } from "@astryxdesign/core/Table";
@@ -29,7 +27,6 @@ import {
 } from "@/components/proxy-hosts/HostInsightCells";
 import { UpstreamHealthPanel } from "@/components/proxy-hosts/upstreams/UpstreamHealthPanel";
 import { StatTiles } from "@/components/ui/StatTiles";
-import { Timestamp } from "@/components/ui/Timestamp";
 import { useTableDensity } from "@/components/ui/TableDensity";
 import { formatBytes, formatShare } from "@/src/app/(dashboard)/analytics/explore/format";
 import { editorSectionHref, proxyHostDetailHref } from "@/lib/proxy-hosts/editor-sections";
@@ -37,48 +34,15 @@ import { HostPageTabs } from "@/components/host-history/HostPageTabs";
 import type { ProxyHostDetail } from "@/lib/proxy-hosts/detail-types";
 import type { HostPathRow, HostStatusRow } from "@/lib/clickhouse/host-traffic";
 import type { SectionFact } from "@/lib/proxy-hosts/section-summary";
+import type { HostAuditRow } from "@/lib/proxy-hosts/detail-types";
+import { HostAuditCard } from "./HostAuditCard";
 import { HostTrafficChart } from "./HostTrafficChart";
 import { ProxyHostHeader } from "./ProxyHostHeader";
+import { SectionCard } from "./SectionCard";
 
-export type HostAuditRow = {
-  id: number;
-  action: string;
-  /** Translated on the server, as the audit log page does. */
-  summary: string;
-  actor: string | null;
-  createdAt: string;
-};
+export type { HostAuditRow };
 
 type DynamicTranslate = (key: string, values?: Record<string, string | number>) => string;
-
-function SectionCard({
-  icon,
-  title,
-  action,
-  children,
-}: {
-  icon: typeof Server;
-  title: string;
-  action?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <Card padding={5}>
-      <VStack gap={3}>
-        <HStack justify="between" vAlign="center" gap={2}>
-          <HStack gap={2} vAlign="center">
-            <Icon icon={icon} size="sm" color="accent" />
-            <Heading level={2} accessibilityLevel={2}>
-              {title}
-            </Heading>
-          </HStack>
-          {action}
-        </HStack>
-        {children}
-      </VStack>
-    </Card>
-  );
-}
 
 export function ProxyHostDetailView({
   detail,
@@ -104,7 +68,6 @@ export function ProxyHostDetailView({
   const t = useTranslations("proxyHosts.detail");
   const tOverview = useTranslations("overview");
   const tAttention = useTranslations("attention");
-  const tAuditLog = useTranslations("auditLog");
   const tCommon = useTranslations("common");
   const tProxyHosts = useTranslations("proxyHosts");
   const tFacts = useTranslations("proxyHosts.detail.facts") as unknown as DynamicTranslate;
@@ -171,34 +134,6 @@ export function ProxyHostDetailView({
         <Text type="code" size="sm">
           {format.number(row.requests)}
         </Text>
-      ),
-    },
-  ];
-
-  const auditColumns: TableColumn<HostAuditRow>[] = [
-    {
-      key: "createdAt",
-      header: t("auditTime"),
-      width: pixel(180),
-      renderCell: (row) => (
-        <Text type="body" size="sm" color="secondary">
-          <Timestamp value={row.createdAt} />
-        </Text>
-      ),
-    },
-    {
-      key: "summary",
-      header: t("auditChange"),
-      width: proportional(3),
-      renderCell: (row) => (
-        <VStack gap={0} className="cpm-cell-lines">
-          <Text type="body" size="sm" maxLines={1}>
-            {row.summary}
-          </Text>
-          <Text type="body" size="sm" color="secondary">
-            {row.actor ?? tAuditLog("systemActor")}
-          </Text>
-        </VStack>
       ),
     },
   ];
@@ -384,15 +319,7 @@ export function ProxyHostDetailView({
         </Grid>
       )}
 
-      {auditRows && (
-        <SectionCard icon={History} title={t("auditTitle")}>
-          {auditRows.length === 0 ? (
-            <EmptyState title={t("auditEmpty")} isCompact />
-          ) : (
-            <Table data={auditRows} columns={auditColumns} idKey="id" density={density} />
-          )}
-        </SectionCard>
-      )}
+      {auditRows && <HostAuditCard rows={auditRows} />}
     </VStack>
   );
 }

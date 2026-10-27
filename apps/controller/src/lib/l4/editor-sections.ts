@@ -31,6 +31,10 @@ export function l4EditorSectionHref(
 }
 
 /** Optionally opened on one revision, compared with the one before it. */
+export function l4ProxyHostDetailHref(hostRef: string | number): string {
+  return `/l4-proxy-hosts/${hostRef}`;
+}
+
 export function l4ProxyHostHistoryHref(hostRef: string | number, revisionId?: number): string {
   return `/l4-proxy-hosts/${hostRef}/history${revisionId ? `?to=${revisionId}` : ""}`;
 }

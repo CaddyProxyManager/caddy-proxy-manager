@@ -15,9 +15,12 @@ import type { ProxyHostHeaderInfo } from "@/lib/proxy-hosts/header";
 export function ProxyHostHeader({
   header,
   tabs,
+  layer4 = false,
 }: {
   header: ProxyHostHeaderInfo;
   tabs: ReactNode;
+  /** An L4 host's, which goes back to its own list. */
+  layer4?: boolean;
 }) {
   const tNav = useTranslations("nav");
   return (
@@ -27,14 +30,14 @@ export function ProxyHostHeader({
           variant="ghost"
           size="sm"
           icon={<ArrowLeft />}
-          label={tNav("proxyHosts")}
-          href="/proxy-hosts"
+          label={layer4 ? tNav("l4ProxyHosts") : tNav("proxyHosts")}
+          href={layer4 ? "/l4-proxy-hosts" : "/proxy-hosts"}
         />
       </HStack>
       <VStack gap={1}>
         <HStack gap={3} vAlign="center" wrap="wrap">
           <Heading level={1}>{header.name}</Heading>
-          <HostStatusCell status={header.status} />
+          {header.status && <HostStatusCell status={header.status} />}
         </HStack>
         <Text type="code" size="sm" color="secondary">
           {header.domains.join(", ")}

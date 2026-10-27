@@ -15,6 +15,7 @@ import { HostNotesHint } from "@/components/proxy-hosts/HostNotesField";
 import { HostTagFilter, HostTagList } from "@/components/proxy-hosts/HostTagsField";
 import { duplicateL4ProxyHostDraft } from "@/src/lib/proxy-hosts/duplicate";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
+import { Link as AstryxLink } from "@astryxdesign/core/Link";
 import { Text } from "@astryxdesign/core/Text";
 import { HStack, StackItem, VStack } from "@astryxdesign/core/Stack";
 import type { L4ProxyHost } from "@/src/lib/models/l4-proxy-hosts";
@@ -35,7 +36,11 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
 import type { AgentOption } from "@/components/agents/AgentAssignmentFields";
 import { useTranslations } from "next-intl";
-import { l4EditorSectionHref, l4ProxyHostHistoryHref } from "@/src/lib/l4/editor-sections";
+import {
+  l4EditorSectionHref,
+  l4ProxyHostDetailHref,
+  l4ProxyHostHistoryHref,
+} from "@/src/lib/l4/editor-sections";
 
 type Props = {
   hosts: L4ProxyHost[];
@@ -273,9 +278,11 @@ export default function L4ProxyHostsClient({
           <Icon icon={Network} size="sm" color={host.protocol === "tcp" ? "accent" : "warning"} />
           <VStack gap={0} className="cpm-cell-lines">
             <HStack gap={1} vAlign="center">
-              <Text type="body" size="sm" weight="semibold">
-                {host.name}
-              </Text>
+              <AstryxLink href={l4ProxyHostDetailHref(host.uuid)}>
+                <Text type="body" size="sm" weight="semibold">
+                  {host.name}
+                </Text>
+              </AstryxLink>
               <HostNotesHint notes={host.description} />
               <AccessListBadge host={host} accessLists={accessLists} />
             </HStack>
@@ -354,9 +361,11 @@ export default function L4ProxyHostsClient({
         <StackItem size="fill">
           <VStack gap={1}>
             <HStack gap={2} vAlign="center">
-              <Text type="body" size="sm" weight="semibold">
-                {host.name}
-              </Text>
+              <AstryxLink href={l4ProxyHostDetailHref(host.uuid)}>
+                <Text type="body" size="sm" weight="semibold">
+                  {host.name}
+                </Text>
+              </AstryxLink>
               <ProtocolBadge protocol={host.protocol} />
               <AccessListBadge host={host} accessLists={accessLists} />
             </HStack>
@@ -460,6 +469,7 @@ export default function L4ProxyHostsClient({
         pagination={pagination}
         sort={initialSort}
         mobileCard={mobileCard}
+        rowHref={(host) => l4ProxyHostDetailHref(host.uuid)}
         rowStatus={(host) => (host.enabled ? null : { color: "gray", label: t("disabled") })}
         selection={{
           selectedKeys,

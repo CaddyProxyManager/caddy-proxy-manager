@@ -5,7 +5,12 @@ import { HostHistoryScreen } from "@/src/components/host-history/HostHistoryScre
 import { deletedHostIdForUuid } from "@/src/lib/host-history";
 import { loadHostHistory } from "@/src/lib/host-history/page";
 import { getL4ProxyHost, resolveL4ProxyHostId } from "@/src/lib/models/l4-proxy-hosts";
-import { l4EditorSectionHref, l4ProxyHostHistoryHref } from "@/src/lib/l4/editor-sections";
+import { l4HostHeader } from "@/src/lib/l4/detail-types";
+import {
+  l4EditorSectionHref,
+  l4ProxyHostDetailHref,
+  l4ProxyHostHistoryHref,
+} from "@/src/lib/l4/editor-sections";
 import { canManage, requireReach, can } from "@/src/lib/users/permissions";
 import { restoreL4ProxyHostAction } from "../../actions";
 
@@ -36,7 +41,9 @@ export default async function L4ProxyHostHistoryPage({ params, searchParams }: P
       name={host?.name ?? data.name ?? raw}
       listHref="/l4-proxy-hosts"
       listLabel={tNav("l4ProxyHosts")}
-      overviewHref={null}
+      overviewHref={host ? l4ProxyHostDetailHref(host.uuid) : null}
+      hostHeader={host ? l4HostHeader(host) : null}
+      layer4
       editHref={host ? l4EditorSectionHref(host.uuid) : null}
       historyHref={l4ProxyHostHistoryHref(raw)}
       view={{

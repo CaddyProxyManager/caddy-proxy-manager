@@ -50,6 +50,16 @@ export const SECTION_FACTS = [
   "compressionOff",
   "maintenanceOn",
   "customConfig",
+  // A layer 4 host's: lib/l4/section-summary.ts.
+  "listen",
+  "matcherSni",
+  "matcherHost",
+  "matcherProxyProtocol",
+  "tlsTerminated",
+  "proxyProtocolIn",
+  "proxyProtocolOut",
+  "samePortUpstreams",
+  "upstreamDnsPinned",
 ] as const;
 export type SectionFactCode = (typeof SECTION_FACTS)[number];
 
@@ -65,7 +75,7 @@ type Lookups = {
   crowdsecActive: boolean;
 };
 
-function fact(code: SectionFactCode, values?: SectionFact["values"]): SectionFact {
+export function fact(code: SectionFactCode, values?: SectionFact["values"]): SectionFact {
   return values ? { code, values } : { code };
 }
 

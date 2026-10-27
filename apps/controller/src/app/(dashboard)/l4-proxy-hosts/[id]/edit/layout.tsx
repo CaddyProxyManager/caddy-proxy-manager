@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
-import { getTranslations } from "next-intl/server";
 import { listAgentOptions } from "@/src/lib/agent/client";
 import { dynamicDnsProviderOptions } from "@/src/lib/dns/dynamic-dns";
 import { listL4AccessListOptions } from "@/src/lib/models/access-lists";
@@ -28,12 +27,9 @@ export default async function L4ProxyHostEditLayout({ params, children }: Layout
     getDnsProviderSettings(),
     agentIdsForHosts("l4", [id]).catch(() => new Map<number, number[]>()),
   ]);
-  const tNav = await getTranslations("nav");
 
   return (
     <L4ProxyHostEditScreen
-      name={host.name}
-      listLabel={tNav("l4ProxyHosts")}
       host={host}
       agents={agents}
       accessLists={accessLists}

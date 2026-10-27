@@ -7,16 +7,18 @@ import { VStack } from "@astryxdesign/core/Stack";
 import { useTranslations } from "next-intl";
 import type { AgentOption } from "@/components/agents/AgentAssignmentFields";
 import { DynamicDnsProvidersProvider } from "@/components/dns/DynamicDnsHostFields";
-import { HostPageHeader } from "@/components/host-history/HostPageHeader";
 import { HostPageTabs } from "@/components/host-history/HostPageTabs";
 import { useEditorRollback } from "@/components/host-history/useEditorRollback";
 import { EditL4HostDialog } from "@/components/l4-proxy-hosts/L4HostDialogs";
+import { ProxyHostHeader } from "@/components/proxy-hosts/detail/ProxyHostHeader";
 import type { DynamicDnsProviderOptions } from "@/lib/dns/dynamic-dns";
+import { l4HostHeader } from "@/lib/l4/detail-types";
 import {
   type L4EditorSection,
   l4EditorSectionFromLink,
   isL4EditorSection,
   l4EditorSectionHref,
+  l4ProxyHostDetailHref,
   l4ProxyHostHistoryHref,
 } from "@/lib/l4/editor-sections";
 import type { L4AccessListOption } from "@/lib/models/access-lists";
@@ -25,8 +27,6 @@ import { l4ProxyHostRollbackAction } from "../../actions";
 
 /** The edit route's whole page, held by the edit layout as the proxy host's is. */
 export function L4ProxyHostEditScreen({
-  name,
-  listLabel,
   host: stored,
   agents,
   accessLists,
@@ -34,8 +34,6 @@ export function L4ProxyHostEditScreen({
   assignedAgentIds,
   children,
 }: {
-  name: string;
-  listLabel: string;
   host: L4ProxyHost;
   agents: AgentOption[];
   accessLists: L4AccessListOption[];
@@ -66,14 +64,13 @@ export function L4ProxyHostEditScreen({
 
   return (
     <VStack gap={5}>
-      <HostPageHeader
-        title={name}
-        listHref="/l4-proxy-hosts"
-        listLabel={listLabel}
+      <ProxyHostHeader
+        layer4
+        header={l4HostHeader(stored)}
         tabs={
           <HostPageTabs
             active="edit"
-            overviewHref={null}
+            overviewHref={l4ProxyHostDetailHref(stored.uuid)}
             editHref={l4EditorSectionHref(stored.uuid)}
             historyHref={l4ProxyHostHistoryHref(stored.uuid)}
           />

@@ -30,6 +30,16 @@ export type HostAuditEntry = {
   createdAt: string;
 };
 
+/** An audit entry as a host's overview lists it. */
+export type HostAuditRow = {
+  id: number;
+  action: string;
+  /** Translated on the server, as the audit log page does. */
+  summary: string;
+  actor: string | null;
+  createdAt: string;
+};
+
 export type ProxyHostDetail = {
   host: ProxyHost;
   status: HostStatus;

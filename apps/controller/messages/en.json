@@ -2385,6 +2385,9 @@
     }
   },
   "l4ProxyHosts": {
+    "detail": {
+      "activeChecks": "{port, select, none {Active health checks every {interval}} other {Active health checks on port {port}, every {interval}}}"
+    },
     "acceptInboundProxyProtocol": "Accept inbound PROXY protocol",
     "accessListNone": "None",
     "accessListOption": "{name} ({count, plural, one {# rule} other {# rules}})",
@@ -3026,7 +3029,16 @@
         "compressionOn": "Compression on",
         "compressionOff": "Compression off",
         "maintenanceOn": "In maintenance",
-        "customConfig": "Custom configuration"
+        "customConfig": "Custom configuration",
+        "listen": "{protocol} on {address}",
+        "matcherSni": "Matches SNI {hostnames}",
+        "matcherHost": "Matches Host {hostnames}",
+        "matcherProxyProtocol": "Matches PROXY protocol",
+        "tlsTerminated": "TLS terminated here",
+        "proxyProtocolIn": "Accepts PROXY protocol",
+        "proxyProtocolOut": "Sends PROXY protocol {version}",
+        "samePortUpstreams": "Upstreams on the listen port",
+        "upstreamDnsPinned": "Upstream DNS pinned"
       }
     },
     "upstreamHealth": {

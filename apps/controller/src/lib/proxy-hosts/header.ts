@@ -19,7 +19,8 @@ export type ProxyHostHeaderInfo = {
   name: string;
   domains: string[];
   tags: string[];
-  status: HostStatus;
+  /** Null where nothing is known but that the host is on: an L4 host has no traffic signals. */
+  status: HostStatus | null;
   /** Administrators with analytics on. */
   analyticsHref: string | null;
   /** Administrators only: access logs carry every client's address. */

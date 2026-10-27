@@ -20,6 +20,7 @@ export function HostHistoryScreen({
   editHref,
   historyHref,
   hostHeader = null,
+  layer4 = false,
   view,
 }: {
   name: string;
@@ -30,6 +31,8 @@ export function HostHistoryScreen({
   historyHref: string;
   /** A live proxy host's, as its other tabs show it; others keep the history's own title. */
   hostHeader?: ProxyHostHeaderInfo | null;
+  /** The header's back link goes to the L4 list. */
+  layer4?: boolean;
   view: ComponentProps<typeof HostHistoryView>;
 }) {
   const t = useTranslations("hostHistory");
@@ -46,7 +49,7 @@ export function HostHistoryScreen({
   return (
     <VStack gap={5}>
       {hostHeader ? (
-        <ProxyHostHeader header={hostHeader} tabs={tabs} />
+        <ProxyHostHeader header={hostHeader} tabs={tabs} layer4={layer4} />
       ) : (
         <HostPageHeader
           title={t("pageTitle", { name })}
