@@ -33,7 +33,8 @@ import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
-import { NATIVE_REQUIRED, NO_SPELLCHECK } from "@/components/ui/native-input-attrs";
+import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
+import { UpstreamInput } from "@/components/proxy-hosts/upstreams/UpstreamInput";
 import { Clock, Earth, Globe, Layers, MapPin, Network, Pin, ShieldBan } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Switch } from "@/src/components/ui/FormBooleanControls";
@@ -161,7 +162,6 @@ type TextFields = {
   name: string;
   description: string;
   listenAddress: string;
-  upstreams: string;
   matcherValue: string;
   lbPolicyChoose: string;
   lbPolicyWeights: string;
@@ -194,7 +194,6 @@ function initialText(initialData?: L4ProxyHost | null): TextFields {
     name: initialData?.name ?? "",
     description: initialData?.description ?? "",
     listenAddress: initialData?.listenAddress ?? "",
-    upstreams: initialData?.upstreams.join("\n") ?? "",
     matcherValue: initialData?.matcherValue?.join(", ") ?? "",
     lbPolicyChoose: lb?.policyChoose != null ? String(lb.policyChoose) : "",
     lbPolicyWeights: lb?.policyWeights?.join(", ") ?? "",
@@ -428,16 +427,10 @@ function L4HostForm({
             onChange={setSamePort}
           />
 
-          <TextArea
-            {...NATIVE_REQUIRED}
-            {...NO_SPELLCHECK}
-            label={tProxyHosts("upstreams")}
-            htmlName="upstreams"
-            placeholder={samePort ? "10.0.0.1\n10.0.0.2" : "10.0.0.1:5432\n10.0.0.2:5432"}
-            value={text.upstreams}
-            onChange={set("upstreams")}
-            rows={2}
-            isRequired
+          <UpstreamInput
+            defaultUpstreams={initialData?.upstreams}
+            withProtocol={false}
+            placeholder={samePort ? "10.0.0.1" : "10.0.0.1:5432"}
             description={samePort ? t("upstreamsSamePortHelp") : t("upstreamsHelp")}
           />
 

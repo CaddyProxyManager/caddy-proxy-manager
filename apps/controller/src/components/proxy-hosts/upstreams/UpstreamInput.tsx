@@ -24,7 +24,10 @@ const PROTOCOL_OPTIONS = [
   { value: "https://", label: "https://" },
 ];
 
-function parseUpstream(upstream: string): UpstreamEntry {
+const NO_PROTOCOL = "";
+
+function parseUpstream(upstream: string, withProtocol: boolean): UpstreamEntry {
+  if (!withProtocol) return { protocol: NO_PROTOCOL, address: upstream };
   if (upstream.startsWith("https://")) {
     return { protocol: "https://", address: upstream.slice(8) };
   }
@@ -37,16 +40,25 @@ function parseUpstream(upstream: string): UpstreamEntry {
 export function UpstreamInput({
   defaultUpstreams = [],
   name = "upstreams",
+  withProtocol = true,
+  placeholder = "10.0.0.5:8080",
+  description,
 }: {
   defaultUpstreams?: string[];
   name?: string;
+  /** False for a layer 4 host, whose upstreams are bare addresses. */
+  withProtocol?: boolean;
+  placeholder?: string;
+  /** Under the card's own help, for what the address must look like. */
+  description?: string;
 }) {
   const t = useTranslations("proxyHosts");
+  const blank = withProtocol ? "http://" : NO_PROTOCOL;
   const [entries, setEntries] = useState<WithRowId<UpstreamEntry>[]>(() =>
     withRowIds(
       defaultUpstreams.length > 0
-        ? defaultUpstreams.map(parseUpstream)
-        : [{ protocol: "http://", address: "" }],
+        ? defaultUpstreams.map((upstream) => parseUpstream(upstream, withProtocol))
+        : [{ protocol: blank, address: "" }],
     ),
   );
 
@@ -62,6 +74,7 @@ export function UpstreamInput({
     setEntries((prev) =>
       prev.map((entry) => {
         if (entry.rowId !== rowId) return entry;
+        if (!withProtocol) return { ...entry, address: newAddress };
         if (newAddress.startsWith("https://")) {
           return { ...entry, protocol: "https://", address: newAddress.slice(8) };
         }
@@ -74,7 +87,7 @@ export function UpstreamInput({
   };
 
   const handleAdd = () =>
-    setEntries((prev) => [...prev, withRowId({ protocol: "http://", address: "" })]);
+    setEntries((prev) => [...prev, withRowId({ protocol: blank, address: "" })]);
 
   const handleRemove = (rowId: string) =>
     setEntries((prev) => (prev.length === 1 ? prev : prev.filter((e) => e.rowId !== rowId)));
@@ -122,6 +135,11 @@ export function UpstreamInput({
           <Text type="supporting" size="sm" color="secondary">
             {t("upstreamsOrderHelp")}
           </Text>
+          {description && (
+            <Text type="supporting" size="sm" color="secondary">
+              {description}
+            </Text>
+          )}
         </VStack>
         <Divider />
         {entries.map((entry, index) => (
@@ -157,14 +175,16 @@ export function UpstreamInput({
               onPointerUp={() => setArmed(null)}
               onKeyDown={(event) => handleKeys(event, entry.rowId, index)}
             />
-            <Selector
-              label={t("protocol")}
-              isLabelHidden
-              width={120}
-              options={PROTOCOL_OPTIONS}
-              value={entry.protocol}
-              onChange={(next) => handleProtocolChange(entry.rowId, next as string)}
-            />
+            {withProtocol && (
+              <Selector
+                label={t("protocol")}
+                isLabelHidden
+                width={120}
+                options={PROTOCOL_OPTIONS}
+                value={entry.protocol}
+                onChange={(next) => handleProtocolChange(entry.rowId, next as string)}
+              />
+            )}
             <TextInput
               startIcon={Network}
               {...NO_SPELLCHECK}
@@ -172,7 +192,7 @@ export function UpstreamInput({
               isLabelHidden
               value={entry.address}
               onChange={(next) => handleAddressChange(entry.rowId, next)}
-              placeholder="10.0.0.5:8080"
+              placeholder={placeholder}
               isRequired={index === 0}
             />
             <IconButton
