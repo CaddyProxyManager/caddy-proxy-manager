@@ -17,7 +17,12 @@ ctx.db = await createTestDb();
 
 vi.mock('@/src/lib/db', () => dbModuleMock(() => ctx.db));
 
-vi.mock('@/src/lib/clickhouse/client', () => ({ isAnalyticsEnabled: async () => true }));
+// Spread over the real module: the settings import chain reaches its query helpers too.
+const realClient = await import('@/src/lib/clickhouse/client');
+vi.mock('@/src/lib/clickhouse/client', () => ({
+  ...realClient,
+  isAnalyticsEnabled: async () => true,
+}));
 vi.mock('@/src/lib/agent/desired-state', () => ({ pushDesiredState: async () => {} }));
 
 const registry = await import('@/src/lib/settings/registry');

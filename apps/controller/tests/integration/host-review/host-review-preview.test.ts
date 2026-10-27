@@ -441,7 +441,7 @@ describe('previewL4ProxyHostAction', () => {
     expect(preview.changes).toEqual([
       expect.objectContaining({
         field: 'listenAddress',
-        section: 'listener',
+        section: 'general',
         before: ':15432',
         after: ':15433',
       }),
