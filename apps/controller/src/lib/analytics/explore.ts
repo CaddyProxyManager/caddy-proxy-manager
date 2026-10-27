@@ -28,6 +28,7 @@ import {
   TOP_LIMIT,
   TOP_VIEW_ALL_LIMIT,
   previousWindow,
+  queryFilters,
   resolveWindow,
   serializeExploreState,
 } from "./explore-state";
@@ -119,7 +120,7 @@ async function buildAnalyticsReport(state: ExploreState, now: number): Promise<A
     };
   }
 
-  const { filters } = state;
+  const filters = queryFilters(state);
   const trafficLimits = Object.fromEntries(
     TOP_DIMENSIONS.filter((dimension) => dimension !== "rule").map((dimension) => [
       dimension,
@@ -171,7 +172,7 @@ export async function getAnalyticsTopList(
   if (!(await isAnalyticsEnabled())) return [];
   return queryExploreTop(
     resolveWindow(state, now),
-    state.filters,
+    queryFilters(state),
     dimension,
     Math.min(Math.max(1, limit), TOP_VIEW_ALL_LIMIT),
   );

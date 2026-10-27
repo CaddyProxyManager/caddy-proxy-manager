@@ -10,6 +10,7 @@ import {
   normalizeFilterValue,
   parseExploreState,
   previousWindow,
+  queryFilters,
   resolveWindow,
   serializeExploreState,
   withFilter,
@@ -38,7 +39,14 @@ describe('parseExploreState', () => {
         { field: 'status', op: 'not', value: '5xx' },
       ],
       mitigatedOnly: true,
+      scope: [],
     });
+  });
+
+  it('reads a host scope, normalised and without repeats', () => {
+    expect(
+      parse('scope=App.Example.com&scope=app.example.com&scope=b.example&scope=').scope,
+    ).toEqual(['app.example.com', 'b.example']);
   });
 
   it('falls back on a range, group or filter it does not know', () => {
@@ -87,6 +95,25 @@ describe('serializeExploreState', () => {
     const query =
       'range=custom&from=100&to=200&compare=0&group=host&f=outcome%3Ais%3Awaf&log=mitigated';
     expect(serializeExploreState(parse(query)).toString()).toBe(query);
+  });
+});
+
+describe('queryFilters', () => {
+  it('puts the scope ahead of the filters as one condition', () => {
+    const state = {
+      ...DEFAULT_EXPLORE_STATE,
+      scope: ['a.example', 'b.example'],
+      filters: [{ field: 'path' as const, op: 'is' as const, value: '/x' }],
+    };
+    expect(queryFilters(state)).toEqual([
+      { field: 'host', op: 'any', values: ['a.example', 'b.example'] },
+      { field: 'path', op: 'is', value: '/x' },
+    ]);
+    expect(serializeExploreState(state).getAll('scope')).toEqual(['a.example', 'b.example']);
+  });
+
+  it('adds nothing without a scope', () => {
+    expect(queryFilters(DEFAULT_EXPLORE_STATE)).toEqual([]);
   });
 });
 

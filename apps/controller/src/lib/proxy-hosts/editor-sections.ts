@@ -45,6 +45,15 @@ export function proxyHostDetailHref(hostRef: string | number): string {
   return `/proxy-hosts/${hostRef}`;
 }
 
+/** Its traffic and its log lines, each the full page locked to the host's names. */
+export function proxyHostAnalyticsHref(hostRef: string | number): string {
+  return `/proxy-hosts/${hostRef}/analytics`;
+}
+
+export function proxyHostLogsHref(hostRef: string | number): string {
+  return `/proxy-hosts/${hostRef}/logs`;
+}
+
 /** Optionally opened on one revision, compared with the one before it. */
 export function proxyHostHistoryHref(hostRef: string | number, revisionId?: number): string {
   return `/proxy-hosts/${hostRef}/history${revisionId ? `?to=${revisionId}` : ""}`;

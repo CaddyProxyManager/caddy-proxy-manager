@@ -13,13 +13,21 @@ import { Selector } from "@astryxdesign/core/Selector";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { SearchField } from "@/components/ui/SearchField";
-import { type LogSource, type LogView, accessLine, isAcmeLine } from "@/src/lib/analytics/log-view";
+import {
+  HOST_LOG_VIEWS,
+  type LogSource,
+  type LogView,
+  accessLine,
+  isAcmeLine,
+  isLineForHosts,
+} from "@/src/lib/analytics/log-view";
 
 type Agent = { agentId: string; name: string; canReadLogs: boolean };
 
 /** Enough to scroll back through without the page growing without bound. */
 const KEPT_LINES = 2000;
-const SOURCES: LogView[] = ["access", "waf", "caddy", "acme"];
+const SOURCES: readonly LogView[] = ["access", "waf", "caddy", "acme"];
+const NO_HOSTS: readonly string[] = [];
 
 /** The source the agent reads; ACME is Caddy's own output, filtered here. */
 const agentSource = (view: LogView): LogSource => (view === "acme" ? "caddy" : view);
@@ -30,6 +38,8 @@ export default function LogsClient({
   initialView,
   initialHost,
   accessLogEnabled,
+  lockedHosts = NO_HOSTS,
+  title,
 }: {
   agents: Agent[];
   initialAgent: string | null;
@@ -37,14 +47,21 @@ export default function LogsClient({
   /** Set when opened from a host's Logs action: its access log, narrowed to its domains. */
   initialHost: string | null;
   accessLogEnabled: boolean;
+  /** A host's tab: only lines for these names, from the sources that name one. */
+  lockedHosts?: readonly string[];
+  /** Under the host's own heading, in place of the page's. */
+  title?: string;
 }) {
   const t = useTranslations("logs");
   const tOverview = useTranslations("overview");
   const tCommon = useTranslations("common");
   const tNav = useTranslations("nav");
   const readable = agents.filter((agent) => agent.canReadLogs);
+  const locked = lockedHosts.length > 0;
+  const sources = locked ? HOST_LOG_VIEWS : SOURCES;
+  const lockedSet = useMemo(() => new Set(lockedHosts), [lockedHosts]);
   const [agentId, setAgentId] = useState(initialAgent ?? readable[0]?.agentId ?? null);
-  const [view, setView] = useState<LogView>(initialView);
+  const [view, setView] = useState<LogView>(sources.includes(initialView) ? initialView : "access");
   const [filter, setFilter] = useState(initialHost ?? "");
   const [following, setFollowing] = useState(true);
   const [lines, setLines] = useState<string[]>([]);
@@ -107,9 +124,11 @@ export default function LogsClient({
     const needle = filter.trim().toLowerCase();
     return lines.filter(
       (line) =>
-        (view !== "acme" || isAcmeLine(line)) && (!needle || line.toLowerCase().includes(needle)),
+        (view !== "acme" || isAcmeLine(line)) &&
+        (!locked || isLineForHosts(view, line, lockedSet)) &&
+        (!needle || line.toLowerCase().includes(needle)),
     );
-  }, [lines, filter, view]);
+  }, [lines, filter, view, locked, lockedSet]);
 
   const text = useMemo(
     () =>
@@ -119,10 +138,18 @@ export default function LogsClient({
     [shown, view],
   );
 
+  // A tab sits under the host's heading, inside the page's own padding.
+  const heading = title ? (
+    <Heading level={2}>{title}</Heading>
+  ) : (
+    <Heading level={1}>{tNav("logs")}</Heading>
+  );
+  const padding = title ? undefined : 6;
+
   if (readable.length === 0) {
     return (
-      <VStack gap={4} padding={6}>
-        <Heading level={1}>{tNav("logs")}</Heading>
+      <VStack gap={4} padding={padding}>
+        {heading}
         <EmptyState
           headingLevel={2}
           title={t("noAgentTitle")}
@@ -133,15 +160,15 @@ export default function LogsClient({
   }
 
   return (
-    <VStack gap={4} padding={6}>
-      <Heading level={1}>{tNav("logs")}</Heading>
+    <VStack gap={4} padding={padding}>
+      {heading}
       <HStack gap={3} vAlign="end" wrap="wrap">
         <SegmentedControl
           label={t("source")}
           value={view}
           onChange={(next) => setView(next as LogView)}
         >
-          {SOURCES.map((source) => (
+          {sources.map((source) => (
             <SegmentedControlItem key={source} value={source} label={t(`sources.${source}`)} />
           ))}
         </SegmentedControl>

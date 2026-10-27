@@ -328,7 +328,17 @@ type DisplayRange = AnalyticsRange | "custom";
 
 type CountryRow = TopRow & { [k: string]: unknown };
 
-export default function AnalyticsClient() {
+const NO_HOSTS: readonly string[] = [];
+
+export default function AnalyticsClient({
+  lockedHosts = NO_HOSTS,
+  title,
+}: {
+  /** A host's tab: every query is scoped to its names, and its saved views are left out. */
+  lockedHosts?: readonly string[];
+  /** Under the host's own heading, in place of the page's. */
+  title?: string;
+} = {}) {
   const t = useTranslations("analytics");
   const tNav = useTranslations("nav");
   const tCommon = useTranslations("common");
@@ -340,17 +350,24 @@ export default function AnalyticsClient() {
   const searchParams = useSearchParams();
   const isNarrow = useMediaQuery("(max-width: 767px)");
 
-  // The URL is the state: parsed, then re-serialised, so an odd link settles to one spelling.
+  // The URL is the state: parsed, then re-serialised, so an odd link settles to one spelling. The
+  // scope never comes from it, so a hand-edited link can neither set one nor lift a tab's.
+  const locked = lockedHosts.length > 0;
   const urlQuery = searchParams.toString();
-  const state = useMemo(() => parseExploreState(new URLSearchParams(urlQuery)), [urlQuery]);
+  const state = useMemo(
+    () => ({
+      ...parseExploreState(new URLSearchParams(urlQuery)),
+      scope: [...lockedHosts],
+    }),
+    [urlQuery, lockedHosts],
+  );
+  /** What the API is asked, scope included. */
   const query = useMemo(() => serializeExploreState(state).toString(), [state]);
 
   const navigate = useCallback(
     (next: ExploreState | string) => {
-      const nextQuery =
-        typeof next === "string"
-          ? serializeExploreState(parseExploreState(new URLSearchParams(next))).toString()
-          : serializeExploreState(next).toString();
+      const parsed = typeof next === "string" ? parseExploreState(new URLSearchParams(next)) : next;
+      const nextQuery = serializeExploreState({ ...parsed, scope: [] }).toString();
       // A filter or grouping changes the page in place; jumping to the top would lose the reader.
       router.push(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
     },
@@ -370,6 +387,10 @@ export default function AnalyticsClient() {
   const shownQuery = useRef<string | null>(null);
 
   useEffect(() => {
+    if (locked) {
+      setHosts([...lockedHosts]);
+      return;
+    }
     fetchJson("/api/analytics/hosts")
       .then((body) =>
         setHosts(
@@ -381,7 +402,7 @@ export default function AnalyticsClient() {
         ),
       )
       .catch(() => setHosts([]));
-  }, []);
+  }, [locked, lockedHosts]);
 
   const load = useCallback(
     (signal: AbortSignal) => {
@@ -499,11 +520,16 @@ export default function AnalyticsClient() {
   const rangeLabel = (range: DisplayRange) => (range === "custom" ? t("intervalCustom") : range);
   const rangeSeconds = report ? report.window.to - report.window.from : 86400;
 
-  const hostFilters = state.filters.filter((f) => f.field === "host" && f.op === "is");
+  const hostFilters = state.filters
+    .filter((f) => f.field === "host" && f.op === "is")
+    .map((f) => f.value)
+    .filter((host) => !locked || lockedHosts.includes(host));
+  // Under a scope, never an empty list: the breakdown would read it as every host.
+  const breakdownHosts = hostFilters.length > 0 ? hostFilters : lockedHosts;
   const breakdownQuery = report
     ? `?from=${report.window.from}&to=${report.window.to}${
-        hostFilters.length > 0
-          ? `&hosts=${hostFilters.map((f) => encodeURIComponent(f.value)).join(",")}`
+        breakdownHosts.length > 0
+          ? `&hosts=${breakdownHosts.map((host) => encodeURIComponent(host)).join(",")}`
           : ""
       }`
     : "?interval=24h";
@@ -617,12 +643,16 @@ export default function AnalyticsClient() {
   return (
     <VStack gap={6}>
       <HStack justify="between" vAlign="center" gap={4} wrap="wrap">
-        <VStack gap={0}>
-          <Text type="label" size="sm" color="secondary" className="cpm-desktop-only">
-            {t("trafficIntelligence")}
-          </Text>
-          <Heading level={1}>{tNav("analytics")}</Heading>
-        </VStack>
+        {title ? (
+          <Heading level={2}>{title}</Heading>
+        ) : (
+          <VStack gap={0}>
+            <Text type="label" size="sm" color="secondary" className="cpm-desktop-only">
+              {t("trafficIntelligence")}
+            </Text>
+            <Heading level={1}>{tNav("analytics")}</Heading>
+          </VStack>
+        )}
         <HStack gap={3} vAlign="center" wrap="wrap">
           <div className="cpm-desktop-only">
             <SegmentedControl
@@ -669,7 +699,8 @@ export default function AnalyticsClient() {
             value={state.compare}
             onChange={(compare) => navigate({ ...state, compare })}
           />
-          <SavedViews query={query} onOpen={(next) => navigate(next)} />
+          {/* A view is the whole page's; saved from a host's tab it would lose the host. */}
+          {!locked && <SavedViews query={query} onOpen={(next) => navigate(next)} />}
         </HStack>
       </HStack>
 

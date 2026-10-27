@@ -1,5 +1,7 @@
 /** Caddy's JSON log lines, made readable for the log viewer. */
 
+import { trafficHostName } from "../proxy-hosts/traffic-status";
+
 export type LogSource = "access" | "waf" | "caddy";
 /** What the viewer offers: the agent's sources, plus ACME, which is Caddy's output filtered. */
 export type LogView = LogSource | "acme";
@@ -52,4 +54,36 @@ export function isAcmeLine(line: string): boolean {
   const entry = parse(line);
   const logger = typeof entry?.logger === "string" ? entry.logger : "";
   return logger.startsWith("tls") || logger.includes("acme");
+}
+
+/** What a host's own Logs tab offers: Caddy's other output names no site. */
+export const HOST_LOG_VIEWS: readonly LogView[] = ["access", "waf", "acme"];
+
+function strings(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
+}
+
+/** The sites a line was for, ports dropped; none for a line that names no site. */
+export function lineHosts(view: LogView, line: string): string[] {
+  const entry = parse(line);
+  if (!entry) return [];
+  let found: string[] = [];
+  if (view === "access") {
+    found = strings((entry.request as Record<string, unknown> | undefined)?.host);
+  } else if (view === "waf") {
+    const request = (entry.transaction as Record<string, unknown> | undefined)?.request as
+      | Record<string, unknown>
+      | undefined;
+    const headers = request?.headers as Record<string, unknown> | undefined;
+    found = strings(headers?.host ?? headers?.Host);
+  } else if (view === "acme") {
+    found = [...strings(entry.identifier), ...strings(entry.identifiers)];
+  }
+  return found.map(trafficHostName).filter((host) => host.length > 0);
+}
+
+/** A line nothing ties to a site is left out, so the lock never lets another site's through. */
+export function isLineForHosts(view: LogView, line: string, hosts: ReadonlySet<string>): boolean {
+  return lineHosts(view, line).some((host) => hosts.has(host));
 }

@@ -47,6 +47,8 @@ export type FilterOp = "is" | "not";
 export type AnalyticsFilter = { field: FilterField; op: FilterOp; value: string };
 
 export const MAX_FILTERS = 20;
+/** A host's domains, which its own analytics tab locks the page to. */
+export const MAX_SCOPE_HOSTS = 100;
 const MAX_FILTER_VALUE = 512;
 
 export const GROUP_BYS = ["none", "outcome", "status", "host"] as const;
@@ -99,6 +101,11 @@ export type ExploreState = {
   filters: AnalyticsFilter[];
   /** The latest-requests log: everything, or only what a gate stopped. */
   mitigatedOnly: boolean;
+  /**
+   * Set by a host's analytics tab rather than the filter bar: a request to any of these hosts.
+   * Every filter narrows it, none can widen it. Empty is everything.
+   */
+  scope: string[];
 };
 
 export const DEFAULT_EXPLORE_STATE: ExploreState = {
@@ -109,6 +116,7 @@ export const DEFAULT_EXPLORE_STATE: ExploreState = {
   group: "none",
   filters: [],
   mitigatedOnly: false,
+  scope: [],
 };
 
 function isOneOf<T extends string>(list: readonly T[], value: unknown): value is T {
@@ -207,6 +215,14 @@ export function parseExploreState(params: URLSearchParams): ExploreState {
         .filter((filter) => filter !== null),
     ),
     mitigatedOnly: params.get("log") === "mitigated",
+    scope: [
+      ...new Set(
+        params
+          .getAll("scope")
+          .map((raw) => normalizeFilterValue("host", raw))
+          .filter((host) => host !== null),
+      ),
+    ].slice(0, MAX_SCOPE_HOSTS),
   };
 }
 
@@ -224,6 +240,7 @@ export function serializeExploreState(state: ExploreState): URLSearchParams {
   if (state.group !== "none") params.set("group", state.group);
   for (const filter of state.filters) params.append("f", encodeFilter(filter));
   if (state.mitigatedOnly) params.set("log", "mitigated");
+  for (const host of state.scope) params.append("scope", host);
   return params;
 }
 
@@ -248,6 +265,16 @@ export function previousWindow(window: TimeWindow): TimeWindow {
 
 export function autoRefreshes(state: ExploreState): boolean {
   return state.range !== "custom" && RANGE_SECONDS[state.range] <= AUTO_REFRESH_MAX_SECONDS;
+}
+
+/** The scope as one condition, ahead of the filters: several "host is" filters would AND. */
+export type ScopeFilter = { field: "host"; op: "any"; values: readonly string[] };
+export type QueryFilter = AnalyticsFilter | ScopeFilter;
+
+export function queryFilters(state: ExploreState): QueryFilter[] {
+  return state.scope.length > 0
+    ? [{ field: "host", op: "any", values: state.scope }, ...state.filters]
+    : state.filters;
 }
 
 /** Same field and value replace each other: "is" and "is not" the same thing cannot both hold. */

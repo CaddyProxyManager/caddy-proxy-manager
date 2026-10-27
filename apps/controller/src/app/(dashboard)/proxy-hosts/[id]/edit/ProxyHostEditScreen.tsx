@@ -75,6 +75,8 @@ export function ProxyHostEditScreen({
           <HostPageTabs
             active="edit"
             overviewHref={proxyHostDetailHref(stored.uuid)}
+            analyticsHref={header.analyticsHref}
+            logsHref={header.logsHref}
             editHref={editorSectionHref(stored.uuid)}
             historyHref={proxyHostHistoryHref(stored.uuid)}
           />

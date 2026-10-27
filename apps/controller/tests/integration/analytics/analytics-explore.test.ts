@@ -174,6 +174,27 @@ describe('analytics report', () => {
     expect((await report('range=1h&f=ip:is:203.0.113.9')).totals.requests).toBe(2);
   });
 
+  it("keeps a host tab's scope to any of its names, which every filter only narrows", async () => {
+    const both = await report('range=1h&scope=app.example.com&scope=api.example.com');
+    expect(both.totals.requests).toBe(7);
+    expect((await report('range=1h&scope=api.example.com')).totals.requests).toBe(2);
+
+    const narrowed = await report('range=1h&scope=api.example.com&f=status:is:5xx');
+    expect(narrowed.totals.requests).toBe(1);
+    // Another host's filter cannot reach past the scope.
+    const elsewhere = await report('range=1h&scope=api.example.com&f=host:is:app.example.com');
+    expect(elsewhere.totals.requests).toBe(0);
+    expect((await report('range=1h&scope=other.example.com')).top.rule).toEqual([]);
+
+    const rows = await getAnalyticsTopList(
+      parseExploreState(new URLSearchParams('range=1h&scope=api.example.com')),
+      'ip',
+      100,
+      NOW,
+    );
+    expect(rows.reduce((sum, r) => sum + r.requests, 0)).toBe(2);
+  });
+
   it('narrows to the requests a WAF rule matched', async () => {
     const result = await report('range=1h&f=rule:is:930130');
     expect(result.totals.requests).toBe(1);

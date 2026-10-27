@@ -37,6 +37,8 @@ export function HostHistoryScreen({
     <HostPageTabs
       active="history"
       overviewHref={overviewHref}
+      analyticsHref={hostHeader?.analyticsHref}
+      logsHref={hostHeader?.logsHref}
       editHref={editHref}
       historyHref={historyHref}
     />

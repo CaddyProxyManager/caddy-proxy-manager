@@ -1,13 +1,13 @@
 /**
- * What heads each of a proxy host's pages: its name, status, domains and tags, and the links out to
- * its analytics and logs. The overview reads the status off attention it gathers anyway; the other
+ * What heads each of a proxy host's pages: its name, status, domains and tags, and whether it has
+ * Analytics and Logs tabs. The overview reads the status off attention it gathers anyway; the other
  * tabs gather only what this needs.
  */
 
 import { collectAttention } from "../attention";
-import { DEFAULT_EXPLORE_STATE, serializeExploreState } from "../analytics/explore-state";
 import type { ProxyHost } from "../models/proxy-hosts";
 import { type Access, can } from "../users/permissions";
+import { proxyHostAnalyticsHref, proxyHostLogsHref } from "./editor-sections";
 import {
   type HostStatus,
   hostStatus,
@@ -28,22 +28,17 @@ export type ProxyHostHeaderInfo = {
 
 export function proxyHostHeaderLinks(
   access: Access,
-  host: Pick<ProxyHost, "domains">,
+  host: Pick<ProxyHost, "domains" | "uuid">,
   analyticsOn: boolean,
 ): Pick<ProxyHostHeaderInfo, "analyticsHref" | "logsHref"> {
-  const primaryName = hostTrafficNames(host.domains)[0];
+  // Only wildcards leaves nothing to lock the tabs to, and an empty lock would be every host.
+  const named = hostTrafficNames(host.domains).length > 0;
   return {
     analyticsHref:
-      analyticsOn && can(access, "analytics:read") && primaryName
-        ? `/analytics?${serializeExploreState({
-            ...DEFAULT_EXPLORE_STATE,
-            filters: [{ field: "host", op: "is", value: primaryName }],
-          }).toString()}`
+      analyticsOn && can(access, "analytics:read") && named
+        ? proxyHostAnalyticsHref(host.uuid)
         : null,
-    logsHref:
-      can(access, "logs:read") && primaryName
-        ? `/logs?source=access&host=${encodeURIComponent(primaryName)}`
-        : null,
+    logsHref: can(access, "logs:read") && named ? proxyHostLogsHref(host.uuid) : null,
   };
 }
 

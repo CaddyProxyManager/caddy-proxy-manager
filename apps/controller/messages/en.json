@@ -2951,6 +2951,8 @@
     },
     "detail": {
       "attentionEmpty": "Nothing needs attention on this host",
+      "analyticsTitle": "Analytics: {name}",
+      "logsTitle": "Logs: {name}",
       "tileRequests": "Requests, last 24 hours",
       "tileMitigated": "{count} stopped by a gate",
       "tileClients": "Distinct clients",

@@ -215,11 +215,13 @@ export function ProxyHostDetailView({
           logsHref,
         }}
         tabs={
-          historyHref && (
+          (historyHref || analyticsHref || logsHref) && (
             <HostPageTabs
               active="overview"
               overviewHref={proxyHostDetailHref(host.uuid)}
-              editHref={editorSectionHref(host.uuid)}
+              analyticsHref={analyticsHref}
+              logsHref={logsHref}
+              editHref={canManage ? editorSectionHref(host.uuid) : null}
               historyHref={historyHref}
             />
           )

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test';
-import { accessLine, isAcmeLine, isLogView } from '../../../src/lib/analytics/log-view';
+import {
+  accessLine,
+  isAcmeLine,
+  isLineForHosts,
+  isLogView,
+  lineHosts,
+} from '../../../src/lib/analytics/log-view';
 
 describe('accessLine', () => {
   it('puts a JSON access entry on one readable line', () => {
@@ -35,5 +41,35 @@ describe('isLogView', () => {
   it('accepts the four views and nothing else', () => {
     for (const view of ['access', 'waf', 'caddy', 'acme']) expect(isLogView(view)).toBe(true);
     expect(isLogView('../etc/passwd')).toBe(false);
+  });
+});
+
+describe('lineHosts', () => {
+  it('reads the site off an access, WAF or ACME line, without its port', () => {
+    expect(
+      lineHosts('access', JSON.stringify({ request: { host: 'App.Example.com:8443' } })),
+    ).toEqual(['app.example.com']);
+    const waf = { transaction: { request: { headers: { host: ['api.example.com'] } } } };
+    expect(lineHosts('waf', JSON.stringify(waf))).toEqual(['api.example.com']);
+    expect(lineHosts('acme', '{"logger":"tls.obtain","identifier":"app.example.com"}')).toEqual([
+      'app.example.com',
+    ]);
+    expect(
+      lineHosts('acme', '{"logger":"tls.issuance.acme","identifiers":["a.example","b.example"]}'),
+    ).toEqual(['a.example', 'b.example']);
+  });
+
+  it('finds none in a line that names no site', () => {
+    expect(lineHosts('caddy', '{"logger":"admin","host":"app.example.com"}')).toEqual([]);
+    expect(lineHosts('access', 'GET / 200')).toEqual([]);
+  });
+});
+
+describe('isLineForHosts', () => {
+  const hosts = new Set(['app.example.com', 'www.example.com']);
+  it("keeps only a line for one of the host's names", () => {
+    expect(isLineForHosts('access', '{"request":{"host":"www.example.com"}}', hosts)).toBe(true);
+    expect(isLineForHosts('access', '{"request":{"host":"other.example.com"}}', hosts)).toBe(false);
+    expect(isLineForHosts('access', 'app.example.com in plain text', hosts)).toBe(false);
   });
 });

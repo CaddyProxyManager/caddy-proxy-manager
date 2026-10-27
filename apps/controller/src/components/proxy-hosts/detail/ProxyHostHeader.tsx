@@ -31,26 +31,16 @@ export function ProxyHostHeader({
           href="/proxy-hosts"
         />
       </HStack>
-      <HStack justify="between" vAlign="center" gap={4} wrap="wrap">
-        <VStack gap={1}>
-          <HStack gap={3} vAlign="center" wrap="wrap">
-            <Heading level={1}>{header.name}</Heading>
-            <HostStatusCell status={header.status} />
-          </HStack>
-          <Text type="code" size="sm" color="secondary">
-            {header.domains.join(", ")}
-          </Text>
-          <HostTagList tags={header.tags} />
-        </VStack>
-        <HStack gap={2} wrap="wrap">
-          {header.analyticsHref && (
-            <Button variant="secondary" label={tNav("analytics")} href={header.analyticsHref} />
-          )}
-          {header.logsHref && (
-            <Button variant="secondary" label={tNav("logs")} href={header.logsHref} />
-          )}
+      <VStack gap={1}>
+        <HStack gap={3} vAlign="center" wrap="wrap">
+          <Heading level={1}>{header.name}</Heading>
+          <HostStatusCell status={header.status} />
         </HStack>
-      </HStack>
+        <Text type="code" size="sm" color="secondary">
+          {header.domains.join(", ")}
+        </Text>
+        <HostTagList tags={header.tags} />
+      </VStack>
       {tabs}
     </VStack>
   );

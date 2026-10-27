@@ -5,11 +5,11 @@
 
 import type { TrafficOutcome } from "@cpm/shared";
 import {
-  type AnalyticsFilter,
   type FilterField,
   type GroupBy,
   MAX_HOST_SERIES,
   OTHER_SERIES_KEY,
+  type QueryFilter,
   type TimeWindow,
   type TopDimension,
 } from "../analytics/explore-state";
@@ -91,13 +91,22 @@ export function wafCondition(field: FilterField, value: string, key: string): Cl
 
 export function buildWhere(
   window: TimeWindow,
-  filters: readonly AnalyticsFilter[],
+  filters: readonly QueryFilter[],
   condition: typeof trafficCondition,
   extra: string[] = [],
 ): Clause {
   const clauses = [timeFilter(), ...extra];
   let params: QueryParams = timeParams(window.from, window.to);
   filters.forEach((filter, index) => {
+    if (filter.op === "any") {
+      const parts = filter.values.flatMap(
+        (value, i) => condition(filter.field, value, `f_${index}_${i}`) ?? [],
+      );
+      // No values would read as no condition, and a scope must never widen to everything.
+      clauses.push(parts.length > 0 ? `(${parts.map((part) => part.sql).join(" OR ")})` : "1 = 0");
+      for (const part of parts) params = { ...params, ...part.params };
+      return;
+    }
     const built = condition(filter.field, filter.value, `f_${index}`);
     if (!built) return;
     clauses.push(filter.op === "not" ? `NOT (${built.sql})` : built.sql);
@@ -148,7 +157,7 @@ const TOTALS_COLUMNS = `
 
 export async function queryExploreTotals(
   window: TimeWindow,
-  filters: readonly AnalyticsFilter[],
+  filters: readonly QueryFilter[],
 ): Promise<ExploreTotals> {
   const where = buildWhere(window, filters, trafficCondition);
   const row = await queryRow<Record<string, unknown>>(
@@ -164,7 +173,7 @@ export async function queryExploreTotals(
  */
 export async function queryExploreTotalsWithMitigatedIps(
   window: TimeWindow,
-  filters: readonly AnalyticsFilter[],
+  filters: readonly QueryFilter[],
 ): Promise<ExploreTotals & { mitigatedIps: number }> {
   const where = buildWhere(window, filters, trafficCondition);
   const row = await queryRow<Record<string, unknown>>(
@@ -229,7 +238,7 @@ function toTimeline(
 
 export async function queryExploreTimeline(
   window: TimeWindow,
-  filters: readonly AnalyticsFilter[],
+  filters: readonly QueryFilter[],
   bucketSeconds: number,
 ): Promise<ExploreBucket[]> {
   const where = buildWhere(window, filters, trafficCondition);
@@ -247,7 +256,7 @@ export async function queryExploreTimeline(
  */
 export async function queryExploreTimelineWithTotals(
   window: TimeWindow,
-  filters: readonly AnalyticsFilter[],
+  filters: readonly QueryFilter[],
   bucketSeconds: number,
 ): Promise<{ timeline: ExploreBucket[]; totals: ExploreTotals }> {
   if (await usesSqliteAnalytics()) {
@@ -276,7 +285,7 @@ const GROUP_SQL: Record<Exclude<GroupBy, "none">, string> = {
 /** Requests per bucket and group, aligned with `bucketStarts`. Status groups are `2xx` and so on. */
 export async function queryExploreGroups(
   window: TimeWindow,
-  filters: readonly AnalyticsFilter[],
+  filters: readonly QueryFilter[],
   bucketSeconds: number,
   group: Exclude<GroupBy, "none">,
 ): Promise<ExploreSeries[]> {
@@ -354,7 +363,7 @@ const TOP_SQL: Record<Exclude<TopDimension, "rule">, string> = {
 
 export async function queryExploreTop(
   window: TimeWindow,
-  filters: readonly AnalyticsFilter[],
+  filters: readonly QueryFilter[],
   dimension: TopDimension,
   limit: number,
 ): Promise<TopRow[]> {
@@ -443,7 +452,7 @@ const NUMERIC_DIMENSIONS = new Set<TrafficDimension>(["asn", "status"]);
  */
 export async function queryExploreTopLists(
   window: TimeWindow,
-  filters: readonly AnalyticsFilter[],
+  filters: readonly QueryFilter[],
   limits: Partial<Record<TrafficDimension, number>>,
 ): Promise<Partial<Record<TrafficDimension, TopRow[]>>> {
   const dimensions = Object.keys(limits) as TrafficDimension[];
@@ -549,7 +558,7 @@ export const REQUEST_LOG_LIMIT = 50;
 
 export async function queryExploreRequests(
   window: TimeWindow,
-  filters: readonly AnalyticsFilter[],
+  filters: readonly QueryFilter[],
   mitigatedOnly: boolean,
   limit = REQUEST_LOG_LIMIT,
 ): Promise<ExploreRequest[]> {
