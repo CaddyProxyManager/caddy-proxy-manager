@@ -448,7 +448,7 @@ services:
   # COMPOSE_PROFILES is needed only with no agent.
   clickhouse:
     container_name: caddy-proxy-manager-clickhouse
-    image: clickhouse/clickhouse-server:26.9.24.8-alpine@sha256:a5a7ba1d334ba323b3353ec002f00c337f140e4dacd4ba1f248822048bb7830a
+    image: clickhouse/clickhouse-server:26.10.3.7-alpine@sha256:1b09f476eb1109522cfc0e8e4ddf6a4305263e7cdd310f7bd1d3fd29dfcb8b33
     profiles: [clickhouse]
     restart: unless-stopped
     environment:
