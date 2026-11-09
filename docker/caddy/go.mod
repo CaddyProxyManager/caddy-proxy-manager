@@ -41,7 +41,7 @@ require (
 	github.com/caddy-dns/spaceship v1.0.0
 	github.com/caddy-dns/vultr v0.0.0-20250723121531-55bf3e9768be
 	github.com/caddyserver/cache-handler v0.17.0
-	github.com/caddyserver/caddy/v2 v2.11.7
+	github.com/caddyserver/caddy/v2 v2.11.9
 	github.com/corazawaf/coraza-caddy/v2 v2.6.2
 	github.com/darkweak/storages/badger/caddy v0.0.22
 	github.com/darkweak/storages/etcd/caddy v0.0.22
@@ -140,7 +140,7 @@ require (
 	github.com/gaissmai/bart v0.28.0 // indirect
 	github.com/gammazero/deque v0.2.1 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.5 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.5 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
 	github.com/go-json-experiment/json v0.0.0-20260820222146-c27c302e5fc3 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -340,9 +340,9 @@ require (
 	go4.org/mem v0.0.0-20240501181205-ae6ca9944745 // indirect
 	go4.org/netipx v0.0.0-20260823151212-3075585bcbeb // indirect
 	golang.org/x/crypto v0.57.0 // indirect
-	golang.org/x/crypto/x509roots/fallback v0.0.0-20260929172509-b39ff6d641ec // indirect
+	golang.org/x/crypto/x509roots/fallback v0.0.0-20261030153154-30a33513ff6d // indirect
 	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
-	golang.org/x/net v0.59.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
