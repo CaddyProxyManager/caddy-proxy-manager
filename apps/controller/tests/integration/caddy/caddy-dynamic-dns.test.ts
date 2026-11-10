@@ -60,6 +60,9 @@ async function dynamicDnsApp(): Promise<unknown> {
 
 beforeEach(async () => {
   agent = await startFakeAgent();
+  // Every block, not just the host one: a host left with dynamic DNS on joins the next document.
+  await ctx.db.delete(schema.proxyHosts);
+  await ctx.db.delete(schema.l4ProxyHosts);
   await ctx.db.delete(schema.settings);
   await saveDnsProviderSettings({
     providers: { cloudflare: { api_token: 'cf-token' } },
@@ -147,8 +150,6 @@ describe('dynamic DNS on a host', () => {
   const NOW = new Date().toISOString();
 
   beforeEach(async () => {
-    await ctx.db.delete(schema.proxyHosts);
-    await ctx.db.delete(schema.l4ProxyHosts);
     await ctx.db.delete(schema.agents);
     await ctx.db.delete(schema.users).catch(() => {});
     await ctx.db.insert(schema.users).values({
