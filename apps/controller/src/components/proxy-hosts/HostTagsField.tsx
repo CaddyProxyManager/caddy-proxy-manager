@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, type ReactNode, useContext, useMemo, useState } from "react";
+import { createContext, type ReactNode, useContext, useMemo, useRef, useState } from "react";
 import { Selector } from "@astryxdesign/core/Selector";
 import { HStack } from "@astryxdesign/core/Stack";
 import { Token } from "@astryxdesign/core/Token";
@@ -46,6 +46,24 @@ function typedTags(text: string): string[] {
 }
 
 const asItem = (tag: string): TagItem => ({ id: tag, label: tag });
+
+/**
+ * Wraps onChangeQuery to skip the empty query Astryx reports right after a pick (since 0.7.12),
+ * which would otherwise undo what the pick just set. Any other query clears the mark.
+ */
+function usePickGuard() {
+  const picked = useRef(false);
+  return {
+    markPick: () => {
+      picked.current = true;
+    },
+    followsPick: (query: string) => {
+      const after = picked.current;
+      picked.current = false;
+      return after && query === "";
+    },
+  };
+}
 // Stable, since a new source mid-search makes Astryx drop that search's results.
 const NONE: string[] = [];
 // A tag holds no space, so this id never meets one in use.
@@ -96,6 +114,7 @@ export function HostTagsField({ initial = [] }: { initial?: string[] }) {
   // the Tokenizer empties its input on every pick.
   const [draft, setDraft] = useState("");
   const source = useTagSource(tags);
+  const guard = usePickGuard();
   // Stable for the same reason as NONE: the Tokenizer rebuilds its source from these.
   const items = useMemo(() => tags.map(asItem), [tags]);
   const error =
@@ -108,6 +127,7 @@ export function HostTagsField({ initial = [] }: { initial?: string[] }) {
       setTags(kept.map((item) => item.id));
       return;
     }
+    guard.markPick();
     const next = [...tags];
     const refused: string[] = [];
     for (const tag of typedTags(change.item.label)) {
@@ -131,7 +151,9 @@ export function HostTagsField({ initial = [] }: { initial?: string[] }) {
         htmlName="tag"
         value={items}
         onChange={onChange}
-        onChangeQuery={setDraft}
+        onChangeQuery={(query) => {
+          if (!guard.followsPick(query)) setDraft(query);
+        }}
         searchSource={source}
         renderItem={(item) => <TagOption item={item} t={t} />}
         hasCreate
@@ -202,6 +224,7 @@ export function BulkTagInput({
   const t = useTranslations("ui.hostTags");
   const [picked, setPicked] = useState<TagItem | null>(null);
   const source = useTagSource(NONE);
+  const guard = usePickGuard();
   const error = hostTagError(hostTagText(value), [], t);
   return (
     <Typeahead
@@ -212,10 +235,12 @@ export function BulkTagInput({
       placeholder={t("bulkPlaceholder")}
       value={picked}
       onChange={(item) => {
+        guard.markPick();
         setPicked(item);
         onChange(item?.label ?? "");
       }}
       onChangeQuery={(query) => {
+        if (guard.followsPick(query)) return;
         setPicked(null);
         onChange(query);
       }}

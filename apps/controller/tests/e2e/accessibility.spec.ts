@@ -9,6 +9,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { waitForHydration } from '../helpers/hydration';
 import { ensureL4ProxyHost } from '../helpers/l4-proxy-api';
+import { L4_TCP_PORT_2 } from '../helpers/l4-ports';
 import { createAccessList, createProxyHost } from '../helpers/proxy-api';
 
 const ADMIN_STATE = resolve(dirname(fileURLToPath(import.meta.url)), '../.auth/admin.json');
@@ -36,12 +37,13 @@ async function axe(page: Page, rules?: string[]): Promise<string[]> {
     for (const node of violation.nodes) {
       const target = node.target.join(' ');
       // WCAG exempts inactive controls from contrast; axe reads a disabled field's suffix as text.
+      // Astryx 0.7.12 disables with aria-disabled to keep the tab stop, which axe does not exempt.
       if (violation.id === 'color-contrast') {
-        const inactive = await page.evaluate(
-          (selector) =>
-            !!document.querySelector(selector)?.parentElement?.querySelector('input:disabled'),
-          target,
-        );
+        const inactive = await page.evaluate((selector) => {
+          const DISABLED = 'input:disabled, input[aria-disabled="true"]';
+          const node = document.querySelector(selector);
+          return !!(node?.matches(DISABLED) || node?.parentElement?.querySelector(DISABLED));
+        }, target);
         if (inactive) continue;
       }
       // axe 4.14 reads the aria-hidden copy Astryx's ToggleButton renders to reserve its pressed
@@ -109,7 +111,7 @@ test.beforeAll(async ({ browser }) => {
   await ensureL4ProxyHost(page, {
     name: SEEDED.l4,
     protocol: 'tcp',
-    listenAddress: ':15433',
+    listenAddress: `:${L4_TCP_PORT_2}`,
     upstream: 'tcp-echo:9000',
   });
   pages = await crawl(page);

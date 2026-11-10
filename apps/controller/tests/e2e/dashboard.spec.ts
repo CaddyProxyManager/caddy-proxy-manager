@@ -130,7 +130,7 @@ test.describe('Dashboard home page', () => {
     await expect(page.getByText(/No traffic in this range/i)).toBeHidden();
 
     await selectTile(page, '5xx responses');
-    await expect(page.getByText(/No requests match this tile/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /No requests match this tile/i })).toBeVisible();
 
     // The audit log is recorded regardless, so the sign-in that got us here still shows.
     await selectTile(page, 'Server events');

@@ -283,7 +283,7 @@ test.describe('Access Lists - rail interaction', () => {
     const search = page.getByPlaceholder(/search lists or members/i);
     await search.fill('zzz-nonexistent-zzz');
 
-    await expect(page.getByText(/no lists match/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /no lists match/i })).toBeVisible();
   });
 
   test('clear search link resets the filter', async ({ page }) => {
@@ -292,7 +292,7 @@ test.describe('Access Lists - rail interaction', () => {
     const search = page.getByPlaceholder(/search lists or members/i);
     const rail = page.locator('ul');
     await search.fill('zzz-nonexistent-zzz');
-    await expect(page.getByText(/no lists match/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /no lists match/i })).toBeVisible();
 
     await page.getByRole('button', { name: 'Clear search', exact: true }).click();
     await expect(search).toHaveValue('');
@@ -533,7 +533,7 @@ test.describe('Access Lists - members tab', () => {
       .click();
 
     await expect(page.getByText('0 members').first()).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('No members yet')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'No members yet' })).toBeVisible();
   });
 
   test('cancel bulk selection', async ({ page }) => {
@@ -576,7 +576,7 @@ test.describe('Access Lists - members empty state', () => {
     await page.getByText(list.name).first().click();
     await expect(page.getByRole('heading', { name: list.name })).toBeVisible({ timeout: 5_000 });
 
-    await expect(page.getByText('No members yet')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'No members yet' })).toBeVisible();
     await expect(page.getByText(/add the first credentials/i)).toBeVisible();
   });
 

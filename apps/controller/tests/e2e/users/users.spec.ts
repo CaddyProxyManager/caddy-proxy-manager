@@ -50,7 +50,7 @@ test.describe('Users page', () => {
     await expect(page.getByText(/^1 user shown/)).toBeVisible({ timeout: 5000 });
 
     await page.getByPlaceholder('Search users…').fill('nonexistent-zzz');
-    await expect(page.getByText('No users found.')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: 'No users found.' })).toBeVisible({ timeout: 5000 });
   });
 
   test('the status filter narrows the list', async ({ page }) => {
