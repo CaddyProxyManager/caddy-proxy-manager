@@ -4,14 +4,15 @@
  * config. Two upstreams, the first dead, "First available", a try window and an active health
  * check: every connection only echoes if caddy-l4 applied all of it.
  *
- * Port TCP 15434; upstreams tcp-echo:9999 (nothing listening) and tcp-echo:9000 (echo).
+ * Port L4_TCP_PORT_3 (helpers/l4-ports.ts); upstreams tcp-echo:9999 (nothing listening) and tcp-echo:9000 (echo).
  */
 import { test, expect } from '@playwright/test';
 import { tcpSend, waitForTcpEcho } from '../../helpers/tcp';
 import { waitForHydration } from '../../helpers/hydration';
 import { saveThroughReview } from '../../helpers/host-editor';
+import { L4_TCP_PORT_3 } from '../../helpers/l4-ports';
 
-const TCP_PORT = 15434;
+const TCP_PORT = L4_TCP_PORT_3;
 const HOST_NAME = 'L4 LB First Available Test';
 const BASE_URL = 'http://localhost:3000';
 // Session-cookie API calls need an Origin header to pass the CSRF check.
@@ -28,9 +29,9 @@ test.describe
 
       await dialog.getByLabel('Name').fill(HOST_NAME);
       await dialog.getByLabel('Listen address').fill(`:${TCP_PORT}`);
-      await dialog
-        .getByRole('textbox', { name: /^Upstreams/ })
-        .fill('tcp-echo:9999\ntcp-echo:9000');
+      await dialog.getByRole('textbox', { name: /^Upstream 1\b/ }).fill('tcp-echo:9999');
+      await dialog.getByRole('button', { name: 'Add upstream' }).click();
+      await dialog.getByRole('textbox', { name: /^Upstream 2\b/ }).fill('tcp-echo:9000');
 
       await dialog.getByRole('button', { name: 'Load balancer' }).click();
       await dialog.getByRole('switch', { name: 'Enable Load Balancing' }).click();

@@ -47,7 +47,7 @@ test.describe('L4 Proxy Hosts page', () => {
     await expect(page.getByLabel('Name')).toBeVisible();
     await expect(page.getByRole('combobox', { name: 'Protocol' }).first()).toBeVisible();
     await expect(page.getByLabel('Listen address')).toBeVisible();
-    await expect(page.getByRole('textbox', { name: /^Upstreams/ })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: /^Upstream 1\b/ })).toBeVisible();
     await expect(page.getByRole('combobox', { name: 'Matcher' }).first()).toBeVisible();
   });
 
@@ -107,7 +107,7 @@ test.describe('L4 Proxy Hosts page', () => {
 
     await page.getByLabel('Name').fill('E2E Test Host');
     await page.getByLabel('Listen address').fill(':19999');
-    await page.getByRole('textbox', { name: /^Upstreams/ }).fill('10.0.0.1:5432');
+    await page.getByRole('textbox', { name: /^Upstream 1\b/ }).fill('10.0.0.1:5432');
 
     await saveThroughReview(page, page.getByRole('dialog'));
 
@@ -125,7 +125,7 @@ test.describe('L4 Proxy Hosts page', () => {
 
     await page.getByLabel('Name').fill('E2E Reserved Port Host');
     await page.getByLabel('Listen address').fill(':443');
-    await page.getByRole('textbox', { name: /^Upstreams/ }).fill('10.0.0.1:8443');
+    await page.getByRole('textbox', { name: /^Upstream 1\b/ }).fill('10.0.0.1:8443');
 
     // The review's preview refuses it, and offers no Create.
     await page.getByRole('dialog').getByRole('button', { name: 'Review', exact: true }).click();
@@ -174,7 +174,7 @@ test.describe('L4 Proxy Hosts page', () => {
       await expect(page.getByRole('dialog')).toBeVisible();
       await page.getByLabel('Name').fill(`E2E Rapid Host ${i}`);
       await page.getByLabel('Listen address').fill(`:2000${i}`);
-      await page.getByRole('textbox', { name: /^Upstreams/ }).fill('10.0.0.1:5432');
+      await page.getByRole('textbox', { name: /^Upstream 1\b/ }).fill('10.0.0.1:5432');
 
       await saveThroughReview(page, page.getByRole('dialog'));
 
@@ -193,7 +193,7 @@ test.describe('L4 Proxy Hosts page', () => {
     await page.getByRole('button', { name: 'New', exact: true }).click();
     await page.getByLabel('Name').fill('E2E Toggle Host');
     await page.getByLabel('Listen address').fill(':20010');
-    await page.getByRole('textbox', { name: /^Upstreams/ }).fill('10.0.0.1:5432');
+    await page.getByRole('textbox', { name: /^Upstream 1\b/ }).fill('10.0.0.1:5432');
     await saveThroughReview(page, page.getByRole('dialog'));
     await expect(page.locator('dialog[open]')).toHaveCount(0, { timeout: 10_000 });
 

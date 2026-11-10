@@ -46,6 +46,8 @@ export function L4TrafficSection({ traffic }: { traffic: L4HostTraffic }) {
     return (
       <Card padding={5}>
         <EmptyState
+          // Straight under the page's h1: no section card wraps it, unlike the ones below.
+          headingLevel={2}
           title={t("offTitle")}
           description={t("offDescription")}
           actions={

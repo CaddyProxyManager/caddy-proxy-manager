@@ -9,11 +9,12 @@ import { execFileSync } from 'node:child_process';
 import { waitForTcpEcho, tcpSend } from '../../helpers/tcp';
 import { COMPOSE_CWD } from '../../helpers/compose';
 import { ensureL4ProxyHost } from '../../helpers/l4-proxy-api';
+import { L4_TCP_PORT } from '../../helpers/l4-ports';
 
 const AGENT_CONTAINER = 'caddy-proxy-manager-agent';
 
 // Shared with l4-proxy-routing.spec.ts, which creates the same host when it runs first.
-const TCP_PORT = 15432;
+const TCP_PORT = L4_TCP_PORT;
 
 const BASE_URL = 'http://localhost:3000';
 const ENV = { ...process.env, CLICKHOUSE_PASSWORD: 'test-clickhouse-password-2026' };

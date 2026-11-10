@@ -897,6 +897,14 @@ TEST_POSTGRES_URL=postgres://cpm:pw@127.0.0.1:5432/cpm_test bun run test
 `bun run test:sqlite` runs the same suite against SQLite, an in-memory database per test, with no
 container.
 
+`bun run test:e2e` builds and starts the whole stack in Docker and needs ports 3000, 80, 443 and,
+for the L4 specs, four more from 15432 (TCP 15432-15434, UDP 15435). If something else holds those
+four, move them with `E2E_L4_PORT_BASE`:
+
+```bash
+E2E_L4_PORT_BASE=25432 bun run test:e2e
+```
+
 ---
 
 ## Backup and restore

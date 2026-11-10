@@ -5,6 +5,10 @@
  */
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { L4_PORT_ENV } from './l4-ports';
+
+// Every docker call here spreads process.env, so this is how the L4 ports reach Compose.
+Object.assign(process.env, L4_PORT_ENV);
 
 /**
  * Every docker command runs from here, not process.cwd(): Compose anchors relative paths to the

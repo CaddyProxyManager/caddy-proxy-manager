@@ -1,14 +1,15 @@
 /**
  * Functional: L4 (TCP/UDP) proxy routing - raw connections and datagrams through Caddy to echo
- * containers. Ports TCP 15432/15433, UDP 15353; upstreams tcp-echo:9000, udp-echo:9001.
+ * containers. Ports from helpers/l4-ports.ts; upstreams tcp-echo:9000, udp-echo:9001.
  */
 import { test, expect } from '@playwright/test';
 import { createL4ProxyHost, ensureL4ProxyHost } from '../../helpers/l4-proxy-api';
+import {
+  L4_TCP_PORT as TCP_PORT,
+  L4_TCP_PORT_2 as TCP_PORT_2,
+  L4_UDP_PORT as UDP_PORT,
+} from '../../helpers/l4-ports';
 import { tcpSend, waitForTcpEcho, tcpConnect, udpSend, waitForUdpRoute } from '../../helpers/tcp';
-
-const TCP_PORT = 15432;
-const TCP_PORT_2 = 15433;
-const UDP_PORT = 15353;
 
 test.describe
   .serial('L4 TCP Proxy Routing', () => {

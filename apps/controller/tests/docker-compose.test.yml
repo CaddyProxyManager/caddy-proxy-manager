@@ -188,17 +188,22 @@ services:
       - "80:80"
       - "443:443"
       # L4 test ports (TCP)
-      - "15432:15432"
-      - "15433:15433"
-      - "15434:15434"
+      - "${E2E_L4_TCP_PORT:-15432}:${E2E_L4_TCP_PORT:-15432}"
+      - "${E2E_L4_TCP_PORT_2:-15433}:${E2E_L4_TCP_PORT_2:-15433}"
+      - "${E2E_L4_TCP_PORT_3:-15434}:${E2E_L4_TCP_PORT_3:-15434}"
       # L4 test ports (UDP)
-      - "15353:15353/udp"
+      - "${E2E_L4_UDP_PORT:-15435}:${E2E_L4_UDP_PORT:-15435}/udp"
   # This file instead of a local override, so the agent recreates caddy on the "-test" volumes.
   agent:
     environment:
       COMPOSE_SKIP_OVERRIDE: "1"
       COMPOSE_EXTRA_FILE: /compose/apps/controller/tests/docker-compose.test.yml
       CLICKHOUSE_PASSWORD: "test-clickhouse-password-2026"
+      # Its own compose interpolates this file again when it recreates Caddy (tests/helpers/l4-ports.ts).
+      E2E_L4_TCP_PORT: ${E2E_L4_TCP_PORT:-15432}
+      E2E_L4_TCP_PORT_2: ${E2E_L4_TCP_PORT_2:-15433}
+      E2E_L4_TCP_PORT_3: ${E2E_L4_TCP_PORT_3:-15434}
+      E2E_L4_UDP_PORT: ${E2E_L4_UDP_PORT:-15435}
   # A second agent for tests/e2e/agents.spec.ts to pair, re-pair and unpair from the UI. Its Docker
   # and Caddy addresses lead nowhere: an idle agent stops Caddy, and this one must never reach the
   # stack's. It idles, unpaired, until that spec runs.
