@@ -173,6 +173,27 @@ async function errorText(error: unknown, fallback: string): Promise<string> {
   return extractErrorMessage(t, error, fallback, format);
 }
 
+/** The save stands either way: a failed apply only changes what the success says. */
+async function applyCaddyAndReport(
+  saved: string,
+  applyFailed: (error: string) => string,
+): Promise<SettingsResult> {
+  try {
+    await applyCaddyConfig();
+    revalidatePath("/settings");
+    return { success: true, message: saved };
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("Failed to apply Caddy config:", error);
+    revalidatePath("/settings");
+    const t = await getTranslations("settings");
+    return {
+      success: true,
+      message: applyFailed(await errorText(error, t("results.unknownError"))),
+    };
+  }
+}
+
 /**
  * For what throws outside an action's own try: the lock, the permission check, staging. Every
  * result type here only adds optional fields to `SettingsResult`, so a bare failure fits each.
@@ -301,20 +322,9 @@ async function updateAcmeSettingsActionUnlocked(
       caRootPem: caRootPem.length > 0 ? caRootPem : undefined,
     });
 
-    try {
-      await applyCaddyConfig();
-      revalidatePath("/settings");
-      return { success: true, message: t("results.acmeSaved") };
-    } catch (error) {
-      unstable_rethrow(error);
-      console.error("Failed to apply Caddy config:", error);
-      revalidatePath("/settings");
-      const errorMsg = await errorText(error, t("results.unknownError"));
-      return {
-        success: true,
-        message: t("results.applyFailed", { error: errorMsg }),
-      };
-    }
+    return await applyCaddyAndReport(t("results.acmeSaved"), (error) =>
+      t("results.applyFailed", { error }),
+    );
   } catch (error) {
     unstable_rethrow(error);
     console.error("Failed to save ACME settings:", error);
@@ -347,23 +357,9 @@ async function updateCloudflareSettingsActionUnlocked(
     });
 
     // Don't fail the save if Caddy is unreachable.
-    try {
-      await applyCaddyConfig();
-      revalidatePath("/settings");
-      return {
-        success: true,
-        message: t("results.cloudflareSaved"),
-      };
-    } catch (error) {
-      unstable_rethrow(error);
-      console.error("Failed to apply Caddy config:", error);
-      revalidatePath("/settings");
-      const errorMsg = await errorText(error, t("results.unknownError"));
-      return {
-        success: true,
-        message: t("results.cloudflareApplyFailed", { error: errorMsg }),
-      };
-    }
+    return await applyCaddyAndReport(t("results.cloudflareSaved"), (error) =>
+      t("results.cloudflareApplyFailed", { error }),
+    );
   } catch (error) {
     unstable_rethrow(error);
     console.error("Failed to save Cloudflare settings:", error);
@@ -1349,20 +1345,9 @@ async function updateMetricsSettingsActionUnlocked(
       port,
     });
 
-    try {
-      await applyCaddyConfig();
-      revalidatePath("/settings");
-      return { success: true, message: t("results.metricsSaved") };
-    } catch (error) {
-      unstable_rethrow(error);
-      console.error("Failed to apply Caddy config:", error);
-      revalidatePath("/settings");
-      const errorMsg = await errorText(error, t("results.unknownError"));
-      return {
-        success: true,
-        message: t("results.applyFailed", { error: errorMsg }),
-      };
-    }
+    return await applyCaddyAndReport(t("results.metricsSaved"), (error) =>
+      t("results.applyFailed", { error }),
+    );
   } catch (error) {
     unstable_rethrow(error);
     console.error("Failed to save metrics settings:", error);
@@ -1393,20 +1378,9 @@ async function updateLoggingSettingsActionUnlocked(
       l4Connections: formData.get("l4Connections") === "on",
     });
 
-    try {
-      await applyCaddyConfig();
-      revalidatePath("/settings");
-      return { success: true, message: t("results.loggingSaved") };
-    } catch (error) {
-      unstable_rethrow(error);
-      console.error("Failed to apply Caddy config:", error);
-      revalidatePath("/settings");
-      const errorMsg = await errorText(error, t("results.unknownError"));
-      return {
-        success: true,
-        message: t("results.applyFailed", { error: errorMsg }),
-      };
-    }
+    return await applyCaddyAndReport(t("results.loggingSaved"), (error) =>
+      t("results.applyFailed", { error }),
+    );
   } catch (error) {
     unstable_rethrow(error);
     console.error("Failed to save logging settings:", error);
@@ -1449,17 +1423,9 @@ async function updateDashboardSettingsActionUnlocked(
 
     await saveDashboardSettings(settings);
 
-    try {
-      await applyCaddyConfig();
-      revalidatePath("/settings");
-      return { success: true, message: t("results.dashboardSaved") };
-    } catch (error) {
-      unstable_rethrow(error);
-      console.error("Failed to apply Caddy config:", error);
-      revalidatePath("/settings");
-      const errorMsg = await errorText(error, t("results.unknownError"));
-      return { success: true, message: t("results.dashboardApplyFailed", { error: errorMsg }) };
-    }
+    return await applyCaddyAndReport(t("results.dashboardSaved"), (error) =>
+      t("results.dashboardApplyFailed", { error }),
+    );
   } catch (error) {
     unstable_rethrow(error);
     console.error("Failed to save dashboard settings:", error);
@@ -1506,20 +1472,9 @@ async function updateTrustedProxiesSettingsActionUnlocked(
       default_geoblock: defaultGeoblock || undefined,
     });
 
-    try {
-      await applyCaddyConfig();
-      revalidatePath("/settings");
-      return { success: true, message: t("results.trustedProxiesSaved") };
-    } catch (error) {
-      unstable_rethrow(error);
-      console.error("Failed to apply Caddy config:", error);
-      revalidatePath("/settings");
-      const errorMsg = await errorText(error, t("results.unknownError"));
-      return {
-        success: true,
-        message: t("results.applyFailed", { error: errorMsg }),
-      };
-    }
+    return await applyCaddyAndReport(t("results.trustedProxiesSaved"), (error) =>
+      t("results.applyFailed", { error }),
+    );
   } catch (error) {
     unstable_rethrow(error);
     console.error("Failed to save trusted proxies settings:", error);
@@ -1541,21 +1496,9 @@ async function updateHttpProtocolsSettingsActionUnlocked(
       http2: formData.get("http2") === "on",
       http3: formData.get("http3") === "on",
     });
-    try {
-      await applyCaddyConfig();
-      revalidatePath("/settings");
-      return { success: true, message: t("results.httpProtocolsSaved") };
-    } catch (error) {
-      unstable_rethrow(error);
-      console.error("Failed to apply Caddy config:", error);
-      revalidatePath("/settings");
-      return {
-        success: true,
-        message: t("results.applyFailed", {
-          error: await errorText(error, t("results.unknownError")),
-        }),
-      };
-    }
+    return await applyCaddyAndReport(t("results.httpProtocolsSaved"), (error) =>
+      t("results.applyFailed", { error }),
+    );
   } catch (error) {
     unstable_rethrow(error);
     console.error("Failed to save HTTP protocol settings:", error);
@@ -1574,21 +1517,9 @@ async function updateCompressionSettingsActionUnlocked(
   try {
     await requireCan("settings:write");
     await saveCompressionSettings({ enabled: formData.get("enabled") === "on" });
-    try {
-      await applyCaddyConfig();
-      revalidatePath("/settings");
-      return { success: true, message: t("results.compressionSaved") };
-    } catch (error) {
-      unstable_rethrow(error);
-      console.error("Failed to apply Caddy config:", error);
-      revalidatePath("/settings");
-      return {
-        success: true,
-        message: t("results.applyFailed", {
-          error: await errorText(error, t("results.unknownError")),
-        }),
-      };
-    }
+    return await applyCaddyAndReport(t("results.compressionSaved"), (error) =>
+      t("results.applyFailed", { error }),
+    );
   } catch (error) {
     unstable_rethrow(error);
     console.error("Failed to save compression settings:", error);
@@ -1761,21 +1692,9 @@ async function updateHttpCacheSettingsActionUnlocked(
         strategy: field("cdnStrategy"),
       },
     });
-    try {
-      await applyCaddyConfig();
-      revalidatePath("/settings");
-      return { success: true, message: t("results.httpCacheSaved") };
-    } catch (error) {
-      unstable_rethrow(error);
-      console.error("Failed to apply Caddy config:", error);
-      revalidatePath("/settings");
-      return {
-        success: true,
-        message: t("results.applyFailed", {
-          error: await errorText(error, t("results.unknownError")),
-        }),
-      };
-    }
+    return await applyCaddyAndReport(t("results.httpCacheSaved"), (error) =>
+      t("results.applyFailed", { error }),
+    );
   } catch (error) {
     unstable_rethrow(error);
     console.error("Failed to save the HTTP cache settings:", error);
@@ -1794,21 +1713,9 @@ async function updateGlobalCaddyConfigActionUnlocked(
   try {
     await requireCan("settings:write");
     await saveGlobalCaddyConfigSettings({ caddyfile: String(formData.get("caddyfile") ?? "") });
-    try {
-      await applyCaddyConfig();
-      revalidatePath("/settings");
-      return { success: true, message: t("results.globalCaddyConfigSaved") };
-    } catch (error) {
-      unstable_rethrow(error);
-      console.error("Failed to apply Caddy config:", error);
-      revalidatePath("/settings");
-      return {
-        success: true,
-        message: t("results.applyFailed", {
-          error: await errorText(error, t("results.unknownError")),
-        }),
-      };
-    }
+    return await applyCaddyAndReport(t("results.globalCaddyConfigSaved"), (error) =>
+      t("results.applyFailed", { error }),
+    );
   } catch (error) {
     unstable_rethrow(error);
     console.error("Failed to save the global Caddyfile:", error);
@@ -1897,20 +1804,9 @@ async function updateDnsSettingsActionUnlocked(
       timeout: timeout && timeout.length > 0 ? timeout : undefined,
     });
 
-    try {
-      await applyCaddyConfig();
-      revalidatePath("/settings");
-      return { success: true, message: t("results.dnsSaved") };
-    } catch (error) {
-      unstable_rethrow(error);
-      console.error("Failed to apply Caddy config:", error);
-      revalidatePath("/settings");
-      const errorMsg = await errorText(error, t("results.unknownError"));
-      return {
-        success: true,
-        message: t("results.applyFailed", { error: errorMsg }),
-      };
-    }
+    return await applyCaddyAndReport(t("results.dnsSaved"), (error) =>
+      t("results.applyFailed", { error }),
+    );
   } catch (error) {
     unstable_rethrow(error);
     console.error("Failed to save DNS settings:", error);
@@ -1944,23 +1840,9 @@ async function updateUpstreamDnsResolutionSettingsActionUnlocked(
       family: familyRaw as "ipv6" | "ipv4" | "both",
     });
 
-    try {
-      await applyCaddyConfig();
-      revalidatePath("/settings");
-      return {
-        success: true,
-        message: t("results.upstreamDnsSaved"),
-      };
-    } catch (error) {
-      unstable_rethrow(error);
-      console.error("Failed to apply Caddy config:", error);
-      revalidatePath("/settings");
-      const errorMsg = await errorText(error, t("results.unknownError"));
-      return {
-        success: true,
-        message: t("results.applyFailed", { error: errorMsg }),
-      };
-    }
+    return await applyCaddyAndReport(t("results.upstreamDnsSaved"), (error) =>
+      t("results.applyFailed", { error }),
+    );
   } catch (error) {
     unstable_rethrow(error);
     console.error("Failed to save upstream DNS resolution settings:", error);
@@ -2062,20 +1944,9 @@ async function updateGeoBlockSettingsActionUnlocked(
 
     await saveGeoBlockSettings(config);
 
-    try {
-      await applyCaddyConfig();
-      revalidatePath("/settings");
-      return { success: true, message: t("results.geoblockSaved") };
-    } catch (error) {
-      unstable_rethrow(error);
-      console.error("Failed to apply Caddy config:", error);
-      revalidatePath("/settings");
-      const errorMsg = await errorText(error, t("results.unknownError"));
-      return {
-        success: true,
-        message: t("results.applyFailed", { error: errorMsg }),
-      };
-    }
+    return await applyCaddyAndReport(t("results.geoblockSaved"), (error) =>
+      t("results.applyFailed", { error }),
+    );
   } catch (error) {
     unstable_rethrow(error);
     console.error("Failed to save geoblocking settings:", error);
@@ -2117,17 +1988,9 @@ async function updateDynamicDnsSettingsActionUnlocked(
       updateOnly: parseCheckbox(formData.get("ddnsUpdateOnly")),
       ipEndpoints: text("ddnsIpEndpoints").split(/\s+/).filter(Boolean),
     });
-    try {
-      await applyCaddyConfig();
-      revalidatePath("/settings");
-      return { success: true, message: t("results.dynamicDnsSaved") };
-    } catch (error) {
-      unstable_rethrow(error);
-      console.error("Failed to apply Caddy config:", error);
-      revalidatePath("/settings");
-      const errorMsg = await errorText(error, t("results.unknownError"));
-      return { success: true, message: t("results.applyFailed", { error: errorMsg }) };
-    }
+    return await applyCaddyAndReport(t("results.dynamicDnsSaved"), (error) =>
+      t("results.applyFailed", { error }),
+    );
   } catch (error) {
     unstable_rethrow(error);
     console.error("Failed to save dynamic DNS settings:", error);
@@ -2161,17 +2024,9 @@ async function updateRateLimitSettingsActionUnlocked(
       allowlist:
         typeof allowlistRaw === "string" ? allowlistRaw.split(/[\s,]+/).filter(Boolean) : [],
     });
-    try {
-      await applyCaddyConfig();
-      revalidatePath("/settings");
-      return { success: true, message: t("results.rateLimitSaved") };
-    } catch (error) {
-      unstable_rethrow(error);
-      console.error("Failed to apply Caddy config:", error);
-      revalidatePath("/settings");
-      const errorMsg = await errorText(error, t("results.unknownError"));
-      return { success: true, message: t("results.applyFailed", { error: errorMsg }) };
-    }
+    return await applyCaddyAndReport(t("results.rateLimitSaved"), (error) =>
+      t("results.applyFailed", { error }),
+    );
   } catch (error) {
     unstable_rethrow(error);
     console.error("Failed to save rate limit settings:", error);
@@ -2203,20 +2058,9 @@ async function updateErrorPagesSettingsActionUnlocked(
 
     await saveErrorPagesSettings({ rules });
 
-    try {
-      await applyCaddyConfig();
-      revalidatePath("/settings");
-      return { success: true, message: t("results.errorPagesSaved") };
-    } catch (error) {
-      unstable_rethrow(error);
-      console.error("Failed to apply Caddy config:", error);
-      revalidatePath("/settings");
-      const errorMsg = await errorText(error, t("results.unknownError"));
-      return {
-        success: true,
-        message: t("results.applyFailed", { error: errorMsg }),
-      };
-    }
+    return await applyCaddyAndReport(t("results.errorPagesSaved"), (error) =>
+      t("results.applyFailed", { error }),
+    );
   } catch (error) {
     unstable_rethrow(error);
     console.error("Failed to save error pages settings:", error);
@@ -2259,20 +2103,9 @@ async function updateDefaultResponseSettingsActionUnlocked(
 
     await saveDefaultResponseSettings(next);
 
-    try {
-      await applyCaddyConfig();
-      revalidatePath("/settings");
-      return { success: true, message: t("results.defaultResponseSaved") };
-    } catch (error) {
-      unstable_rethrow(error);
-      console.error("Failed to apply Caddy config:", error);
-      revalidatePath("/settings");
-      const errorMsg = await errorText(error, t("results.unknownError"));
-      return {
-        success: true,
-        message: t("results.applyFailed", { error: errorMsg }),
-      };
-    }
+    return await applyCaddyAndReport(t("results.defaultResponseSaved"), (error) =>
+      t("results.applyFailed", { error }),
+    );
   } catch (error) {
     unstable_rethrow(error);
     console.error("Failed to save default response settings:", error);
