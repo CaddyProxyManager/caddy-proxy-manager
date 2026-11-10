@@ -2,7 +2,7 @@
 
 # $BUILDPLATFORM: emulated, `vite build` deadlocks until the runner's 6-hour cap, so the binary
 # is cross-compiled instead. Keep the tag in step with bun-version in the workflows and db-seed.
-FROM --platform=$BUILDPLATFORM oven/bun:1.4.3-slim@sha256:14a223fa35747ec728bce300ef85888bc5f7958164d15bbba6a54b22b52a3288 AS base
+FROM --platform=$BUILDPLATFORM oven/bun:1.4.4-slim@sha256:1846adf22496bd711036aae8be147e57bdebbaea2e5264e3e0b5af1db187d9a4 AS base
 WORKDIR /app
 
 FROM base AS deps
@@ -47,7 +47,7 @@ RUN case "$TARGETARCH" in \
 # The binary carries its own musl-linked Bun, which still loads libgcc and libstdc++. node_modules
 # is installed on Debian, so a native addon in it must ship a musl build too: today only sharp
 # (next's optional dependency) does, and nothing imports it.
-FROM alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS runner
+FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS runner
 ARG PUID=10001
 ARG PGID=10001
 

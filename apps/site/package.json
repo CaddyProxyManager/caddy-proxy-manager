@@ -13,24 +13,24 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@astrojs/react": "^7.1.1",
+    "@astrojs/react": "^7.1.5",
     "@astrojs/starlight": "^0.42.6",
-    "@astryxdesign/core": "^0.7.2",
-    "@astryxdesign/theme-neutral": "^0.7.2",
+    "@astryxdesign/core": "^0.7.12",
+    "@astryxdesign/theme-neutral": "^0.7.12",
     "@catppuccin/starlight": "^2.1.0",
     "@cpm/controller": "workspace:*",
-    "apexcharts": "^8.4.1",
-    "astro": "^7.4.2",
-    "lucide-react": "^1.61.0",
+    "apexcharts": "^8.8.1",
+    "astro": "^7.4.8",
+    "lucide-react": "^1.71.0",
     "react": "^19.3.1",
-    "react-apexcharts": "^2.1.1",
+    "react-apexcharts": "^2.2.0",
     "react-dom": "^19.3.1",
-    "satteri": "^0.10.5",
+    "satteri": "^0.11.7",
     "sharp": "^0.35.5",
-    "use-intl": "^4.14.9"
+    "use-intl": "^4.14.10"
   },
   "devDependencies": {
-    "@playwright/test": "^1.64.1",
+    "@playwright/test": "^1.65.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "typescript": "^7.0.2"

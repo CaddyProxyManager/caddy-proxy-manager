@@ -233,7 +233,7 @@ describe('passkey registration', () => {
     const { verify } = await register(jar, { userVerified: false });
 
     expect(verify?.status).toBe(400);
-    expect((await (verify as Response).json()).code).toBe('USER_NOT_VERIFIED');
+    expect((await (verify as Response).json()).code).toBe('FAILED_TO_VERIFY_REGISTRATION');
     expect(await passkeysOf(user.id)).toHaveLength(0);
   });
 
@@ -296,7 +296,7 @@ describe('passkey sign-in', () => {
     });
 
     expect(response.status).toBe(400);
-    expect((await response.json()).code).toBe('USER_NOT_VERIFIED');
+    expect((await response.json()).code).toBe('AUTHENTICATION_FAILED');
     expect(browser.has('session_token')).toBe(false);
     const sessionsAfter = await db
       .select()

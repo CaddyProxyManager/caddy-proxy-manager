@@ -4,7 +4,7 @@
  * so a new pair would orphan every subscription.
  */
 
-import webpush, { WebPushError } from "web-push";
+import { generateVAPIDKeys, type RequestOptions, sendNotification, WebPushError } from "web-push";
 import { DEFAULT_LOCALE, type Locale, parseLocale } from "../locale";
 import {
   adminPushTargets,
@@ -28,14 +28,9 @@ const MAX_LINES = 3;
 const MAX_BODY = 1_000;
 
 type VapidKeys = { publicKey: string; privateKey: string };
-type Deliver = (
-  target: PushTarget,
-  payload: string,
-  options: webpush.RequestOptions,
-) => Promise<unknown>;
+type Deliver = (target: PushTarget, payload: string, options: RequestOptions) => Promise<unknown>;
 
-let deliver: Deliver = (target, payload, options) =>
-  webpush.sendNotification(target, payload, options);
+let deliver: Deliver = (target, payload, options) => sendNotification(target, payload, options);
 
 let keys: Promise<VapidKeys> | null = null;
 
@@ -56,7 +51,7 @@ async function loadOrCreateKeys(): Promise<VapidKeys> {
   if (typeof stored?.publicKey === "string" && typeof stored.privateKey === "string") {
     return { publicKey: stored.publicKey, privateKey: decryptSecret(stored.privateKey) };
   }
-  const created = webpush.generateVAPIDKeys();
+  const created = generateVAPIDKeys();
   await outsideStagingScope(() =>
     setStoredJson(VAPID_KEY, {
       publicKey: created.publicKey,
@@ -188,8 +183,7 @@ function describe(error: unknown): string {
 
 /** Test seams: what a send hands the push service, and forgetting the memoized keys. */
 export function setPushDeliveryForTests(fake: Deliver | null): void {
-  deliver =
-    fake ?? ((target, payload, options) => webpush.sendNotification(target, payload, options));
+  deliver = fake ?? ((target, payload, options) => sendNotification(target, payload, options));
 }
 
 export function resetPushKeysForTests(): void {

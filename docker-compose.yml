@@ -299,7 +299,7 @@ services:
   # validating input. See SECURITY.md.
   docker-socket-proxy:
     container_name: caddy-proxy-manager-docker-proxy
-    image: wollomatic/socket-proxy:1.13.1@sha256:3935b709275e4ec35d6ed5a5c4a1f0d01ed31eec5e7234efc3357ecd47689002
+    image: wollomatic/socket-proxy:1.13.2@sha256:ff95d6ff6c27853005ef85eb8f4ab5923dc3d2f1e055f98fb6aeeaceec3fe848
     restart: unless-stopped
     # Root, since the socket's group differs between hosts: one static binary, no shell, nothing
     # writable, no capability. `user: "65534:<docker group id>"` in an override drops it.
@@ -425,7 +425,7 @@ services:
   # purpose: publishing 5432 is how a database ends up on the internet.
   postgres:
     container_name: caddy-proxy-manager-postgres
-    image: postgres:18-alpine@sha256:83148c0bc09eac4d598b70a61e1404d0212b76c95c504bfd6c81a4c59ec91792
+    image: postgres:18-alpine@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-cpm}
@@ -448,7 +448,7 @@ services:
   # COMPOSE_PROFILES is needed only with no agent.
   clickhouse:
     container_name: caddy-proxy-manager-clickhouse
-    image: clickhouse/clickhouse-server:26.9.24.8-alpine@sha256:a5a7ba1d334ba323b3353ec002f00c337f140e4dacd4ba1f248822048bb7830a
+    image: clickhouse/clickhouse-server:26.10.3.7-alpine@sha256:1b09f476eb1109522cfc0e8e4ddf6a4305263e7cdd310f7bd1d3fd29dfcb8b33
     profiles: [clickhouse]
     restart: unless-stopped
     environment:
@@ -481,7 +481,7 @@ services:
   # the controller generated. For the bundled agent's host only.
   crowdsec:
     container_name: caddy-proxy-manager-crowdsec
-    image: crowdsecurity/crowdsec:v1.8.1@sha256:0f2523fa61ef507f15d953045cface490cc880670c62f2755ced17524107f71a
+    image: crowdsecurity/crowdsec:v1.8.2@sha256:65b74942f7e7ed5c60fde4ac15fc4ba715904c398c8b16dd451f4907d90347d4
     profiles: [crowdsec]
     restart: unless-stopped
     environment:

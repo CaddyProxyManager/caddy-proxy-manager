@@ -323,7 +323,10 @@ async function refuseEnforcedPasskey(userId: number): Promise<void> {
   if (policy.enforced && !isBreakGlassAccount(policy, userId)) await refuseWithoutSso();
 }
 
-/** Called after the signature checks out: the plugin verifies without requiring UV. */
+/**
+ * Called after the signature checks out. Since passkey 1.7.19 the plugin refuses a missing UV
+ * itself, with a generic code, so this only stands should that check ever go again.
+ */
 async function requireUserVerification(args: {
   verification: Parameters<typeof isUserVerified>[0];
 }): Promise<void> {

@@ -23,7 +23,7 @@
     }
   },
   "engines": {
-    "bun": ">=1.4.3"
+    "bun": ">=1.4.4"
   },
   "astryx": {
     "theme": "neutral"
@@ -52,15 +52,15 @@
     "test:e2e:no-clickhouse": "bun run --filter @cpm/controller test:e2e:no-clickhouse"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.6.2",
+    "@biomejs/biome": "^2.6.6",
     "@socketsecurity/bun-security-scanner": "^1.1.3",
-    "@types/bun": "^1.4.3",
+    "@types/bun": "^1.4.4",
     "typescript": "^7.0.2"
   },
   "overrides": {
-    "@astrojs/starlight": "0.42.6",
+    "@astrojs/starlight": "0.42.10",
     "@esbuild-kit/esm-loader": "file:./patches/esbuild-kit-esm-loader-stub",
-    "@graphql-tools/utils": "^12.0.3",
+    "@graphql-tools/utils": "^13.2.2",
     "fflate": "^0.7.5",
     "http-cache-semantics": "^4.3.0",
     "postcss-selector-parser": "^7.1.6",
@@ -72,6 +72,6 @@
     "core-js-pure"
   ],
   "patchedDependencies": {
-    "vinext@1.3.0": "patches/vinext@1.3.0.patch"
+    "vinext@1.4.4": "patches/vinext@1.4.4.patch"
   }
 }

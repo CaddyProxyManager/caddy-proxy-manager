@@ -243,10 +243,13 @@ describe.skipIf(!onPostgres)('leadership', () => {
     await contendForLeadership();
     expect(isLeader()).toBe(true);
 
+    // Our own backend by pid: advisory locks are server-wide, and terminating every holder killed
+    // the connections of whichever parallel test file held the lock too.
+    const leader = (globalThis as { __cpmLeaderConnection?: SQL | null }).__cpmLeaderConnection;
+    const [{ pid }] = await leader!`select pg_backend_pid() as pid`;
     const other = otherReplica();
     try {
-      await other`select pg_terminate_backend(pid) from pg_locks
-        where locktype = 'advisory' and classid = ${ADVISORY_NAMESPACE} and objid = ${LEADER_LOCK}`;
+      await other`select pg_terminate_backend(${pid})`;
     } finally {
       await other.close();
     }

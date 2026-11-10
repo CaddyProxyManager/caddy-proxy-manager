@@ -3,7 +3,7 @@
 # On BUILDPLATFORM, cross-compiling, to avoid QEMU for arm64. The -builder image ships xcaddy and a
 # pinned Go toolchain, so cold builds skip compiling xcaddy. This tag pins only those; go.mod pins
 # Caddy and the plugins, and the two may drift.
-FROM --platform=$BUILDPLATFORM caddy:2.11.7-builder@sha256:671d2a6e5465cc894c9ca57706c7ea7d101018059fe3154c65805a0eda550467 AS builder
+FROM --platform=$BUILDPLATFORM caddy:2.11.9-builder@sha256:3fddbec729442a56b942d4c9eaef1df80893dbf2cf5b86701bfae6aad1408eeb AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -53,7 +53,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # Alpine like the builder, so a cgo plugin still works. Not caddy:<version>, whose binary would sit
 # under ours as ~50MB of dead weight. The compose healthcheck uses busybox's wget.
-FROM alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 
 # 10000 avoids clashing with system users.
 ARG PUID=10000

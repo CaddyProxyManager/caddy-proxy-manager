@@ -23,6 +23,10 @@ const yoga = createYoga<ServerContext>({
   graphiql: process.env.NODE_ENV === "development",
   // Yoga's default reflects any Origin with credentials allowed.
   cors: false,
+  // Yoga 6 logs a line per request at "info", and every agent status and analytics post is one.
+  logging: "warn",
+  // Its id comes from a client-sent header by default and nothing here reads it.
+  requestId: false,
   plugins: [authenticatedIntrospectionPlugin()],
   context: ({ request, rawBody, accepted }) =>
     createContext(request as NextRequest, rawBody, accepted),

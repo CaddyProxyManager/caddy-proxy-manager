@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.6@sha256:ac85f380a63b13dfcefa89046420e1781752bab202122f8f50032edf31be0021
 
 # A single Bun binary, but the runtime still needs the Docker CLI and compose plugin to recreate Caddy.
-FROM --platform=$BUILDPLATFORM oven/bun:1.4.3-slim@sha256:14a223fa35747ec728bce300ef85888bc5f7958164d15bbba6a54b22b52a3288 AS builder
+FROM --platform=$BUILDPLATFORM oven/bun:1.4.4-slim@sha256:1846adf22496bd711036aae8be147e57bdebbaea2e5264e3e0b5af1db187d9a4 AS builder
 WORKDIR /app
 
 # Every workspace manifest: `bun install` fails on a member it cannot read.
@@ -31,7 +31,7 @@ RUN case "$TARGETARCH" in \
 # ── Runtime ──────────────────────────────────────────────────────────────────
 # Alpine, not docker:cli, so the Docker tools are pinned here rather than by that image's tag. The
 # binary's Bun is musl-linked and still loads libgcc and libstdc++.
-FROM alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS runner
+FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS runner
 
 # buildx because the legacy builder cannot build docker/caddy/Dockerfile. Pinned to majors, not
 # exact builds, since the repository drops old ones. Bump the majors by hand.

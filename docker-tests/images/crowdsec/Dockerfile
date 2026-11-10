@@ -1,6 +1,6 @@
 # The managed CrowdSec image with its hub content baked in: the rig's network has no egress, so the
 # first start could not download the collections docker-compose.yml asks for. Same digest as there.
-FROM crowdsecurity/crowdsec:v1.8.1@sha256:0f2523fa61ef507f15d953045cface490cc880670c62f2755ced17524107f71a
+FROM crowdsecurity/crowdsec:v1.8.2@sha256:65b74942f7e7ed5c60fde4ac15fc4ba715904c398c8b16dd451f4907d90347d4
 
 # Installed into the staging trees the entrypoint copies from on a first start, so a fresh container
 # finds them already there. The whitelists parser drops private addresses, which is all the rig has.
