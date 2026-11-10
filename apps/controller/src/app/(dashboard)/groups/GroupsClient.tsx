@@ -61,6 +61,7 @@ import {
   type NamedResource,
   type ProviderOption,
 } from "@/components/groups/GroupAccessDialog";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
 type GroupMember = {
   userId: number;
@@ -794,7 +795,7 @@ function GroupRoleCard({
       unwrap(await setGroupRoleAction(group.id, value === NO_ROLE ? null : value));
       onChanged();
     } catch (err) {
-      setError(err instanceof Error && err.message ? err.message : t("roleFailed"));
+      setError(thrownMessage(err, t("roleFailed")));
     } finally {
       setSaving(false);
     }
@@ -1006,9 +1007,7 @@ function GroupFormDialog({
             await onSubmit(formData);
           } catch (err) {
             // A form action that throws takes the whole page down with it.
-            setError(
-              err instanceof Error && err.message ? err.message : tCommon("somethingWentWrong"),
-            );
+            setError(thrownMessage(err, tCommon("somethingWentWrong")));
           } finally {
             setSubmitting(false);
           }

@@ -25,12 +25,12 @@ export const RATE_LIMIT_METHODS = [
 ] as const;
 
 export const RATE_LIMIT_MAX_ZONES = 20;
-export const RATE_LIMIT_MAX_PATHS = 50;
-export const RATE_LIMIT_PATH_MAX_LENGTH = 512;
+const RATE_LIMIT_MAX_PATHS = 50;
+const RATE_LIMIT_PATH_MAX_LENGTH = 512;
 export const RATE_LIMIT_MAX_EVENTS = 1_000_000;
 export const RATE_LIMIT_IPV6_PREFIX_MIN = 1;
 export const RATE_LIMIT_IPV6_PREFIX_MAX = 128;
-export const RATE_LIMIT_HEADER_MAX_LENGTH = 64;
+const RATE_LIMIT_HEADER_MAX_LENGTH = 64;
 export const RATE_LIMIT_MAX_ALLOWLIST = 200;
 
 /** An RFC 7230 token: no brace can reach the placeholder the name is put in. */
@@ -227,7 +227,7 @@ export function normalizeHostRateLimitInput(value: unknown): HostRateLimitMeta |
 }
 
 /** A host stored with zones but no mode predates global zones, and keeps its own as before. */
-export function hostRateLimitMode(meta: HostRateLimitMeta | undefined): RateLimitMode {
+function hostRateLimitMode(meta: HostRateLimitMeta | undefined): RateLimitMode {
   if (!meta) return "inherit";
   return meta.mode ?? "merge";
 }
@@ -261,7 +261,7 @@ export function rateLimitZoneName(hostId: number, index: number): string {
 }
 
 /** A global zone counts per host too: inheriting a limit is not sharing one. */
-export function globalRateLimitZoneName(hostId: number, index: number): string {
+function globalRateLimitZoneName(hostId: number, index: number): string {
   return `h${hostId}_g${index}`;
 }
 
@@ -365,7 +365,7 @@ function handlerOf(rateLimits: Record<string, Record<string, unknown>>, keyed: b
   return handler;
 }
 
-export type RateLimitHandlers = {
+type RateLimitHandlers = {
   /** In the shared chain, after CrowdSec. */
   pre: Handler | null;
   /** After sign-in, for zones counting the signed-in user. Null without forward auth. */

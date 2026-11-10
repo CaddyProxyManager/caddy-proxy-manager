@@ -3,7 +3,7 @@
  * built-in email and push are listed but not edited here: Settings and Profile own them.
  */
 
-import { asc, eq, isNull } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { logAuditEvent } from "../audit";
 import db, { nowIso, runInTransaction } from "../db";
 import { alertDigests, alertRules, notificationChannels } from "../db/schema";
@@ -156,7 +156,7 @@ export async function deleteChannel(id: number, userId: number | null): Promise<
 }
 
 /** Whether the service said it delivered the test, or only that it accepted it (Teams). */
-export type ChannelTestResult = { outcome: "delivered" | "accepted"; recipients?: string[] };
+type ChannelTestResult = { outcome: "delivered" | "accepted"; recipients?: string[] };
 
 /**
  * Straight to the channel, nothing queued; throws with the receiver's answer so the page can say
@@ -221,12 +221,4 @@ export async function testChannel(
     throw domainError("alertChannelTestFailed", { error: result.error }, { status: 400 });
   }
   return { outcome: channel.kind === "teams" || result.status === 202 ? "accepted" : "delivered" };
-}
-
-export async function addedChannelIds(): Promise<number[]> {
-  const rows = await db
-    .select({ id: notificationChannels.id })
-    .from(notificationChannels)
-    .where(isNull(notificationChannels.builtin));
-  return rows.map((row) => row.id);
 }

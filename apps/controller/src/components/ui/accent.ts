@@ -30,7 +30,7 @@ export const ACCENTS: Record<Hue, { edge: string; text: string }> = {
 };
 
 /** By position, for a row of tiles that carry no meaning of their own to colour by. */
-export const POSITION_HUES: readonly Hue[] = ["purple", "green", "yellow", "cyan"];
+const POSITION_HUES: readonly Hue[] = ["purple", "green", "yellow", "cyan"];
 
 export function hueAt(index: number): Hue {
   return POSITION_HUES[index % POSITION_HUES.length];

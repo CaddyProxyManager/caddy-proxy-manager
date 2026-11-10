@@ -5,7 +5,7 @@ import { RadioList, RadioListItem } from "@astryxdesign/core/RadioList";
 import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/Stack";
 
-export type SheetOption<V extends string> = {
+type SheetOption<V extends string> = {
   value: V;
   label: string;
   description?: string;

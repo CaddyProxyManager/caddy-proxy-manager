@@ -40,7 +40,7 @@ export function actionError(t: Translator, error: unknown, fallbackMessage: stri
 }
 
 /** What a list param needs from next-intl's formatter; `await getFormatter()` is one. */
-export type ListFormatter = Pick<ReturnType<typeof useFormatter>, "list">;
+type ListFormatter = Pick<ReturnType<typeof useFormatter>, "list">;
 
 /** Without `format`, a list param is joined English-style, which is merely readable elsewhere. */
 export function extractErrorMessage(

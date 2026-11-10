@@ -37,6 +37,7 @@ import {
   saveSinkAction,
   testSinkAction,
 } from "./actions";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
 /** `SINK_KINDS` and friends in lib/audit-stream/sinks, which pulls the secrets module in. */
 const KINDS = ["syslog-udp", "syslog-tcp", "syslog-tls", "http", "file"] as const;
@@ -129,10 +130,6 @@ function inputOf(form: SinkForm): SinkInput {
   };
 }
 
-function message(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
-
 function TestResult({ result }: { result: SinkTestOutcome }) {
   const t = useTranslations("settings.auditStreaming");
   if (!result.ok) {
@@ -183,7 +180,7 @@ function SinkDialog({
       onSaved();
       onClose();
     } catch (err) {
-      setError(message(err, t("saveFailed")));
+      setError(thrownMessage(err, t("saveFailed")));
     } finally {
       setSaving(false);
     }
@@ -195,7 +192,7 @@ function SinkDialog({
     try {
       setTested(await testSinkAction(editing?.id ?? null, inputOf(form)));
     } catch (err) {
-      setTested({ ok: false, error: message(err, t("testFailed")) });
+      setTested({ ok: false, error: thrownMessage(err, t("testFailed")) });
     } finally {
       setTesting(false);
     }
@@ -502,7 +499,7 @@ export default function AuditStreamingClient({
     try {
       unwrap(await deleteSinkAction(sink.id));
     } catch (err) {
-      setError(message(err, t("deleteFailed")));
+      setError(thrownMessage(err, t("deleteFailed")));
     } finally {
       await reload();
     }
@@ -514,7 +511,10 @@ export default function AuditStreamingClient({
     try {
       setTested({ name: sink.name, result: await testSinkAction(sink.id, null) });
     } catch (err) {
-      setTested({ name: sink.name, result: { ok: false, error: message(err, t("testFailed")) } });
+      setTested({
+        name: sink.name,
+        result: { ok: false, error: thrownMessage(err, t("testFailed")) },
+      });
     } finally {
       setTesting(null);
     }

@@ -6,7 +6,7 @@ import { CAPABILITIES, type Capability, type RoleDefinition } from "./capabiliti
 
 export const BUILT_IN_ROLE_KEYS = ["admin", "operator", "user", "viewer"] as const;
 
-export type BuiltInRoleKey = (typeof BUILT_IN_ROLE_KEYS)[number];
+type BuiltInRoleKey = (typeof BUILT_IN_ROLE_KEYS)[number];
 
 export function isBuiltInRoleKey(value: unknown): value is BuiltInRoleKey {
   return typeof value === "string" && (BUILT_IN_ROLE_KEYS as readonly string[]).includes(value);

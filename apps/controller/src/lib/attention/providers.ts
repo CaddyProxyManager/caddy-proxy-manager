@@ -48,7 +48,7 @@ export const SETTINGS_LINKS = {
 } as const;
 
 /** Reconnects take seconds; one gone longer than this is worth a look. */
-export const AGENT_OFFLINE_GRACE_MS = 2 * 60_000;
+const AGENT_OFFLINE_GRACE_MS = 2 * 60_000;
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
@@ -642,7 +642,7 @@ const security: AttentionProvider = {
 // ── Scheduled backups ───────────────────────────────────────────────────────
 
 /** Settings > Backup, where schedules and their runs are listed. */
-export const BACKUP_SETTINGS_HREF = "/settings/backup";
+const BACKUP_SETTINGS_HREF = "/settings/backup";
 
 const backups: AttentionProvider = {
   id: "backups",

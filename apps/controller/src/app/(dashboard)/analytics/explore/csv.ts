@@ -3,7 +3,7 @@
  * a spreadsheet would read as a formula is prefixed with a quote and stays text.
  */
 
-export type CsvCell = string | number | null | undefined;
+type CsvCell = string | number | null | undefined;
 
 const FORMULA_START = /^[=+\-@\t\r]/;
 

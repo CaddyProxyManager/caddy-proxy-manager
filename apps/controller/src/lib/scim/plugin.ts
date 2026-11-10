@@ -17,7 +17,7 @@ export const SCIM_PATH = "/scim/v2/";
 /** One domain: a person provisioned by two identity providers is one CPM account. */
 export const SCIM_DOMAIN = "cpm";
 /** The grant every provisioned group projects, so groups no role is mapped to still arrive. */
-export const MEMBER_ROLE = "member";
+const MEMBER_ROLE = "member";
 const ALL_SCOPES = [
   "scim.users.read",
   "scim.users.write",

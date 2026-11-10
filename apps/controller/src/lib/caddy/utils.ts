@@ -318,7 +318,7 @@ export function formatHostPort(host: string, port: number): string {
   return host.length === 0 ? `:${port}` : formatDialAddress(host, String(port));
 }
 
-export type ParsedUpstreamTarget = {
+type ParsedUpstreamTarget = {
   original: string;
   dial: string;
   scheme: "http" | "https" | null;

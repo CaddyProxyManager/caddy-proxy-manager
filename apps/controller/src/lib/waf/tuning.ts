@@ -4,7 +4,7 @@
  */
 
 export const PARANOIA_LEVELS = [1, 2, 3, 4] as const;
-export type ParanoiaLevel = (typeof PARANOIA_LEVELS)[number];
+type ParanoiaLevel = (typeof PARANOIA_LEVELS)[number];
 
 export const DEFAULT_PARANOIA_LEVEL: ParanoiaLevel = 1;
 export const DEFAULT_INBOUND_THRESHOLD = 5;
@@ -28,11 +28,11 @@ export type WafTuning = {
   outbound_anomaly_threshold?: number;
 };
 
-export function isParanoiaLevel(value: unknown): value is ParanoiaLevel {
+function isParanoiaLevel(value: unknown): value is ParanoiaLevel {
   return (PARANOIA_LEVELS as readonly unknown[]).includes(value);
 }
 
-export function isAnomalyThreshold(value: unknown): value is number {
+function isAnomalyThreshold(value: unknown): value is number {
   return (
     typeof value === "number" &&
     Number.isInteger(value) &&

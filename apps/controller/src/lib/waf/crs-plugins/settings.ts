@@ -10,9 +10,9 @@ import { OFFICIAL_CRS_REGISTRY_URL } from "./registry";
 
 const KEY = "crs_plugin_registry";
 
-export const DEFAULT_REFRESH_INTERVAL_HOURS = 24;
-export const MAX_REFRESH_INTERVAL_HOURS = 24 * 30;
-export const MAX_REGISTRIES = 10;
+const DEFAULT_REFRESH_INTERVAL_HOURS = 24;
+const MAX_REFRESH_INTERVAL_HOURS = 24 * 30;
+const MAX_REGISTRIES = 10;
 const MAX_NAME_LENGTH = 64;
 
 export type CrsRegistrySource = {
@@ -22,7 +22,7 @@ export type CrsRegistrySource = {
   url: string;
 };
 
-export const OFFICIAL_CRS_REGISTRY: CrsRegistrySource = {
+const OFFICIAL_CRS_REGISTRY: CrsRegistrySource = {
   id: "official",
   name: "OWASP CRS",
   url: OFFICIAL_CRS_REGISTRY_URL,

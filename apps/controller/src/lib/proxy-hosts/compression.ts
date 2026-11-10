@@ -8,7 +8,7 @@ export type HostCompressionMode = (typeof HOST_COMPRESSION_MODES)[number];
 
 export type CompressionSettings = { enabled: boolean };
 
-export const DEFAULT_COMPRESSION_SETTINGS: CompressionSettings = { enabled: true };
+const DEFAULT_COMPRESSION_SETTINGS: CompressionSettings = { enabled: true };
 
 export function normalizeCompressionSettings(value: unknown): CompressionSettings {
   const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};

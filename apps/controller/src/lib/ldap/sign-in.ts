@@ -38,11 +38,7 @@ export async function resolveSignInDirectory(
  * A made-up address for an entry without `mail`: `common.email` is required and unique. The hash
  * keeps two names that sanitize alike apart; `.invalid` can never be delivered to or registered.
  */
-export function placeholderEmail(
-  directory: LdapDirectory,
-  identity: LdapIdentity,
-  username: string,
-) {
+function placeholderEmail(directory: LdapDirectory, identity: LdapIdentity, username: string) {
   const local =
     username
       .toLowerCase()
@@ -80,7 +76,7 @@ async function hasAccountFor(userId: number, directory: LdapDirectory): Promise<
   return !!row;
 }
 
-export type LdapUserResolution =
+type LdapUserResolution =
   | { ok: true; userId: number; created: boolean }
   | {
       ok: false;
@@ -88,7 +84,7 @@ export type LdapUserResolution =
     };
 
 /** The CPM user for a directory identity: linked already, linked now by email, or created. */
-export async function resolveLdapUser(
+async function resolveLdapUser(
   adapter: InternalAdapter,
   directory: LdapDirectory,
   identity: LdapIdentity,
@@ -130,7 +126,7 @@ export async function resolveLdapUser(
 }
 
 /** The directory's groups onto the user's role and CPM groups, as a group claim would be. */
-export async function applyLdapGroups(
+async function applyLdapGroups(
   userId: number,
   directory: LdapDirectory,
   identity: LdapIdentity,

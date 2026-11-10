@@ -22,7 +22,7 @@ export type ServerLogRow =
     }
   | { kind: "event"; ts: number; summary: string; actor: string | null; entityType: string };
 
-export const SERVER_LOG_TYPES = [
+const SERVER_LOG_TYPES = [
   "requests",
   "errors",
   "serverErrors",
@@ -30,14 +30,14 @@ export const SERVER_LOG_TYPES = [
   "blocked",
   "serverEvents",
 ] as const;
-export type ServerLogType = (typeof SERVER_LOG_TYPES)[number];
+type ServerLogType = (typeof SERVER_LOG_TYPES)[number];
 
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 
 // Astryx ships these labels in every locale; no catalog entries needed.
 const op = (key: string) => ({ key, i18nKey: `@astryx.powersearch.operator.${key}` }) as const;
 
-export type ServerLogSearchLabels = {
+type ServerLogSearchLabels = {
   text: string;
   type: string;
   types: Record<ServerLogType, string>;

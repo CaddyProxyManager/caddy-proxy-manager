@@ -159,7 +159,7 @@ export async function findModuleConflicts(
   return problems;
 }
 
-export type CaddyfileSnippetWarning = {
+type CaddyfileSnippetWarning = {
   count: number;
   /** The first few, by name. */
   names: string[];

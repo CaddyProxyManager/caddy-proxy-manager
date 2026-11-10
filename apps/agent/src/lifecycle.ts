@@ -75,8 +75,9 @@ import {
 } from "./logs";
 import { OperationBusyError, type Operations } from "./operations";
 import { AGENT_VERSION, buildStatus } from "./status";
+import { thrownMessage } from "./thrown-message";
 
-export type LifecycleDeps = {
+type LifecycleDeps = {
   config: AgentConfig;
   store: AgentStore;
   docker: DockerHost;
@@ -96,7 +97,7 @@ const STREAM_SILENCE_MS = 3 * AGENT_STREAM_KEEPALIVE_MS;
 const FORGOTTEN_MESSAGE =
   "The controller no longer recognises this agent. Pair it again with a fresh code.";
 
-export type PairOutcome = { ok: true } | { ok: false; error: string };
+type PairOutcome = { ok: true } | { ok: false; error: string };
 
 export class AgentLifecycle {
   private lifecycle: Lifecycle = "idle";
@@ -294,7 +295,7 @@ export class AgentLifecycle {
         repair: preview?.repair ?? false,
       };
     } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      return { ok: false, error: thrownMessage(error) };
     }
   }
 
@@ -477,7 +478,7 @@ export class AgentLifecycle {
       void this.run();
       return { ok: true };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = thrownMessage(error);
       await this.goIdle(message);
       return { ok: false, error: message };
     }
@@ -808,7 +809,7 @@ export class AgentLifecycle {
         id: command.id,
         ok: false,
         code,
-        error: error instanceof Error ? error.message : String(error),
+        error: thrownMessage(error),
       };
     }
   }

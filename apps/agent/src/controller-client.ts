@@ -41,7 +41,7 @@ async function sha256Hex(body: string): Promise<string> {
   return hasher.digest("hex");
 }
 
-export class ControllerUnreachable extends Error {
+class ControllerUnreachable extends Error {
   constructor(url: string, cause: unknown) {
     super(`Could not reach the controller at ${url}: ${describe(cause)}`);
     this.name = "ControllerUnreachable";

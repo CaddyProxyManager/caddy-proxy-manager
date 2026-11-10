@@ -56,7 +56,7 @@ async function checkEndpoint(endpoint: string): Promise<void> {
  * Where requests go. Virtual-hosted style puts the bucket in the host name; Bun wants that host as
  * the endpoint and then ignores `bucket`, so it is composed here from the two fields entered.
  */
-export function s3Endpoint(config: S3DestinationConfig): string {
+function s3Endpoint(config: S3DestinationConfig): string {
   if (!config.endpoint || !config.virtualHostedStyle) return config.endpoint;
   const url = new URL(config.endpoint);
   url.hostname = `${config.bucket}.${url.hostname}`;
@@ -135,7 +135,7 @@ export function dataDirectory(): string {
   return process.env.L4_PORTS_DIR || "/app/data";
 }
 
-export function localRoot(folder: string): string {
+function localRoot(folder: string): string {
   return join(dataDirectory(), "backups", folder);
 }
 

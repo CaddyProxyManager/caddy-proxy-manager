@@ -27,9 +27,9 @@ import {
 
 const BATCH_SIZE = 250;
 
-export type TableResult = { table: string; copied: number; skipped: number };
+type TableResult = { table: string; copied: number; skipped: number };
 
-export type ImportReport = {
+type ImportReport = {
   tables: TableResult[];
   /** Named so nothing looks lost. */
   droppedFromSchema: string[];

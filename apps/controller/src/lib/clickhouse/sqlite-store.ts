@@ -77,7 +77,7 @@ function addMissingColumns(database: Database): void {
 export const ANALYTICS_TABLES = ["traffic_events", "waf_events", "l4_events"] as const;
 
 /** Beside the app's SQLite file, so a demo resets in one directory; memory on PostgreSQL. */
-export function sqliteStorePath(env: Record<string, string | undefined> = process.env): string {
+function sqliteStorePath(env: Record<string, string | undefined> = process.env): string {
   const pinned = env.DEMO_ANALYTICS_DB?.trim();
   if (pinned) return pinned;
   if (databaseDialect(env) !== "sqlite") return ":memory:";

@@ -121,7 +121,7 @@ function reject(
   throw new SettingValidationError(key, code, params, message);
 }
 
-export function booleanSetting(spec: Common<boolean>): SettingDefinition<boolean> {
+function booleanSetting(spec: Common<boolean>): SettingDefinition<boolean> {
   const key = `${KEY_PREFIX}${spec.name}`;
   const parse = (value: unknown): boolean => {
     if (typeof value === "boolean") return value;
@@ -136,7 +136,7 @@ export function booleanSetting(spec: Common<boolean>): SettingDefinition<boolean
   return { ...spec, key, parse, fromEnv: parse };
 }
 
-export function stringSetting(
+function stringSetting(
   spec: Common<string> & {
     maxLength?: number;
     pattern?: RegExp;
@@ -172,9 +172,7 @@ export function stringSetting(
 }
 
 /** Leave `generatable` off for a secret that must match something external, like a licence key. */
-export function secretSetting(
-  spec: Common<string> & { maxLength?: number; generatable?: boolean },
-) {
+function secretSetting(spec: Common<string> & { maxLength?: number; generatable?: boolean }) {
   return {
     ...stringSetting({ ...spec, maxLength: spec.maxLength ?? 16 * 1024 }),
     secret: true,
@@ -182,7 +180,7 @@ export function secretSetting(
   };
 }
 
-export function numberSetting(
+function numberSetting(
   spec: Common<number> & { min: number; max: number; unit?: SettingUnit },
 ): SettingDefinition<number> {
   const key = `${KEY_PREFIX}${spec.name}`;
@@ -200,7 +198,7 @@ export function numberSetting(
 }
 
 /** Tri-state: null means "no opinion", deferring to a Settings toggle as unset `AUTH_*` vars do. */
-export function optionalBooleanSetting(
+function optionalBooleanSetting(
   spec: Omit<Common<boolean | null>, "default"> & { gate?: boolean },
 ): SettingDefinition<boolean | null> {
   const key = `${KEY_PREFIX}${spec.name}`;

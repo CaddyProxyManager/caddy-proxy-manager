@@ -29,7 +29,7 @@ import {
 import { revokeSessionsAfterPasswordChange } from "../models/sessions";
 import { getUserById, updateUserPassword, usersWithPassword } from "../models/user";
 
-export const EMAILED_LINK_PATH = "/login/reset-password";
+const EMAILED_LINK_PATH = "/login/reset-password";
 
 async function linkFor(token: string): Promise<string> {
   return `${await getPublicBaseUrl()}${EMAILED_LINK_PATH}#${token}`;

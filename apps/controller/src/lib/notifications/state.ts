@@ -18,7 +18,7 @@ import {
   rulesForEvent,
 } from "./rules";
 
-export type EventType = "notice" | "problem" | "recovery";
+type EventType = "notice" | "problem" | "recovery";
 
 /** Built from the event that raised it, e.g. to name the agent again; null for none. */
 export type Recovery =

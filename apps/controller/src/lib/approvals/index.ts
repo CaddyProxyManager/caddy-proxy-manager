@@ -47,7 +47,7 @@ import {
 
 export { getApprovalPolicy } from "./kinds";
 
-export type Submitter = {
+type Submitter = {
   userId: number;
   /** Through an API token: the policy's "Apply to API tokens" decides what happens. */
   viaToken?: boolean;
@@ -76,7 +76,7 @@ async function actorOf(userId: number): Promise<(Actor & { role: string; status:
 }
 
 /** Whether `change` waits, applies, or applies with approval marked as skipped. */
-export async function routeOf(
+async function routeOf(
   by: Submitter,
   change: Change,
   policy?: ApprovalPolicy,
@@ -121,7 +121,7 @@ export async function submitOrApply<K extends ChangeKind>(
 }
 
 /** Stores the request; the preview runs every check a save would, so a bad change is refused here. */
-export async function submitChange(
+async function submitChange(
   by: Submitter,
   change: Change,
   policy: ApprovalPolicy,
@@ -177,11 +177,7 @@ async function loadRow(id: number): Promise<Row> {
 }
 
 /** Whether `userId` may approve under `policy`: their role, a role their groups carry, or a group. */
-export async function isApprover(
-  policy: ApprovalPolicy,
-  userId: number,
-  role: string,
-): Promise<boolean> {
+async function isApprover(policy: ApprovalPolicy, userId: number, role: string): Promise<boolean> {
   if (policy.approverRoles.includes(role)) return true;
   const groupIds = await groupIdsOf(userId);
   if (groupIds.some((id) => policy.approverGroupIds.includes(id))) return true;
@@ -406,7 +402,7 @@ async function invalidate(row: Row): Promise<boolean> {
 }
 
 /** Pending requests whose target changed since they were submitted. */
-export async function sweepInvalidated(): Promise<number> {
+async function sweepInvalidated(): Promise<number> {
   await recoverStalledApplies();
   const pending = await db
     .select()
@@ -470,7 +466,7 @@ async function assertMayDecide(row: Row, access: Access) {
   }
 }
 
-export type DecisionResult = { status: ChangeStatus; approvals: number; required: number };
+type DecisionResult = { status: ChangeStatus; approvals: number; required: number };
 
 /**
  * Records the approval; the one that brings the count to what the request needs applies it. Two

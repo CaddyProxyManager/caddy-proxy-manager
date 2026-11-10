@@ -16,7 +16,7 @@ export const UNAVAILABLE_REASONS = [
 export type UnavailableReason = (typeof UNAVAILABLE_REASONS)[number];
 
 /** As lib/caddy/index.ts decides it: managed CrowdSec forces the access log on, in JSON. */
-export async function accessLogReadable(): Promise<boolean> {
+async function accessLogReadable(): Promise<boolean> {
   const { getCrowdSecSettings, getLoggingSettings } = await import("../settings");
   const [logging, crowdsec] = await Promise.all([getLoggingSettings(), getCrowdSecSettings()]);
   return (

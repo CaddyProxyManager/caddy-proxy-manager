@@ -2,6 +2,7 @@ import nodemailer from "nodemailer";
 import { getAppName } from "../branding/app-name";
 import { domainError } from "../errors/domain-error";
 import { readSmtpConfig, type SmtpConfig } from "./config";
+import { thrownMessage } from "../errors/thrown-message";
 
 export type EmailMessage = {
   to: string | string[];
@@ -53,7 +54,7 @@ export async function sendEmail(message: EmailMessage): Promise<void> {
   try {
     await deliver(config, { ...message, from });
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
+    const detail = thrownMessage(error);
     throw domainError("emailSendFailed", { detail });
   }
 }

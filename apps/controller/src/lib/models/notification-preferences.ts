@@ -7,7 +7,7 @@ import { NOTIFICATION_CATEGORIES, type NotificationCategory } from "../notificat
  * What one administrator is told, and how. Written to the table directly, as the nav pins are: a
  * personal choice must not appear in anyone's staged diff. No row means never chosen.
  */
-export type NotificationPreferences = {
+type NotificationPreferences = {
   /** Null until chosen: the default depends on the Recipients list (see audience.ts). */
   email: boolean | null;
   push: boolean;
@@ -15,7 +15,7 @@ export type NotificationPreferences = {
   muted: NotificationCategory[];
 };
 
-export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   email: null,
   push: true,
   muted: [],

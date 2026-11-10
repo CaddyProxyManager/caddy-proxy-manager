@@ -6,8 +6,8 @@
 import { domainError } from "../errors/domain-error";
 
 /** Anubis serves its challenge page, assets and pass endpoint under this prefix. */
-export const ANUBIS_PREFIX = "/.within.website";
-export const ANUBIS_CHECK_URI = `${ANUBIS_PREFIX}/x/cmd/anubis/api/check`;
+const ANUBIS_PREFIX = "/.within.website";
+const ANUBIS_CHECK_URI = `${ANUBIS_PREFIX}/x/cmd/anubis/api/check`;
 export const ANUBIS_EXEMPT_PATHS_MAX = 50;
 const EXEMPT_PATH_MAX_LENGTH = 512;
 

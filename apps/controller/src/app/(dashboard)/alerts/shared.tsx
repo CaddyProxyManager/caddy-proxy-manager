@@ -9,10 +9,6 @@ export const SEVERITIES = ["critical", "warning", "info"] as const;
 
 const SEVERITY_COLOR = { critical: "red", warning: "orange", info: "blue" } as const;
 
-export function message(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
-
 export function SeverityToken({ severity }: { severity: string }) {
   const t = useTranslations("attention.severity");
   const known = severity in SEVERITY_COLOR ? (severity as keyof typeof SEVERITY_COLOR) : "info";

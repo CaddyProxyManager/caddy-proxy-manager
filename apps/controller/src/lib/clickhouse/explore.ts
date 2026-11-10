@@ -554,7 +554,7 @@ export type ExploreRequest = {
   userAgent: string;
 };
 
-export const REQUEST_LOG_LIMIT = 50;
+const REQUEST_LOG_LIMIT = 50;
 
 export async function queryExploreRequests(
   window: TimeWindow,

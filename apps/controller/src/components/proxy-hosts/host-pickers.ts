@@ -18,7 +18,7 @@ export function toOptions(items: { id: number; name: string }[], noneLabel: stri
 type ProxyHostsT = ReturnType<typeof useTranslations<"proxyHosts">>;
 
 /** A list with neither users nor IP rules admits nobody. */
-export function accessListIsEmpty(list: Pick<AccessList, "entries" | "ipRules">): boolean {
+function accessListIsEmpty(list: Pick<AccessList, "entries" | "ipRules">): boolean {
   return list.entries.length === 0 && (list.ipRules?.length ?? 0) === 0;
 }
 

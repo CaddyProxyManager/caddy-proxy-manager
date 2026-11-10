@@ -103,7 +103,7 @@ export function compareSemver(a: Semver, b: Semver): number {
  * A stable install is never offered a beta or RC; one running a prerelease is offered both, as
  * the deploy repository's `next` branch carries both. A dev build counts as stable.
  */
-export function onChannel(current: string, tag: string): boolean {
+function onChannel(current: string, tag: string): boolean {
   const parsed = parseSemver(tag);
   if (!parsed) return false;
   return parsed.prerelease.length === 0 || (parseSemver(current)?.prerelease.length ?? 0) > 0;

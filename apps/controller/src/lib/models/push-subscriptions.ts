@@ -17,7 +17,7 @@ export type PushTarget = {
   locale: string | null;
 };
 
-export type BrowserSubscription = Pick<PushTarget, "endpoint" | "keys">;
+type BrowserSubscription = Pick<PushTarget, "endpoint" | "keys">;
 
 /** Bounds a row a browser hands us; real endpoints and keys are a fraction of these. */
 const MAX_ENDPOINT = 2048;
@@ -39,7 +39,7 @@ const PUSH_SERVICE_HOSTS = [
   "push.apple.com",
 ];
 
-export function isPushServiceUrl(value: string): boolean {
+function isPushServiceUrl(value: string): boolean {
   let url: URL;
   try {
     url = new URL(value);

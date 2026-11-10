@@ -126,7 +126,7 @@ export function isEnvOverridden(definition: SettingDefinition): boolean {
 /** Shown to the operator by the setup and migration pages. */
 export type SettingSource = "stored" | "environment" | "default";
 
-export type ResolvedSetting<T extends SettingValue = SettingValue> = {
+type ResolvedSetting<T extends SettingValue = SettingValue> = {
   value: T;
   source: SettingSource;
 };

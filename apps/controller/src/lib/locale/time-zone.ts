@@ -9,7 +9,7 @@ export const TIME_ZONE_COOKIE = "cpm-tz";
 /** A year, matching the locale and theme cookies. */
 export const TIME_ZONE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
-export const DEFAULT_TIME_ZONE = "UTC";
+const DEFAULT_TIME_ZONE = "UTC";
 
 /** Canonical IANA name or undefined: the cookie is client-written, and `Intl` throws on junk. */
 export function parseTimeZone(value: string | null | undefined): string | undefined {

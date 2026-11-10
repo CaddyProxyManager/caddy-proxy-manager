@@ -123,7 +123,7 @@ let client: ClickHouseClient | null = null;
 /** The connection settings `client` was opened with, so a changed one is noticed. */
 let clientKey: string | null = null;
 
-export async function getClient(): Promise<ClickHouseClient> {
+async function getClient(): Promise<ClickHouseClient> {
   const { url, user, password, database } = await chConfig();
   const key = JSON.stringify([url, user, password, database]);
   if (client && clientKey === key) return client;
@@ -569,7 +569,7 @@ export async function insertL4Events(rows: L4ConnectionRow[], agentId = ""): Pro
 export type QueryParams = Record<string, unknown>;
 
 /** A host filter clause with parameterized placeholders: the SQL fragment plus its params. */
-export function hostFilter(hosts: string[]): { sql: string; params: QueryParams } {
+function hostFilter(hosts: string[]): { sql: string; params: QueryParams } {
   if (hosts.length === 0) return { sql: "", params: {} };
   const params: QueryParams = {};
   const placeholders: string[] = [];
@@ -1250,7 +1250,7 @@ export async function queryDistinctHosts(): Promise<string[]> {
   return rows.map((r) => r.host);
 }
 
-export interface HostTotals {
+interface HostTotals {
   host: string;
   total: number;
   blocked: number;

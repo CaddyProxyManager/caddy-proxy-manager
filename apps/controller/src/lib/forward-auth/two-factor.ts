@@ -14,11 +14,11 @@ import { config } from "../config";
 
 /** Better Auth's defaults, repeated because the portal has to enforce the same budget. */
 export const TWO_FACTOR_MAX_FAILURES = 10;
-export const TWO_FACTOR_LOCK_MS = 15 * 60 * 1000;
+const TWO_FACTOR_LOCK_MS = 15 * 60 * 1000;
 const TOTP = { digits: 6, period: 30 } as const;
 
 export type SecondFactorMethod = "totp" | "backup";
-export type SecondFactorResult = "ok" | "invalid" | "locked" | "notEnabled";
+type SecondFactorResult = "ok" | "invalid" | "locked" | "notEnabled";
 
 // What Better Auth encrypts the plugin's columns with: `createAuth` passes this as its only secret.
 async function secretKey(): Promise<string> {

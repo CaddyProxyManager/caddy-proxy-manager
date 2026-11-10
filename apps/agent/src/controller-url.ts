@@ -6,7 +6,7 @@
  */
 
 /** Where the controller listens when the operator gave a host and no port. */
-export const DEFAULT_CONTROLLER_PORT = 3000;
+const DEFAULT_CONTROLLER_PORT = 3000;
 
 export class ControllerAddressError extends Error {
   constructor(message: string) {
@@ -51,7 +51,7 @@ export function isLocalHost(hostname: string): boolean {
  * link-local, and the suffixes those networks name hosts with. A name is taken at its word - this
  * decides what to warn about, and a public name ending `.internal` is the operator's own doing.
  */
-export function isPrivateHost(hostname: string): boolean {
+function isPrivateHost(hostname: string): boolean {
   const host = bareHost(hostname);
   if (isLocalHost(host)) return true;
 

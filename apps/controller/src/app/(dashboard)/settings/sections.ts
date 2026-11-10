@@ -39,7 +39,7 @@ export type SettingsBlock = {
   envSearch?: readonly string[];
 };
 
-export type SettingItem = {
+type SettingItem = {
   id: string;
   name: string;
   desc: string;
@@ -47,7 +47,7 @@ export type SettingItem = {
   blocks: readonly SettingsBlock[];
 };
 
-export type SettingsGroup = {
+type SettingsGroup = {
   id: string;
   label: string;
   items: SettingItem[];

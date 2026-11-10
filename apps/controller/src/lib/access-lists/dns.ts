@@ -14,10 +14,11 @@ import {
 } from "../dns/lookup";
 import { MAX_ADDRESSES_PER_HOSTNAME, splitRuleHostname } from "./rules";
 import { getDnsSettings } from "../settings";
+import { thrownMessage } from "../errors/thrown-message";
 
 /** TTLs are clamped: a 0 would re-resolve every wake, a day would miss a dynamic-DNS update. */
-export const MIN_TTL_SECONDS = 60;
-export const MAX_TTL_SECONDS = 60 * 60;
+const MIN_TTL_SECONDS = 60;
+const MAX_TTL_SECONDS = 60 * 60;
 /** How long the last known answer outlives failed lookups before the name stands for nothing. */
 export const MAX_STALE_MS = 24 * 60 * 60 * 1000;
 /** A save waits on this; the refresher retries anything slower within a minute. */
@@ -154,7 +155,7 @@ export async function resolveHostnames(
           resolvedAt,
           expiresAt: new Date(now + MIN_TTL_SECONDS * 1000).toISOString(),
           // English, like the resolver's own messages; shown as the reason beside the name.
-          lastError: error instanceof Error ? error.message : String(error),
+          lastError: thrownMessage(error),
           lastErrorAt: new Date(now).toISOString(),
         };
       }

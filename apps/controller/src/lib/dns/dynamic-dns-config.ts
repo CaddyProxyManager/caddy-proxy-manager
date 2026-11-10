@@ -3,7 +3,7 @@
 import type { DynamicDnsRecordSet, DynamicDnsSettings } from "./dynamic-dns";
 import { buildDnsProviderConfig } from "./provider-credentials";
 
-export type DynamicDnsTarget = {
+type DynamicDnsTarget = {
   /** The agent this document is for; null for the direct transport. */
   agentId: string | null;
   /** Where a set without an agent goes: the bundled agent, else the direct transport. */

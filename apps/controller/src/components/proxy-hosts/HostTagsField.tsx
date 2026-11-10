@@ -24,7 +24,7 @@ type UiT = ReturnType<typeof useTranslations<"ui.hostTags">>;
 type TagItem = SearchableItem<{ typed?: boolean }>;
 
 /** The reason a typed tag cannot be added, in the reader's language; null when it can. */
-export function hostTagError(tag: string, existing: string[], t: UiT): string | null {
+function hostTagError(tag: string, existing: string[], t: UiT): string | null {
   if (!tag || existing.includes(tag)) return null;
   const problem = hostTagProblem(tag);
   if (problem === "invalid") return t("invalid");

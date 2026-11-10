@@ -39,7 +39,7 @@ function revalidate(hostId: number) {
   revalidatePath("/waf");
 }
 
-export type WafOverrideStateResult =
+type WafOverrideStateResult =
   | { status: "success"; session: WafOverrideSession | null }
   | { status: "error"; message: string };
 
@@ -55,7 +55,7 @@ export async function wafOverrideStateAction(hostId: number): Promise<WafOverrid
   }
 }
 
-export type WafOverrideResultState =
+type WafOverrideResultState =
   | { status: "success"; result: WafOverrideResult }
   | { status: "error"; message: string };
 

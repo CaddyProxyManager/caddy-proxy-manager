@@ -53,7 +53,7 @@ type PaletteItem = {
 
 const PaletteContext = createContext<{ open: () => void }>({ open: () => {} });
 
-export function useCommandPalette() {
+function useCommandPalette() {
   return useContext(PaletteContext);
 }
 

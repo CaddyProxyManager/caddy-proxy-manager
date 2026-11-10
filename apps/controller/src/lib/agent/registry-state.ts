@@ -38,7 +38,7 @@ export type RemoteConnection = {
   lastSeenAt: number;
 };
 
-export type Waiter = {
+type Waiter = {
   resolve: (result: CaddyAdminProxyResponse) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;

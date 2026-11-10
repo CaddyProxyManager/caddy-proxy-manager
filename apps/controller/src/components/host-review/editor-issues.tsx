@@ -14,7 +14,7 @@ import {
   useState,
 } from "react";
 
-export type EditorIssueCounts = { errors: number; warnings: number };
+type EditorIssueCounts = { errors: number; warnings: number };
 
 type Report = (id: string, counts: EditorIssueCounts | null) => void;
 

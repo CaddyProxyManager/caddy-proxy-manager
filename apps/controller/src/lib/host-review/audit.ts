@@ -14,7 +14,7 @@ type HostLike = Record<string, unknown> & {
   accessListId?: number | null;
 };
 
-export type HostAuditSide = { host: HostLike; agentIds: readonly number[] } | null;
+type HostAuditSide = { host: HostLike; agentIds: readonly number[] } | null;
 
 async function nameMap(
   table: typeof agents | typeof accessLists | typeof certificates,

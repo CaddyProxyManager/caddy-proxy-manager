@@ -22,7 +22,7 @@ type CardElement =
     }
   | { type: "FactSet"; facts: { title: string; value: string }[] };
 
-export type TeamsPayload = {
+type TeamsPayload = {
   type: "message";
   attachments: {
     contentType: "application/vnd.microsoft.card.adaptive";

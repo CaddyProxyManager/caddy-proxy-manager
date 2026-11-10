@@ -325,12 +325,6 @@ export function takeFromWindow(key: string, limit: number, windowMs: number, now
   return true;
 }
 
-/** Without counting anything. */
-export function windowSpent(key: string, limit: number, now = Date.now()): boolean {
-  const entry = WINDOWS.get(key);
-  return entry !== undefined && entry.resetAt > now && entry.count >= limit;
-}
-
 export function resetWindow(key: string): void {
   WINDOWS.delete(key);
 }

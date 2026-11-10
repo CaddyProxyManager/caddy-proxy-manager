@@ -43,7 +43,7 @@ function same(stored: string | null, expected: string): boolean {
 }
 
 /** What the chain covers: everything a reader sees except the user's display name. */
-export type ChainedContent = {
+type ChainedContent = {
   seq: number;
   actorId: number | null;
   action: string;
@@ -74,7 +74,7 @@ export function auditEventHash(prevHash: string, row: ChainedContent, key = chai
 }
 
 /** An event from before the chain: bound to its id, since it has no place in the sequence. */
-export function legacyAuditMark(
+function legacyAuditMark(
   row: Omit<ChainedContent, "seq"> & { id: number },
   key = chainKey(),
 ): string {
@@ -147,7 +147,7 @@ function carrySeal(head: Head, next: HeadState, key: Buffer): string | null {
 }
 
 /** Pure: the rows with their links, and where the head moves to. */
-export function linkAuditRows(
+function linkAuditRows(
   head: Pick<Head, "headSeq" | "headHash">,
   rows: AuditRow[],
   key = chainKey(),
@@ -400,7 +400,7 @@ export async function pruneAuditEvents(
  * current: sealed under SESSION_SECRET; sealed: a chain from before the keyed scheme was re-hashed;
  * rekeyed: SESSION_SECRET_PREVIOUS's chain verified and moved to SESSION_SECRET; unverified: neither.
  */
-export type AuditChainStartup = "current" | "sealed" | "rekeyed" | "unverified";
+type AuditChainStartup = "current" | "sealed" | "rekeyed" | "unverified";
 
 const rekeyEvent = (reason: "upgrade" | "rotation"): AuditRow => ({
   userId: null,

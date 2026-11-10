@@ -17,7 +17,7 @@ import { type SecurityRecord, type SecurityRecordBody, securityRecord } from "./
 
 const HEAD_ID = 1;
 export const SECURITY_KEEP_MS = 24 * 60 * 60_000;
-export const SECURITY_KEEP_RECORDS = 100_000;
+const SECURITY_KEEP_RECORDS = 100_000;
 /** Rows per insert: well inside SQLite's bound-parameter limit. */
 const INSERT_CHUNK = 500;
 
@@ -78,10 +78,10 @@ export function trafficSecurityBody(row: TrafficEventRow): SecurityRecordBody | 
   };
 }
 
-export const SECURITY_WANTED_MEMO = "audit-sinks:security-wanted";
+const SECURITY_WANTED_MEMO = "audit-sinks:security-wanted";
 
 /** Held per process: every analytics batch asks. Sink writes announce `audit-sinks` to drop it. */
-export function securityWanted(): Promise<boolean> {
+function securityWanted(): Promise<boolean> {
   return processMemo(SECURITY_WANTED_MEMO, async () => {
     const [row] = await db
       .select({ id: auditSinks.id })

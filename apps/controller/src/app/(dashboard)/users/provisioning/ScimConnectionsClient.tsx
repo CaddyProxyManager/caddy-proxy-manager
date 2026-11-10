@@ -34,15 +34,12 @@ import {
   saveScimConnectionAction,
 } from "./actions";
 import { unwrap } from "@/src/lib/errors/action-result";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
-export type MappableRole = { key: string; name: string | null; builtIn: boolean };
+type MappableRole = { key: string; name: string | null; builtIn: boolean };
 
 const BUILT_IN = ["operator", "user", "viewer"] as const;
 type BuiltIn = (typeof BUILT_IN)[number];
-
-function message(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
 
 function useRoleName() {
   const tUsers = useTranslations("users");
@@ -83,7 +80,7 @@ export default function ScimConnectionsClient({
     try {
       setToken(unwrap(await rotateScimTokenAction(connection.id)));
     } catch (err) {
-      setError(message(err, t("actionFailed")));
+      setError(thrownMessage(err, t("actionFailed")));
     } finally {
       router.refresh();
     }
@@ -94,7 +91,7 @@ export default function ScimConnectionsClient({
     try {
       unwrap(await deleteScimConnectionAction(connection.id));
     } catch (err) {
-      setError(message(err, t("actionFailed")));
+      setError(thrownMessage(err, t("actionFailed")));
     } finally {
       router.refresh();
     }
@@ -358,7 +355,7 @@ function ConnectionDialog({
       onSaved(result.token);
       onClose();
     } catch (err) {
-      setError(message(err, t("saveFailed")));
+      setError(thrownMessage(err, t("saveFailed")));
     } finally {
       setSaving(false);
     }

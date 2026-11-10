@@ -422,7 +422,7 @@ export async function releaseContestedSignInUsername(userId: number): Promise<vo
   });
 }
 
-export type SignInUsernameReview = {
+type SignInUsernameReview = {
   userId: number;
   username: string;
   reason: "shared" | "other-address";

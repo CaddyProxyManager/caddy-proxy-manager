@@ -22,7 +22,7 @@ const translate = createTranslator({
   namespace: "attention",
 }) as unknown as DynamicTranslate;
 
-export function attentionItemForApi(item: AttentionItem) {
+function attentionItemForApi(item: AttentionItem) {
   const values = attentionMessageValues(item);
   return {
     id: item.id,

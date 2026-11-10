@@ -75,6 +75,7 @@ import {
   getAccessListStatsAction,
 } from "./actions";
 import { wideMeasure } from "@/components/ui/measure";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
 type Props = {
   lists: AccessList[];
@@ -498,7 +499,7 @@ function SettingsTab({
         toast.success(t("saved"));
       }
     } catch (failure) {
-      toast.error(failure instanceof Error ? failure.message : t("ipRulesSaveFailed"));
+      toast.error(thrownMessage(failure, t("ipRulesSaveFailed")));
     }
   };
 

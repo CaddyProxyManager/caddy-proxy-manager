@@ -15,7 +15,7 @@ export function isAppRole(value: unknown): value is AppRole {
   return typeof value === "string" && (APP_ROLES as readonly string[]).includes(value);
 }
 
-export type GroupMappingConfig = {
+type GroupMappingConfig = {
   groupsClaim: string;
   /** Where role mapping reads its values; null reads them from `groupsClaim`, as it always did. */
   rolesClaim: string | null;
@@ -220,7 +220,7 @@ export function splitGroupList(value: string | null | undefined): string[] {
  * `roleGroups` lists them, then `user` and `viewer`, which manage nothing (they are forward-auth
  * identities).
  */
-export function roleOrder(cfg: GroupMappingConfig): string[] {
+function roleOrder(cfg: GroupMappingConfig): string[] {
   const made = Object.keys(cfg.roleGroups).filter((role) => !isAppRole(role));
   return ["admin", "operator", ...made, "user", "viewer"];
 }

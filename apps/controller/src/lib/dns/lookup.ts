@@ -5,6 +5,7 @@
 import type { Resolver } from "node:dns/promises";
 import { toDurationMs } from "../caddy/utils";
 import type { DnsSettings, UpstreamDnsAddressFamily } from "../settings";
+import { thrownMessage } from "../errors/thrown-message";
 
 export type DnsResolverRouteConfig = {
   enabled: boolean;
@@ -105,7 +106,7 @@ async function lookupFamilies<T>(
     try {
       return { addresses: await withTimeout(query(), timeoutMs, label), error: null };
     } catch (error) {
-      return { addresses: [], error: error instanceof Error ? error.message : String(error) };
+      return { addresses: [], error: thrownMessage(error) };
     }
   };
 

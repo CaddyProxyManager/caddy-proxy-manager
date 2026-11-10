@@ -27,10 +27,10 @@ export const DEMO_AGENT_ID = "de300000000000000000000000000000";
 const DEMO_AGENT_NAME = "Demo agent";
 
 /** A real rebuild takes minutes; a demo should not. */
-export type SimulationDelays = { ports: number; build: number; services: number };
+type SimulationDelays = { ports: number; build: number; services: number };
 const DEFAULT_DELAYS: SimulationDelays = { ports: 1_500, build: 6_000, services: 3_000 };
 
-export type SimulatedAgent = { agentId: string; agentRowId: number; stop: () => void };
+type SimulatedAgent = { agentId: string; agentRowId: number; stop: () => void };
 
 const sameList = (a: readonly string[], b: readonly string[]) =>
   a.length === b.length && [...a].sort().join("\n") === [...b].sort().join("\n");

@@ -73,13 +73,15 @@ export type OAuthProvider = OAuthGroupMapping & {
 type DbProvider = typeof oauthProviders.$inferSelect &
   LegacyRoleColumns & { roleGroups: RoleGroups };
 
-function parseDbProvider(row: DbProvider): OAuthProvider {
+/** Secrets decrypted. */
+export function parseDbProvider(row: DbProvider): OAuthProvider {
+  const context = `OAuth provider "${row.name}"`;
   return {
     id: row.id,
     name: row.name,
     type: row.type,
-    clientId: decryptSecret(row.clientId),
-    clientSecret: decryptSecret(row.clientSecret),
+    clientId: decryptSecret(row.clientId, context),
+    clientSecret: decryptSecret(row.clientSecret, context),
     issuer: row.issuer,
     authorizationUrl: row.authorizationUrl,
     tokenUrl: row.tokenUrl,

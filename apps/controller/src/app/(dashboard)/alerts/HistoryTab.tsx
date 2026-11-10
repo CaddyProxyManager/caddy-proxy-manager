@@ -18,7 +18,8 @@ import { useTableDensity } from "@/components/ui/TableDensity";
 import { Timestamp } from "@/components/ui/Timestamp";
 import { unwrap } from "@/src/lib/errors/action-result";
 import { type AlertsOverview, type HistoryRow, loadHistoryAction } from "./actions";
-import { message, SEVERITIES, SeverityToken, useChannelName, useRuleName } from "./shared";
+import { SEVERITIES, SeverityToken, useChannelName, useRuleName } from "./shared";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
 const TYPES = ["notice", "problem", "recovery"] as const;
 const STATUSES = ["pending", "sent", "failed", "dropped", "withdrawn"] as const;
@@ -116,7 +117,7 @@ export function HistoryTab({ overview }: { overview: AlertsOverview }) {
         setRows((prev) => (before === null ? page.rows : [...prev, ...page.rows]));
         setHasMore(page.hasMore);
       } catch (err) {
-        setError(message(err, t("loadFailed")));
+        setError(thrownMessage(err, t("loadFailed")));
       } finally {
         setLoading(false);
       }

@@ -49,6 +49,7 @@ import {
   testLdapDirectoryAction,
   updateLdapDirectoryAction,
 } from "./ldap-actions";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
 type Form = GroupMappingForm & {
   name: string;
@@ -217,7 +218,7 @@ export default function LdapDirectoriesSection({
       );
       closeDialog();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("saveFailed"));
+      setError(thrownMessage(err, t("saveFailed")));
     } finally {
       setSaving(false);
     }
@@ -239,7 +240,7 @@ export default function LdapDirectoriesSection({
     } catch (err) {
       setTestResult({
         ok: false,
-        message: err instanceof Error ? err.message : t("test.failed"),
+        message: thrownMessage(err, t("test.failed")),
         detail: null,
         identity: null,
       });

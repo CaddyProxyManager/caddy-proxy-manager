@@ -15,10 +15,6 @@ export const STORAGE_NAME = /^[A-Za-z0-9*][A-Za-z0-9._*+-]{0,252}$/;
 const CACHE_MS = 60_000;
 let cached: { at: number; certificates: CaddyCertificate[] } | null = null;
 
-export function clearCertificateCache() {
-  cached = null;
-}
-
 /** Parse the listing script's output: a separator line with the path, then the PEM. */
 export function parseCertificateListing(output: string): CaddyCertificate[] {
   const found: CaddyCertificate[] = [];

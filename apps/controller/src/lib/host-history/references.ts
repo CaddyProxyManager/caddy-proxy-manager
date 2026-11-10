@@ -58,7 +58,7 @@ const ids = (value: unknown): number[] =>
 const one = (value: unknown): number[] => (Number.isInteger(value) ? [value as number] : []);
 
 /** Every id a snapshot names, by kind. */
-export function referencedIds(
+function referencedIds(
   kind: HostKind,
   snapshot: HostSnapshot,
 ): Record<HostReferenceKind, number[]> {

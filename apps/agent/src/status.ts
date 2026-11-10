@@ -17,7 +17,7 @@ import pkg from "../package.json";
 /** From the manifest, so there is one version to bump. */
 export const AGENT_VERSION: string = pkg.version;
 
-export type StatusDeps = {
+type StatusDeps = {
   config: AgentConfig;
   store: AgentStore;
   docker: DockerHost;

@@ -7,7 +7,7 @@
 
 import { AsyncLocalStorage } from "node:async_hooks";
 
-export type StagingScope = {
+type StagingScope = {
   /** Wins over the table. A staged clear is `"null"`: present, so it wins, and parses to null. */
   overlay: ReadonlyMap<string, string>;
   /** `setSetting` writes here instead; absent, writes land for real (apply, dry-run render). */
@@ -22,7 +22,7 @@ export function currentStagingScope(): StagingScope | undefined {
   return storage.getStore();
 }
 
-export function withStagingScope<T>(scope: StagingScope, fn: () => Promise<T>): Promise<T> {
+function withStagingScope<T>(scope: StagingScope, fn: () => Promise<T>): Promise<T> {
   return storage.run(scope, fn);
 }
 

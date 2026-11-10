@@ -98,7 +98,7 @@ export const L4_FIELDS: Record<string, FieldSpec<L4EditorSection>> = {
   geoblockMode: { section: "protection" },
 };
 
-export function hostFields(kind: HostKind): Record<string, FieldSpec<string>> {
+function hostFields(kind: HostKind): Record<string, FieldSpec<string>> {
   return kind === "http" ? HTTP_FIELDS : L4_FIELDS;
 }
 

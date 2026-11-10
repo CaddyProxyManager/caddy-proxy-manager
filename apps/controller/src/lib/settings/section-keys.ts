@@ -7,7 +7,7 @@
 import type { useTranslations } from "next-intl";
 
 /** The review sheet's name for a staged change; deliberately not the navigation's label. */
-export type SectionKeys = { label: string; keys: readonly string[] };
+type SectionKeys = { label: string; keys: readonly string[] };
 
 export const SECTION_STORAGE_KEYS: Record<string, SectionKeys> = {
   general: { label: "General", keys: ["general"] },

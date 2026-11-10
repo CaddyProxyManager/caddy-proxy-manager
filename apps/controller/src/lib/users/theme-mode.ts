@@ -14,7 +14,7 @@ export const THEME_COOKIE = "cpm-theme";
 /** A year - long enough that the preference outlives ordinary session churn. */
 export const THEME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
-export function isThemeMode(value: unknown): value is ThemeMode {
+function isThemeMode(value: unknown): value is ThemeMode {
   return value === "light" || value === "dark" || value === "system";
 }
 

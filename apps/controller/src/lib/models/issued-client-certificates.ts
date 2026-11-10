@@ -36,7 +36,7 @@ type IssuedClientCertificateRow = typeof issuedClientCertificates.$inferSelect;
  * Applied on read, since rows issued earlier hold forge's form ("1A0F…" for "01A0F…"); nothing
  * matches on the serial (revocation goes by id, Caddy by the PEM), so no migration is needed.
  */
-export function canonicalSerialNumber(serial: string): string {
+function canonicalSerialNumber(serial: string): string {
   const trimmed = serial.trim();
   const hex = trimmed.replace(/:/g, "");
   if (!/^[0-9a-fA-F]+$/.test(hex)) return trimmed;

@@ -65,7 +65,7 @@ const textLayer: CSSProperties = {
   tabSize: 2,
 };
 
-export type CodeEditorProps = {
+type CodeEditorProps = {
   label: string;
   value: string;
   onChange?: (value: string) => void;

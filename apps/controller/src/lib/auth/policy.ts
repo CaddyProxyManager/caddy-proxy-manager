@@ -5,7 +5,7 @@
  */
 import { config } from "../config";
 
-export type AuthPolicy = {
+type AuthPolicy = {
   disableLocalUsers: boolean;
   allowSelfRegistration: boolean;
   allowOauthRegistration: boolean;

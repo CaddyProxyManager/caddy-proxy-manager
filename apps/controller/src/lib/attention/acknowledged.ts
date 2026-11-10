@@ -12,8 +12,8 @@ import { ATTENTION_CODES, type AttentionCode, type AttentionList } from "./types
 const STATE_KEY = "attention_acknowledged";
 const MAX_ID_LENGTH = 300;
 
-export type Acknowledgement = { code: AttentionCode; at: string; by: number };
-export type Acknowledgements = Record<string, Acknowledgement>;
+type Acknowledgement = { code: AttentionCode; at: string; by: number };
+type Acknowledgements = Record<string, Acknowledgement>;
 
 function isCode(value: unknown): value is AttentionCode {
   return (ATTENTION_CODES as readonly unknown[]).includes(value);

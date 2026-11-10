@@ -60,7 +60,7 @@ export class AgentRequiredError extends AgentUnavailableError {
   }
 }
 
-export class AgentRequestError extends Error {
+class AgentRequestError extends Error {
   constructor(
     message: string,
     readonly status: number,
@@ -114,16 +114,6 @@ export async function isAgentAvailable(): Promise<boolean> {
   return connectedAgents().length > 0;
 }
 
-/** Throws when there is no primary, or it has not reported yet. A map lookup, no round trip. */
-export async function getAgentStatus(): Promise<AgentStatus> {
-  const agent = primary();
-  if (!agent) throw noAgentError();
-  if (!agent.status) {
-    throw new AgentRequestError(`${agent.name} has connected but not reported yet.`, 503);
-  }
-  return agent.status;
-}
-
 /** For page renders: a missing agent must not turn the page into an error. */
 export async function tryGetAgentStatus(): Promise<AgentStatus | null> {
   return primary()?.status ?? null;
@@ -168,7 +158,7 @@ export async function requestCaddyBuild(_modules: string[]): Promise<CaddyBuildS
 }
 
 /** A connected agent that loads an operator-built image rather than building one. */
-export type ExternalBuildAgent = { agentRowId: number; name: string; external: ExternalCaddyImage };
+type ExternalBuildAgent = { agentRowId: number; name: string; external: ExternalCaddyImage };
 
 /** One agent's answer, or the fleet's; `builders` counts the ones that still build for themselves. */
 export function caddyBuildAgents(agentRowId?: number): {

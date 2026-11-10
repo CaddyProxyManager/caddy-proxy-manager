@@ -19,7 +19,7 @@ import type { DockerHost } from "./docker";
 
 const SEPARATOR = "@@cpm-certfile@@";
 /** Each also the controller's poll: Caddy reloads nothing by itself, and renewals are days early. */
-export const CERTIFICATE_FILES_POLL_MS = 6 * 60 * 60_000;
+const CERTIFICATE_FILES_POLL_MS = 6 * 60 * 60_000;
 /** Under the controller's 8 MiB request cap, with room for JSON escaping of the PEM. */
 const POST_BATCH_BYTES = 4 * 1024 * 1024;
 
@@ -94,7 +94,7 @@ export function parseCertificateFileListing(output: string): CertificateFileEntr
   return found.sort((a, b) => a.path.localeCompare(b.path));
 }
 
-export type ReadFile = { status: "ok"; content: string } | { status: CertificateFileError };
+type ReadFile = { status: "ok"; content: string } | { status: CertificateFileError };
 
 /** Parse the read script: per argument, a separator with its 1-based index and a status. */
 export function parseCertificateFileRead(output: string, count: number): ReadFile[] {
@@ -252,9 +252,7 @@ export function withoutKnownPem(
   return batches.filter((batch) => batch.length > 0);
 }
 
-export type CertificateFilesPost = (
-  results: CertificateFileResult[],
-) => Promise<CertificateFilesAck>;
+type CertificateFilesPost = (results: CertificateFileResult[]) => Promise<CertificateFilesAck>;
 
 /** Reads on a change of sources, every six hours, and whenever asked; one read at a time. */
 export class CertificateFilePoller {

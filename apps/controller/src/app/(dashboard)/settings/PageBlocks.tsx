@@ -91,7 +91,7 @@ export function FocusField() {
   return null;
 }
 
-export type PageAnchor = { id: string; label: string };
+type PageAnchor = { id: string; label: string };
 
 /** The nearest ancestor that scrolls: the content pane, not the window. */
 function scrollParent(element: HTMLElement): HTMLElement | null {

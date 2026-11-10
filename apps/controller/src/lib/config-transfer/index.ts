@@ -237,7 +237,7 @@ function canonical(value: unknown): string {
 
 // ── Export ──────────────────────────────────────────────────────────────────
 
-export type ExportOptions = { sections?: readonly ConfigSection[] };
+type ExportOptions = { sections?: readonly ConfigSection[] };
 
 type KeyIndex = {
   /** Unique keys only. */

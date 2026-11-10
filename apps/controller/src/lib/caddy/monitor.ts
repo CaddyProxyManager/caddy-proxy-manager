@@ -37,7 +37,6 @@ type Target = { key: string; agent: ConnectedAgent | null };
 
 const states = new Map<string, CaddyMonitorState>();
 
-let monitorInterval: NodeJS.Timeout | null = null;
 let isMonitoring = false;
 
 function targets(): Target[] {
@@ -172,25 +171,11 @@ export function startCaddyMonitoring(): void {
     console.error("[CaddyMonitor] Initial health check failed:", error);
   });
 
-  monitorInterval = setInterval(() => {
+  setInterval(() => {
     checkCaddyHealth().catch((error) => {
       console.error("[CaddyMonitor] Health check failed:", error);
     });
   }, HEALTH_CHECK_INTERVAL);
-}
-
-export function stopCaddyMonitoring(): void {
-  if (!isMonitoring) {
-    return;
-  }
-
-  console.log("[CaddyMonitor] Stopping Caddy health monitoring");
-  isMonitoring = false;
-
-  if (monitorInterval) {
-    clearInterval(monitorInterval);
-    monitorInterval = null;
-  }
 }
 
 /** Keyed by agentId. */

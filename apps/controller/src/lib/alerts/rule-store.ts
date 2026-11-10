@@ -89,7 +89,7 @@ export async function listRules(): Promise<RuleView[]> {
   return Promise.all(rows.map((row) => toView(parseRule(row), keys)));
 }
 
-export async function getRule(id: number): Promise<AlertRule | null> {
+async function getRule(id: number): Promise<AlertRule | null> {
   const [row] = await db.select().from(alertRules).where(eq(alertRules.id, id));
   return row ? parseRule(row) : null;
 }

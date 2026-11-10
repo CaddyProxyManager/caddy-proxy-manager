@@ -19,7 +19,7 @@ const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
 /** MaxMind must not hold a page open; the cached answer is served regardless. */
 const REQUEST_TIMEOUT_MS = 10_000;
 
-export type GeoipUpdateCheck = {
+type GeoipUpdateCheck = {
   checkedAt: string;
   error: string | null;
   /** Absent from results stored before codes were. */
@@ -28,7 +28,7 @@ export type GeoipUpdateCheck = {
   available: Record<string, string>;
 };
 
-export type GeoipUpdateCheckStatus = {
+type GeoipUpdateCheckStatus = {
   checkedAt: string | null;
   error: string | null;
   errorCode: StoredErrorCode | null;

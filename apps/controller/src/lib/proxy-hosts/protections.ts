@@ -33,7 +33,7 @@ type ProtectedHost = {
   forwardAuth: { enabled?: boolean } | null;
 };
 
-export function signInKind(host: ProtectedHost): SignInKind | null {
+function signInKind(host: ProtectedHost): SignInKind | null {
   if (host.cpmForwardAuth?.enabled) return "cpm";
   if (host.authentik?.enabled) return "authentik";
   if (host.forwardAuth?.enabled) return "forwardAuth";

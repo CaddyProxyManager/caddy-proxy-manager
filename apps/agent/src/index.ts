@@ -23,6 +23,7 @@ import { createLocalHandler } from "./local-server";
 import { adoptLegacyState } from "./migrate";
 import { Operations } from "./operations";
 import { AGENT_VERSION } from "./status";
+import { thrownMessage } from "./thrown-message";
 
 /**
  * Before any env is read, so `--help` works unconfigured. `hideBin` suits the compiled binary
@@ -139,7 +140,7 @@ if (argv.pair) {
         preview = (await response.json()) as AgentLocalPairPreviewResponse;
       }
     } catch (error) {
-      console.error(`Could not reach the agent on ${config.socketPath}: ${describeError(error)}`);
+      console.error(`Could not reach the agent on ${config.socketPath}: ${thrownMessage(error)}`);
       process.exit(1);
     }
     if (!preview.ok) {
@@ -168,7 +169,7 @@ if (argv.pair) {
     console.log(describeState(body.state));
     process.exit(0);
   } catch (error) {
-    console.error(`Could not reach the agent on ${config.socketPath}: ${describeError(error)}`);
+    console.error(`Could not reach the agent on ${config.socketPath}: ${thrownMessage(error)}`);
     process.exit(1);
   }
 }
@@ -210,10 +211,6 @@ function describeState(state: AgentLocalState): string {
   if (state.caddy.running) return "Caddy is running.";
   if (state.caddy.allowed) return "Caddy is starting.";
   return "Caddy is stopped; the controller has not enabled it yet.";
-}
-
-function describeError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 // ─── Running the agent ───────────────────────────────────────────────────────

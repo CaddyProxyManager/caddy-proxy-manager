@@ -27,7 +27,7 @@ export type GroupMember = {
   createdAt: string;
 };
 
-export type GroupInput = {
+type GroupInput = {
   name: string;
   description?: string | null;
 };

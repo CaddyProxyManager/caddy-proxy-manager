@@ -25,7 +25,7 @@ export type AcmeDnsAccount = {
   server_url: string;
 };
 
-export const ACME_CHALLENGE_LABEL = "_acme-challenge";
+const ACME_CHALLENGE_LABEL = "_acme-challenge";
 export const ACMEDNS_PROVIDER = "acmedns";
 export const MAX_DNS_DELEGATIONS = 256;
 
@@ -53,7 +53,7 @@ function covers(suffix: string, name: string): boolean {
 }
 
 /** Longest suffix wins, so a delegation for `a.example.com` beats one for `example.com`. */
-export function longestSuffixMatch<T>(name: string, entries: Iterable<[string, T]>): T | null {
+function longestSuffixMatch<T>(name: string, entries: Iterable<[string, T]>): T | null {
   let best: { length: number; value: T } | null = null;
   for (const [suffix, value] of entries) {
     const normalized = challengeBaseName(suffix);
@@ -97,7 +97,7 @@ function hasSingleAcmeDnsAccount(credentials: Record<string, string> | undefined
   );
 }
 
-export type DnsChallengePartition = {
+type DnsChallengePartition = {
   subjects: string[];
   /** Null: no DNS-01 for these subjects. */
   provider: string | null;
@@ -106,7 +106,7 @@ export type DnsChallengePartition = {
   acmeDnsConfig: Record<string, AcmeDnsAccount> | null;
 };
 
-export type DnsChallengeSettings = {
+type DnsChallengeSettings = {
   providers: Record<string, Record<string, string>>;
   delegations?: DnsChallengeDelegation[];
   acmeDnsAccounts?: Record<string, AcmeDnsAccount>;

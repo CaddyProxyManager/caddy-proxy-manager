@@ -941,7 +941,7 @@ export function parseProxyHostOptionUpdates(formData: FormData): Partial<ProxyHo
 export type ForwardAuthAccessInput = { userIds: number[]; groupIds: number[] };
 
 /** The editor's whole form, as the save action and the review step both read it. */
-export type ParsedProxyHostForm<T> = {
+type ParsedProxyHostForm<T> = {
   input: T;
   /** Who may sign in through CPM's portal; undefined leaves the stored grants alone. */
   forwardAuthAccess?: ForwardAuthAccessInput;

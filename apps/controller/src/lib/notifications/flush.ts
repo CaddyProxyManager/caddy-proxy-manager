@@ -21,9 +21,10 @@ import {
   RETRY_MS,
 } from "./plan";
 import { jsonArray, loadRules, ruleSwitchedOn } from "./rules";
+import { thrownMessage } from "../errors/thrown-message";
 
 /** Longer than any send takes; a claim older than this is a worker that died mid-send. */
-export const CLAIM_MS = 2 * 60_000;
+const CLAIM_MS = 2 * 60_000;
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
@@ -294,7 +295,7 @@ export async function flushBuiltin(now: number, ids?: Builtins): Promise<void> {
         await sendEmail(await notificationEmail({ to: entry.to, notices: entry.notices }));
         mark(entry.notices, entry.keys);
       } catch (error) {
-        failure = error instanceof Error ? error.message : String(error);
+        failure = thrownMessage(error);
       }
     }
   }

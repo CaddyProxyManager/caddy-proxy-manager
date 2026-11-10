@@ -11,15 +11,8 @@ import { deregisterReplica, replicaHeartbeat } from "./replicas";
 import { cluster, HEARTBEAT_MS } from "./state";
 
 export { announce, onAnnouncement } from "./announcements";
-export { isClusterShared, onClusterMessage, onClusterSync, sendToCluster } from "./bus";
 export { isLeader, runAsLeader } from "./leader";
-export {
-  keyFingerprint,
-  liveReplicas,
-  otherReplicasLive,
-  registerReplica,
-  ReplicaKeyMismatchError,
-} from "./replicas";
+export { registerReplica, ReplicaKeyMismatchError } from "./replicas";
 
 export function replicaId(): string {
   return cluster.replicaId;

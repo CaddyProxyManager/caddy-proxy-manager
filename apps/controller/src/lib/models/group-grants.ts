@@ -18,7 +18,7 @@ export type GrantResource =
   | { kind: "l4ProxyHost"; id: number }
   | { kind: "agent"; id: number };
 
-export type GroupGrant = {
+type GroupGrant = {
   id: number;
   groupId: number;
   resource: GrantResource;

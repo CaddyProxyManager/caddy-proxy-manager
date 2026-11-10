@@ -42,8 +42,8 @@ export const DEFAULT_APPROVAL_POLICY: ApprovalPolicy = {
 };
 
 export const APPROVAL_POLICY_KEY = "change_approval_policy";
-export const MAX_APPROVER_ENTRIES = 50;
-export const MAX_POLICY_TAGS = 50;
+const MAX_APPROVER_ENTRIES = 50;
+const MAX_POLICY_TAGS = 50;
 export const BYPASS_REASON_MAX_LENGTH = 500;
 export const DECISION_NOTE_MAX_LENGTH = 500;
 

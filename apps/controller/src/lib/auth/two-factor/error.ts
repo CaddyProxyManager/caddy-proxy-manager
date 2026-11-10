@@ -9,7 +9,7 @@ export const TWO_FACTOR_SETUP_PATH = "/two-factor-setup";
 /** The portal's refusal of a covered account past its grace period: it has no setup of its own. */
 export const TWO_FACTOR_SETUP_REQUIRED = "TWO_FACTOR_SETUP_REQUIRED";
 
-export type TwoFactorErrorKey =
+type TwoFactorErrorKey =
   | "invalidSecondFactor"
   | "secondFactorExpired"
   | "secondFactorLocked"

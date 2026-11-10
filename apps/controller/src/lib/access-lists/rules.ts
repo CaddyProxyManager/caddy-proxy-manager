@@ -71,7 +71,7 @@ const MAX_NOTE_LENGTH = 200;
 /** Per name, so a hostname rule adds at most this many ranges to every request's path. */
 export const MAX_ADDRESSES_PER_HOSTNAME = 16;
 /** A home connection's AAAA changes within its /64 as privacy addresses rotate. */
-export const DEFAULT_HOSTNAME_IPV6_PREFIX = 64;
+const DEFAULT_HOSTNAME_IPV6_PREFIX = 64;
 /** Wider than a site's usual allocation would admit strangers. */
 const MIN_HOSTNAME_IPV6_PREFIX = 48;
 const HOSTNAME =
@@ -211,7 +211,7 @@ function normalizeContinent(value: string): string | null {
 }
 
 /** `AS13335` or `13335`. */
-export function normalizeAsn(value: string): number | null {
+function normalizeAsn(value: string): number | null {
   const digits = value.replace(/^as/i, "");
   const asn = Number(digits);
   return /^\d{1,10}$/.test(digits) && asn > 0 && asn <= 4_294_967_295 ? asn : null;
@@ -439,7 +439,7 @@ const hasTarget = (rule: RuntimeIpRule) =>
   Boolean(rule.countries?.length || rule.continents?.length || rule.asns?.length);
 
 /** One blocker's decision: deny what `block` matches unless `allow` does too. */
-export type BlockerDecision = { block: BlockerTarget; allow: BlockerTarget; isDefault: boolean };
+type BlockerDecision = { block: BlockerTarget; allow: BlockerTarget; isDefault: boolean };
 
 /**
  * The first matching rule decides, as with `client_ip`. A deny only needs the allows above it

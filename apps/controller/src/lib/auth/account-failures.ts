@@ -24,11 +24,11 @@ export type SignInSource = "local" | "directory";
 
 const PORTAL_DOMAIN = "@localhost";
 
-export const AUTO_DISABLE_ACTION = "user_disabled_failed_sign_ins";
+const AUTO_DISABLE_ACTION = "user_disabled_failed_sign_ins";
 /** `cpm-server --enable-user`. */
 export const CONSOLE_ENABLE_ACTION = "user_enabled_console";
 
-export type AccountKeyUser = {
+type AccountKeyUser = {
   id: number;
   email: string;
   role: string;
@@ -56,7 +56,7 @@ export async function findUserByAccountKey(account: string): Promise<AccountKeyU
   return rows.length === 1 ? rows[0] : null;
 }
 
-export type AccountFailureOutcome = {
+type AccountFailureOutcome = {
   /** The lock now imposed, in ms. */
   delayMs: number;
   failures: number;

@@ -40,6 +40,7 @@ import {
 import { agentStatusMessage, type AgentStatusWords } from "@/src/lib/agent/status-message";
 import { extractErrorMessage } from "@/src/lib/errors/action-error";
 import { caddyImageBuildCommand, caddyImageTag } from "@/src/lib/caddy/image-build/image";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
 type BuildStatus = AgentStatusWords & {
   state: "idle" | "pending" | "building" | "applied" | "failed";
@@ -229,7 +230,7 @@ export function CaddyBuildFields({
       }
       await fetchStatus();
     } catch (error) {
-      setRebuildError(error instanceof Error ? error.message : t("rebuildCouldNotStart"));
+      setRebuildError(thrownMessage(error, t("rebuildCouldNotStart")));
     } finally {
       setRebuilding(false);
     }

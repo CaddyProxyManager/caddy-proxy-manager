@@ -14,7 +14,7 @@ export function chainFingerprint(certificatePem: string): string {
 }
 
 /** DNS and IP SANs, lowercased and deduplicated: what a host on this certificate may serve. */
-export function certificateSanNames(cert: X509Certificate): string[] {
+function certificateSanNames(cert: X509Certificate): string[] {
   const names = (cert.subjectAltName ?? "")
     .split(",")
     .map((entry) => entry.trim())
@@ -23,7 +23,7 @@ export function certificateSanNames(cert: X509Certificate): string[] {
   return [...new Set(names)];
 }
 
-export type CheckedCertificatePair =
+type CheckedCertificatePair =
   | { ok: true; certificatePem: string; keyPem: string; names: string[]; fingerprint: string }
   | { ok: false; error: CertificateFileError };
 

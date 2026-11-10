@@ -113,10 +113,6 @@ export function sortAttention(items: readonly AttentionItem[]): AttentionItem[] 
   });
 }
 
-export function worstSeverity(items: readonly AttentionItem[]): AttentionSeverity | null {
-  return sortAttention(items)[0]?.severity ?? null;
-}
-
 /** ISO strings under these names are rendered as dates by the catalog's ICU arguments. */
 const DATE_VALUES = new Set(["date", "since", "until", "from", "to"]);
 

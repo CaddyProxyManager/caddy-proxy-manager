@@ -39,7 +39,7 @@ export function isEncryptedSecret(value: string): boolean {
  * Columns that are a secret in full, by table and SQL name. Older releases, and backups taken by
  * them, stored some in plain text, so anything copying rows in seals these on the way.
  */
-export const SECRET_COLUMNS: Readonly<Record<string, readonly string[]>> = {
+const SECRET_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   certificates: ["privateKeyPem"],
   ca_certificates: ["privateKeyPem"],
 };

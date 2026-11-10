@@ -17,13 +17,13 @@ function hasForbiddenControlCharacter(value: string): boolean {
 }
 
 /** Every Tailscale MagicDNS name ends here; Caddy keys its own certificate handling off it. */
-export const TAILSCALE_DOMAIN_SUFFIX = ".ts.net";
+const TAILSCALE_DOMAIN_SUFFIX = ".ts.net";
 
 /**
  * On the `caddy-data` volume so a node keeps its identity across a recreate - otherwise it
  * re-registers on every restart and the tailnet fills with duplicates.
  */
-export const TAILSCALE_DEFAULT_STATE_DIR = "/data/tailscale";
+const TAILSCALE_DEFAULT_STATE_DIR = "/data/tailscale";
 
 export const TAILSCALE_DEFAULT_NODE = "caddy";
 

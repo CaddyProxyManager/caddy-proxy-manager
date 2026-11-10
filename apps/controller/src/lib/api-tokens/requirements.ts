@@ -8,7 +8,7 @@
 import { type Capability, type CapabilityResource, capabilityArea } from "../roles/capabilities";
 import { type TokenAccess, type TokenArea, type TokenScope, scopeAllows } from "./scope";
 
-export type TokenRequirement = {
+type TokenRequirement = {
   capability: Capability;
   area: TokenArea;
   access: TokenAccess;

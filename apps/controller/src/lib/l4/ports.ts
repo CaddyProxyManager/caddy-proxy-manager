@@ -15,7 +15,7 @@ import { isAgentAvailable, requestL4Ports, tryGetAgentStatus } from "../agent/cl
 export type { L4PortsStatus };
 export { isAgentAvailable };
 
-export type L4PortsDiff = {
+type L4PortsDiff = {
   currentPorts: string[];
   requiredPorts: string[];
   needsApply: boolean;

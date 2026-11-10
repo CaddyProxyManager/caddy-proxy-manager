@@ -1,7 +1,7 @@
 import { createReadStream } from "node:fs";
 
 /** Per pass, so a backlog after downtime is drained over several rather than held in memory. */
-export const MAX_READ_BYTES = 8 * 1024 * 1024;
+const MAX_READ_BYTES = 8 * 1024 * 1024;
 
 /**
  * The offset advances only past the last newline, so a half-written line is re-read next pass

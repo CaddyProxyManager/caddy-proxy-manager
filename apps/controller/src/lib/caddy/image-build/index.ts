@@ -45,7 +45,7 @@ import {
 
 export type { CaddyBuildState, CaddyBuildStatus };
 
-export type CaddyBuildDiff = {
+type CaddyBuildDiff = {
   /** `--with` specs the running image was built with. */
   appliedSpecs: string[];
   /** `--with` specs the current selection would build. */
@@ -111,7 +111,7 @@ export async function ensureDynamicDnsModule(): Promise<boolean> {
   return true;
 }
 
-export function resolveCustomModules(settings: CaddyBuildSettings | null): CaddyCustomModule[] {
+function resolveCustomModules(settings: CaddyBuildSettings | null): CaddyCustomModule[] {
   return (settings?.customModules ?? []).filter(
     (entry) => entry.enabled && validateCustomModule(entry) === null,
   );
@@ -297,7 +297,7 @@ export function isDnsProviderUsable(
  * Names the module(s) an operator has to enable to get a feature back. `nameOf` is how a caller
  * with a reader says each name; without one it is the registry's English.
  */
-export function featureModuleNames(
+function featureModuleNames(
   feature: CaddyFeatureId,
   nameOf: (module: CaddyModuleDefinition) => string = (module) => module.name,
 ): string {

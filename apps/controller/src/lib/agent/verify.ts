@@ -16,7 +16,7 @@ import {
 import { claimNonce } from "../cluster/nonces";
 import { type AgentCredentials, findAgentByAgentId } from "../models/agents";
 
-export type VerifyResult =
+type VerifyResult =
   | { ok: true; agent: AgentCredentials }
   | { ok: false; status: number; error: string };
 

@@ -65,7 +65,3 @@ export function createContext(
 
   return { viewer, access, rawBody, request, applyFailures, markAccepted };
 }
-
-export async function requireUser(context: GraphQLContext): Promise<ApiAuthResult> {
-  return await context.viewer();
-}

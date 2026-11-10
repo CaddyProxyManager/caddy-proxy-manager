@@ -21,13 +21,14 @@ import {
 } from "./bind-name";
 import { parseLdapUrl } from "./config";
 import { buildGroupFilter, buildUserDn, buildUserFilter, firstRdnValue } from "./escape";
+import { thrownMessage } from "../errors/thrown-message";
 
 const CONNECT_TIMEOUT_MS = 5_000;
 const OPERATION_TIMEOUT_MS = 10_000;
 /** Enough for anyone's group list; a larger answer is a filter matching far too much. */
 const GROUP_LIMIT = 1_000;
-export const LDAP_USERNAME_MAX_LENGTH = 256;
-export const LDAP_PASSWORD_MAX_LENGTH = 1_024;
+const LDAP_USERNAME_MAX_LENGTH = 256;
+const LDAP_PASSWORD_MAX_LENGTH = 1_024;
 
 export type LdapIdentity = {
   dn: string;
@@ -38,7 +39,7 @@ export type LdapIdentity = {
   groups: string[];
 };
 
-export type LdapFailure =
+type LdapFailure =
   | "invalid-input"
   | "invalid-credentials"
   | "not-found"
@@ -49,9 +50,7 @@ export type LdapFailure =
   | "other-entry"
   | "unavailable";
 
-export type LdapAuthResult =
-  | { ok: true; identity: LdapIdentity }
-  | { ok: false; reason: LdapFailure };
+type LdapAuthResult = { ok: true; identity: LdapIdentity } | { ok: false; reason: LdapFailure };
 
 /** Control characters have no business in a sign-in name, escaped or not. */
 function hasControlCharacter(value: string): boolean {
@@ -78,7 +77,7 @@ export function isAcceptableLdapPassword(password: string): boolean {
   return password.length > 0 && password.length <= LDAP_PASSWORD_MAX_LENGTH;
 }
 
-export function ldapTlsOptions(directory: LdapDirectory): ConnectionOptions {
+function ldapTlsOptions(directory: LdapDirectory): ConnectionOptions {
   const parsed = parseLdapUrl(directory.url);
   const host = parsed?.host ?? "";
   const { caPem, tlsVerify } = directory.config;
@@ -378,7 +377,7 @@ export async function authenticateLdap(
   }
 }
 
-export type LdapTestResult =
+type LdapTestResult =
   | { ok: true; identity: LdapIdentity | null }
   | {
       ok: false;
@@ -397,20 +396,19 @@ export async function testLdapConnection(
   probe?: { username: string; password: string },
 ): Promise<LdapTestResult> {
   let client: Client | null = null;
-  const detail = (error: unknown) => (error instanceof Error ? error.message : String(error));
   try {
     try {
       // A refused StartTLS lands here whatever its type: it must never read as reachable.
       client = await openClient(directory);
     } catch (error) {
-      return { ok: false, stage: "connect", detail: detail(error) };
+      return { ok: false, stage: "connect", detail: thrownMessage(error) };
     }
     try {
       // The root DSE, anonymously: it opens the socket, and any LDAP answer proves it is up.
       await client.search("", { scope: "base", filter: "(objectClass=*)", attributes: ["1.1"] });
     } catch (error) {
       if (!(error instanceof ResultCodeError)) {
-        return { ok: false, stage: "connect", detail: detail(error) };
+        return { ok: false, stage: "connect", detail: thrownMessage(error) };
       }
     }
     // A template binds as each user, so only a test sign-in can go further.
@@ -419,13 +417,13 @@ export async function testLdapConnection(
         try {
           await client.bind(directory.bindDn, directory.bindPassword);
         } catch (error) {
-          return { ok: false, stage: "bind", detail: detail(error) };
+          return { ok: false, stage: "bind", detail: thrownMessage(error) };
         }
       }
       try {
         await client.search(directory.config.baseDn, { scope: "base", attributes: ["1.1"] });
       } catch (error) {
-        return { ok: false, stage: "search", detail: detail(error) };
+        return { ok: false, stage: "search", detail: thrownMessage(error) };
       }
     }
   } finally {

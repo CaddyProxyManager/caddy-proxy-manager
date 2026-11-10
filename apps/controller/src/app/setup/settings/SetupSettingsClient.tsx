@@ -46,15 +46,15 @@ export type SettingField = {
   source: "stored" | "environment" | "default";
 };
 
-export type GeneralFields = { defaultDomain: string; acmeEmail: string };
+type GeneralFields = { defaultDomain: string; acmeEmail: string };
 
-export type DashboardCard = {
+type DashboardCard = {
   enabled: boolean;
   domain: string;
   fromEnvironment: boolean;
 };
 
-export type OAuthPrefill = {
+type OAuthPrefill = {
   providerName: string;
   issuer: string;
   clientId: string;
@@ -96,7 +96,7 @@ const OAUTH_ENV = {
   syncGroups: "OAUTH_SYNC_GROUPS",
 } as const satisfies Record<keyof OAuthPrefill, string>;
 
-export type OAuthCard = {
+type OAuthCard = {
   /** Non-empty means this card has nothing to add. */
   existing: string[];
   fromEnvironment: boolean;

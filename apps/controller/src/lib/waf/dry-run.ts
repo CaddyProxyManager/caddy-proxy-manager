@@ -20,9 +20,9 @@ export type WafDryRunTarget =
   | { kind: "preset" }
   | { kind: "plugin" };
 
-export type WafDryRunCandidate = { target: WafDryRunTarget; waf: WafSettings | null };
+type WafDryRunCandidate = { target: WafDryRunTarget; waf: WafSettings | null };
 
-export type WafDryRunOutcome =
+type WafDryRunOutcome =
   | { status: "accepted" }
   | { status: "refused"; target: WafDryRunTarget; detail: string }
   /** Nothing was learned; the save proceeds. */
@@ -184,7 +184,7 @@ async function loadPlugins(): Promise<Map<number, CrsPluginRules>> {
 type HostWaf = { target: WafDryRunTarget; waf: WafHostConfig | null | undefined };
 
 /** As caddy/index.ts attaches them: every global exclusion, and the host's own. */
-export function withExclusions(
+function withExclusions(
   waf: WafSettings | null,
   exclusions: readonly WafExclusionRule[],
   target: WafDryRunTarget,

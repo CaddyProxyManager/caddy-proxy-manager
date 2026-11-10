@@ -12,7 +12,7 @@ import { users } from "../db/schema";
 import type { DomainErrorCode } from "../errors/domain-error";
 import { isUsableSignInUsername, isValidLoginUsername } from "./login-username";
 
-export type SignInNameReader = Pick<Db, "select">;
+type SignInNameReader = Pick<Db, "select">;
 
 export const PORTAL_EMAIL_DOMAIN = "@localhost";
 

@@ -105,7 +105,7 @@ export function hydrateHostMaintenance(
   };
 }
 
-export type MaintenancePage = { body: string; contentType: string };
+type MaintenancePage = { body: string; contentType: string };
 
 type ErrorPageLike = { statuses: number[]; body: string; contentType?: string };
 

@@ -17,6 +17,7 @@ import {
   type ManagedServicesRequest,
 } from "@cpm/shared";
 import type { AgentConfig } from "./config";
+import { thrownMessage } from "./thrown-message";
 
 export const L4_OVERRIDE_FILE = "docker-compose.l4-ports.yml";
 export const BUILD_OVERRIDE_FILE = "docker-compose.caddy-build.yml";
@@ -58,7 +59,7 @@ async function run(
       return { ok: false, exitCode: 124, output: "", timedOut: true };
     }
     // Docker missing, or the socket unreachable. The message is the agent's own, never a remote's.
-    const message = error instanceof Error ? error.message : String(error);
+    const message = thrownMessage(error);
     return { ok: false, exitCode: -1, output: message, timedOut: false };
   } finally {
     if (timer) clearTimeout(timer);
@@ -92,7 +93,7 @@ const WINDOWS_DRIVE_PATH = /^([A-Za-z]):[\\/](.*)$/;
  * is "mount denied: too many colons"; omitted, relative binds mount empty directories. Only the
  * current layout: the old `/host_mnt/<letter>` is left to COMPOSE_HOST_DIR rather than guessed.
  */
-export function hostPathForDaemon(label: string): string {
+function hostPathForDaemon(label: string): string {
   const match = WINDOWS_DRIVE_PATH.exec(label.trim());
   if (!match) return "";
 
@@ -107,7 +108,7 @@ export function hostPathForDaemon(label: string): string {
  * invocation aborts; too short for web to accept as a SESSION_SECRET, so one can never become a
  * running controller's key.
  */
-export const COMPOSE_PLACEHOLDERS: Readonly<Record<string, string>> = {
+const COMPOSE_PLACEHOLDERS: Readonly<Record<string, string>> = {
   SESSION_SECRET: "unused-by-the-agent",
   POSTGRES_PASSWORD: "unused-by-the-agent",
   POSTGRES_HOST: "unused-by-the-agent",
@@ -471,7 +472,7 @@ export class DockerHost {
       } catch (error) {
         return {
           state: "unreadable",
-          reason: error instanceof Error ? error.message : String(error),
+          reason: thrownMessage(error),
         };
       }
       const modules = parseCaddyModuleList(contents);
@@ -592,53 +593,23 @@ export class DockerHost {
    * doesn't open - as validateCaddyConfig does.
    */
   async runInCaddyStorage(argv: string[], timeoutSeconds = 30): Promise<CommandResult> {
-    const deadline = Date.now() + timeoutSeconds * 1000;
-    const remaining = () => Math.max(1, Math.round((deadline - Date.now()) / 1000));
     const caddy = this.config.caddyContainerName;
-    const image = await run(["docker", "inspect", "--format", "{{.Image}}", caddy], {
-      timeoutSeconds: 15,
-    });
-    if (!image.ok || !image.output.trim().startsWith("sha256:")) {
-      return {
-        ok: false,
-        exitCode: -1,
-        output: "Caddy's container does not exist yet.",
-        timedOut: false,
-      };
-    }
-    const name = `cpm-caddy-storage-${randomUUID()}`;
-    try {
-      const create = await run(
-        [
-          "docker",
-          "create",
-          "--name",
-          name,
-          "--label",
-          "cpm.caddy-storage=1",
-          "--network",
-          "none",
-          "--cap-drop",
-          "ALL",
-          "--volumes-from",
-          `${caddy}:ro`,
-          "--entrypoint",
-          argv[0],
-          image.output.trim(),
-          ...argv.slice(1),
-        ],
-        { timeoutSeconds: remaining() },
-      );
-      if (!create.ok) return create;
-      const start = await run(["docker", "start", name], { timeoutSeconds: remaining() });
-      if (!start.ok) return start;
-      const wait = await run(["docker", "wait", name], { timeoutSeconds: remaining() });
-      if (!wait.ok) return wait;
-      const logs = await run(["docker", "logs", name], { timeoutSeconds: remaining() });
-      return { ...logs, ok: logs.ok && wait.output.trim() === "0" };
-    } finally {
-      await run(["docker", "rm", "--force", name], { timeoutSeconds: 15 });
-    }
+    return this.runThrowaway(
+      "cpm-caddy-storage",
+      [
+        "--label",
+        "cpm.caddy-storage=1",
+        "--network",
+        "none",
+        "--cap-drop",
+        "ALL",
+        "--volumes-from",
+        `${caddy}:ro`,
+      ],
+      argv,
+      timeoutSeconds,
+      [],
+    );
   }
 
   /**
@@ -650,6 +621,42 @@ export class DockerHost {
     hostDir: string,
     argv: string[],
     timeoutSeconds = 30,
+  ): Promise<CommandResult> {
+    return this.runThrowaway(
+      "cpm-cert-files",
+      [
+        "--label",
+        "cpm.certificate-files=1",
+        "--network",
+        "none",
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges",
+        "--user",
+        "0",
+        "--read-only",
+        "--memory",
+        "64m",
+        "--pids-limit",
+        "64",
+        // --mount, not -v: a missing source is an error, not a directory Docker creates as root.
+        "--mount",
+        `type=bind,source=${hostPathForDaemon(hostDir) || hostDir},target=/certs,readonly`,
+      ],
+      argv,
+      timeoutSeconds,
+      ["--volumes"],
+    );
+  }
+
+  /** `argv` in a container of Caddy's image made with `flags`, its output read back once it exits. */
+  private async runThrowaway(
+    prefix: string,
+    flags: string[],
+    argv: string[],
+    timeoutSeconds: number,
+    rmFlags: string[],
   ): Promise<CommandResult> {
     const deadline = Date.now() + timeoutSeconds * 1000;
     const remaining = () => Math.max(1, Math.round((deadline - Date.now()) / 1000));
@@ -665,7 +672,7 @@ export class DockerHost {
         timedOut: false,
       };
     }
-    const name = `cpm-cert-files-${randomUUID()}`;
+    const name = `${prefix}-${randomUUID()}`;
     try {
       const create = await run(
         [
@@ -673,24 +680,7 @@ export class DockerHost {
           "create",
           "--name",
           name,
-          "--label",
-          "cpm.certificate-files=1",
-          "--network",
-          "none",
-          "--cap-drop",
-          "ALL",
-          "--security-opt",
-          "no-new-privileges",
-          "--user",
-          "0",
-          "--read-only",
-          "--memory",
-          "64m",
-          "--pids-limit",
-          "64",
-          // --mount, not -v: a missing source is an error, not a directory Docker creates as root.
-          "--mount",
-          `type=bind,source=${hostPathForDaemon(hostDir) || hostDir},target=/certs,readonly`,
+          ...flags,
           "--entrypoint",
           argv[0],
           image.output.trim(),
@@ -706,7 +696,7 @@ export class DockerHost {
       const logs = await run(["docker", "logs", name], { timeoutSeconds: remaining() });
       return { ...logs, ok: logs.ok && wait.output.trim() === "0" };
     } finally {
-      await run(["docker", "rm", "--force", "--volumes", name], { timeoutSeconds: 15 });
+      await run(["docker", "rm", "--force", ...rmFlags, name], { timeoutSeconds: 15 });
     }
   }
 
@@ -916,7 +906,7 @@ function parseOverride(file: string, contents: string): string[] | null {
  * Whether a generated override may be handed to compose. One that fails to round-trip is removed:
  * the next desired-state frame, or the startup port restore, writes a fresh one.
  */
-export function overrideIsUsable(dataDir: string, file: string): boolean {
+function overrideIsUsable(dataDir: string, file: string): boolean {
   const path = join(dataDir, file);
   if (!existsSync(path)) return false;
   let contents: string;

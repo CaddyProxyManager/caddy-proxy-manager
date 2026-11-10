@@ -33,6 +33,7 @@ import { useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { unwrap } from "@/src/lib/errors/action-result";
 import { setAccessListIpRulesAction, updateAccessListAction } from "./actions";
 import { wideMeasure } from "@/components/ui/measure";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
 type Rule = {
   action: "allow" | "deny";
@@ -156,7 +157,7 @@ export function NetworkTab({
         toast.success(t("saved"));
       }
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : t("ipRulesSaveFailed"));
+      setError(thrownMessage(failure, t("ipRulesSaveFailed")));
     } finally {
       setSaving(false);
     }
@@ -171,7 +172,7 @@ export function NetworkTab({
         toast.success(t("saved"));
       }
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : t("ipRulesSaveFailed"));
+      setError(thrownMessage(failure, t("ipRulesSaveFailed")));
     }
   };
 

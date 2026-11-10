@@ -42,7 +42,7 @@ import { CRS_VERSION, effectiveTuning } from "../waf/tuning";
 import { getWafEventReviews, type WafEventReview } from "./waf-event";
 import { countModes, type WafEngineMode, wafHostModes } from "./waf-hosts";
 
-export const SECURITY_EVENTS_PER_PAGE = 50;
+const SECURITY_EVENTS_PER_PAGE = 50;
 const TOP_LIMIT = 10;
 
 export type SecurityRuleSet = {

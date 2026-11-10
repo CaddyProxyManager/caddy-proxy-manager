@@ -5,7 +5,7 @@
  */
 import { USERNAME_PLACEHOLDER } from "./defaults";
 
-export type BindNameTemplate =
+type BindNameTemplate =
   | { kind: "dn"; template: string }
   | { kind: "upn"; realm: string }
   | { kind: "down-level"; domain: string };
@@ -48,7 +48,7 @@ export function buildBindName(
     : `${template.domain}\\${username}`;
 }
 
-export type BoundEntryNames = {
+type BoundEntryNames = {
   dn: string;
   userPrincipalName: string | null;
   sAMAccountName: string | null;

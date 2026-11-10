@@ -26,8 +26,9 @@ import {
   requireDigest,
 } from "./digests";
 import { alertBatch } from "./message";
+import { thrownMessage } from "../errors/thrown-message";
 
-export type DigestTrigger = "schedule" | "catch-up" | "manual";
+type DigestTrigger = "schedule" | "catch-up" | "manual";
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
@@ -88,14 +89,10 @@ async function emailReaders(digest: Digest): Promise<Reader[]> {
   });
 }
 
-export type ChannelResult = { channelId: number; name: string; ok: boolean; error?: string };
+type ChannelResult = { channelId: number; name: string; ok: boolean; error?: string };
 
 /** Every channel the digest names, each on its own: one failing never stops the rest. */
-export async function sendDigest(
-  digest: Digest,
-  data: DigestData,
-  now: number,
-): Promise<ChannelResult[]> {
+async function sendDigest(digest: Digest, data: DigestData, now: number): Promise<ChannelResult[]> {
   const rows =
     digest.channelIds.length === 0
       ? []
@@ -149,7 +146,7 @@ export async function sendDigest(
         channelId: row.id,
         name: row.name,
         ok: false,
-        error: (error instanceof Error ? error.message : String(error)).slice(0, 300),
+        error: thrownMessage(error).slice(0, 300),
       });
     }
   }
@@ -177,7 +174,7 @@ export async function runDigest(
     const sent = results.filter((result) => result.ok).length;
     status = sent === results.length && sent > 0 ? "sent" : sent > 0 ? "partial" : "failed";
   } catch (caught) {
-    error = (caught instanceof Error ? caught.message : String(caught)).slice(0, 500);
+    error = thrownMessage(caught).slice(0, 500);
   }
   await db
     .update(alertDigestRuns)
@@ -189,7 +186,7 @@ export async function runDigest(
   return runId;
 }
 
-export async function getDigestRun(id: number): Promise<DigestRun | null> {
+async function getDigestRun(id: number): Promise<DigestRun | null> {
   const [row] = await db.select().from(alertDigestRuns).where(eq(alertDigestRuns.id, id));
   return row ? parseRun(row) : null;
 }

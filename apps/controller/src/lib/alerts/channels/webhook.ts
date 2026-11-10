@@ -8,7 +8,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { AlertBatch } from "../message";
 
-export const SECRET_PREFIX = "whsec_";
+const SECRET_PREFIX = "whsec_";
 /** Header names a custom header may not take: the signature's and the body's own. */
 export const RESERVED_HEADERS = new Set([
   "webhook-id",
@@ -48,7 +48,7 @@ export function messageId(deliveryIds: readonly number[]): string {
   return `msg_${digest.slice(0, 32)}`;
 }
 
-export type WebhookBody = {
+type WebhookBody = {
   type: "alerts" | "digest";
   timestamp: string;
   data: {

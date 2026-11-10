@@ -31,7 +31,7 @@ import type { AuditChange } from "@/lib/audit/changes";
 import type { ConfigDiff } from "@/lib/settings/config-diff";
 import type { HostRevisionSummary, MissingReference } from "@/lib/host-history/types";
 
-export type HostHistoryComparison = {
+type HostHistoryComparison = {
   from: number;
   to: number;
   changes: AuditChange[];
@@ -134,7 +134,7 @@ export function HostHistoryView(props: Props) {
   );
 }
 
-export function useOperationLabel() {
+function useOperationLabel() {
   const t = useTranslations("hostHistory");
   const dynamic = t as unknown as DynamicTranslate;
   return (revision: Pick<HostRevisionSummary, "operation" | "detail">) => {

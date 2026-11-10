@@ -23,7 +23,7 @@ const CARRYOVERS: Carryover[] = [
   },
 ];
 
-export type CarryoverResult = { settingKey: string; value: boolean };
+type CarryoverResult = { settingKey: string; value: boolean };
 
 /** Only writes what it finds: inventing a value would pin a default that was free to change. */
 export async function carryOverBlobSettings(): Promise<CarryoverResult[]> {

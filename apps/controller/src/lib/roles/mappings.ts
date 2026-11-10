@@ -35,7 +35,7 @@ export function legacyColumns(groups: RoleGroups): LegacyRoleColumns {
 }
 
 /** The legacy fields present in an input, as role groups; an absent field leaves its role alone. */
-export function fromLegacyColumns(input: Partial<LegacyRoleColumns>): RoleGroups {
+function fromLegacyColumns(input: Partial<LegacyRoleColumns>): RoleGroups {
   const groups: RoleGroups = {};
   for (const [column, role] of LEGACY) {
     if (input[column] !== undefined) groups[role] = splitGroupList(input[column]);
@@ -47,9 +47,7 @@ export function fromLegacyColumns(input: Partial<LegacyRoleColumns>): RoleGroups
  * Per provider: built-in roles first in rank order, then the others in the order they were made,
  * which is how `mapGroupsToRole` ranks them when several match.
  */
-export async function roleGroupsFor(
-  providerIds: readonly string[],
-): Promise<Map<string, RoleGroups>> {
+async function roleGroupsFor(providerIds: readonly string[]): Promise<Map<string, RoleGroups>> {
   if (providerIds.length === 0) return new Map();
   const rows = await db
     .select({

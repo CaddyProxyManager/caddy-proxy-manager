@@ -10,6 +10,7 @@ import { getSetting as getStoredJson, setSetting as setStoredJson } from "../set
 import { emailReady } from "./config";
 import { type CertificateAlertItem, certificateAlertEmail } from "./messages";
 import { sendEmail } from "./transport";
+import { thrownMessage } from "../errors/thrown-message";
 
 const STATE_KEY = "certificate_expiry_alerts";
 const DAY_MS = 86_400_000;
@@ -19,9 +20,9 @@ const WAKE_MS = 60 * 60 * 1000;
 /** Past startup, so agents have reconnected and their certificates are in the first pass. */
 const FIRST_WAKE_MS = 5 * 60 * 1000;
 
-export type AlertStage = "expiring" | "expired";
+type AlertStage = "expiring" | "expired";
 
-export type CertificateAlertState = {
+type CertificateAlertState = {
   checkedAt: string | null;
   /** English, for the log and the Settings page; null after a clean pass. */
   error: string | null;
@@ -166,7 +167,7 @@ export async function alertRecipients(): Promise<string[]> {
     .filter((email) => isEmailAddress(email, "public"));
 }
 
-export type CertificateAlertOutcome =
+type CertificateAlertOutcome =
   | { skipped: "disabled" | "email" | "no-recipients" }
   | { sent: number };
 
@@ -217,7 +218,7 @@ export async function runCertificateExpiryAlerts(
     return { sent: plan.toSend.length };
   } catch (error) {
     // The previous stages stay, so what failed to send is sent on the next pass.
-    const message = error instanceof Error ? error.message : String(error);
+    const message = thrownMessage(error);
     await setStoredJson<CertificateAlertState>(STATE_KEY, {
       ...previous,
       checkedAt,

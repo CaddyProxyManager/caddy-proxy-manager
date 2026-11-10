@@ -16,7 +16,7 @@ export const BUN_REQUIRED_MESSAGE = [
 ].join("\n");
 
 /** Names the current runtime for the error message. */
-export function describeRuntime(): string {
+function describeRuntime(): string {
   return process.versions.node ? `Node.js ${process.versions.node}` : "an unknown runtime";
 }
 

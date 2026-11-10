@@ -9,8 +9,8 @@ import { tagOutcome } from "./outcome-markers";
 
 export type ActiveBlockedSource = { kind: BlockedSourceKind; value: string };
 
-export const BLOCKED_STATUS = 403;
-export const BLOCKED_BODY = "Forbidden";
+const BLOCKED_STATUS = 403;
+const BLOCKED_BODY = "Forbidden";
 
 type Handler = Record<string, unknown>;
 

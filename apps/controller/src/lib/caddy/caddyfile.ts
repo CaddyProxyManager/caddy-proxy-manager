@@ -7,7 +7,7 @@ import { connectedAgents } from "../agent/registry";
 import { type DomainError, domainError } from "../errors/domain-error";
 import { caddyAdminRequest } from "./admin";
 
-export type AdaptedCaddyfile = {
+type AdaptedCaddyfile = {
   routes: Record<string, unknown>[];
   warnings: string[];
   /** Apps not honoured at host scope (`tls`, `layer4`), surfaced so they do not silently vanish. */

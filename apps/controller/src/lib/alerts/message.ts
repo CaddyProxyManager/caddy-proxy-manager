@@ -46,7 +46,7 @@ export type AlertBatch = {
   };
 };
 
-export type AlertSource = {
+type AlertSource = {
   id: number;
   at: string;
   event: NotificationEvent;

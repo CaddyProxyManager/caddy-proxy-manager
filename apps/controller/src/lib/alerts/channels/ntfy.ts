@@ -8,7 +8,7 @@ import { type AlertBatch, clip } from "../message";
 /** ntfy keeps a message up to 4096 bytes as text; longer becomes an attachment. */
 const MESSAGE_MAX = 3500;
 
-export type NtfyPayload = {
+type NtfyPayload = {
   topic: string;
   title: string;
   message: string;

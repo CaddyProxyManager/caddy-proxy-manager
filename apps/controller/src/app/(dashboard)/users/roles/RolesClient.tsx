@@ -34,8 +34,9 @@ import {
 } from "@/src/lib/roles/capabilities";
 import { deleteRoleAction, saveRoleAction } from "./actions";
 import { unwrap } from "@/src/lib/errors/action-result";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
-export type RoleView = {
+type RoleView = {
   key: string;
   name: string | null;
   description: string | null;
@@ -52,10 +53,6 @@ type BuiltIn = (typeof BUILT_IN)[number];
 function levelOf(capabilities: readonly Capability[], resource: CapabilityResource): Level {
   if (capabilities.includes(`${resource}:write`)) return "write";
   return capabilities.includes(`${resource}:read`) ? "read" : "none";
-}
-
-function message(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
 }
 
 /** Names from the catalog for the built-in roles, and from the role for the rest. */
@@ -96,7 +93,7 @@ export default function RolesClient({
     try {
       unwrap(await deleteRoleAction(role.key));
     } catch (err) {
-      setError(message(err, t("deleteFailed")));
+      setError(thrownMessage(err, t("deleteFailed")));
     } finally {
       router.refresh();
     }
@@ -298,7 +295,7 @@ function RoleDialog({
       onSaved();
       onClose();
     } catch (err) {
-      setError(message(err, t("saveFailed")));
+      setError(thrownMessage(err, t("saveFailed")));
     } finally {
       setSaving(false);
     }

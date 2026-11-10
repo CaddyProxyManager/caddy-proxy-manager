@@ -10,7 +10,6 @@ import { domainError } from "../errors/domain-error";
 import { isMadeRoleKey } from "../roles/built-in";
 
 export const VIEW_AS_ROLES = ["operator", "user", "viewer"] as const;
-export type ViewAsRole = (typeof VIEW_AS_ROLES)[number];
 /** Long enough to click around, short enough that a forgotten one doesn't linger. */
 export const VIEW_AS_DURATION_MS = 60 * 60 * 1000;
 

@@ -11,7 +11,7 @@ type Translator = ReturnType<typeof useTranslations>;
 /** The one place key narrowing is given up: the keys are composed at runtime. */
 type DynamicTranslate = (key: string, values?: Record<string, string>) => string;
 
-export type AuditSummaryPattern = {
+type AuditSummaryPattern = {
   entityType: string;
   action: string;
   message: string;

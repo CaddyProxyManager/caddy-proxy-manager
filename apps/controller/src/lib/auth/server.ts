@@ -9,8 +9,8 @@ import { and, eq, notInArray } from "drizzle-orm";
 import { config } from "../config";
 import { extraTrustedOrigins } from "./trusted-origins";
 import { getPublicBaseUrl, publicOrigins } from "../http/public-url";
-import { decryptSecret, encryptSecret, isEncryptedSecret } from "../secrets";
-import type { OAuthProvider } from "../models/oauth-providers";
+import { encryptSecret, isEncryptedSecret } from "../secrets";
+import { type OAuthProvider, parseDbProvider } from "../models/oauth-providers";
 import { withRoleGroups } from "../roles/mappings";
 import type { GenericOAuthConfig } from "better-auth/plugins";
 import {
@@ -190,34 +190,7 @@ async function loadProviders(): Promise<GenericOAuthConfig[]> {
           notInArray(schema.oauthProviders.type, [LDAP_PROVIDER_TYPE, SAML_PROVIDER_TYPE]),
         ),
       );
-    const providers: OAuthProvider[] = (await withRoleGroups(rows)).map((row) => ({
-      id: row.id,
-      name: row.name,
-      type: row.type,
-      clientId: decryptSecret(row.clientId, `OAuth provider "${row.name}"`),
-      clientSecret: decryptSecret(row.clientSecret, `OAuth provider "${row.name}"`),
-      issuer: row.issuer,
-      authorizationUrl: row.authorizationUrl,
-      tokenUrl: row.tokenUrl,
-      userinfoUrl: row.userinfoUrl,
-      scopes: row.scopes,
-      autoLink: row.autoLink,
-      enabled: row.enabled,
-      source: row.source,
-      groupsClaim: row.groupsClaim,
-      rolesClaim: row.rolesClaim,
-      groupPrefix: row.groupPrefix,
-      roleMappingEnabled: row.roleMappingEnabled,
-      adminGroup: row.adminGroup,
-      operatorGroup: row.operatorGroup,
-      userGroup: row.userGroup,
-      viewerGroup: row.viewerGroup,
-      roleGroups: row.roleGroups,
-      defaultRole: row.defaultRole,
-      syncGroups: row.syncGroups,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-    }));
+    const providers = (await withRoleGroups(rows)).map(parseDbProvider);
     const { allowOauthRegistration } = await authPolicy();
     cachedProviders = providers.map((provider) =>
       mapOAuthProvider(provider, allowOauthRegistration),
@@ -266,7 +239,7 @@ async function refusePasskey(
 }
 
 /** The plugin checks each ceremony; this adds what CPM asks of an account on top. */
-export async function guardPasskeyRequest(
+async function guardPasskeyRequest(
   ctx: AuthHookContext,
   localUsersDisabled: boolean,
 ): Promise<void> {
@@ -322,7 +295,7 @@ function bodyField(body: unknown, key: string): string {
  * unless the name is a break-glass account's. A passkey names its account only once verified, so
  * that is refused at session creation instead (`refuseEnforcedPasskey`).
  */
-export async function guardSsoEnforcement(ctx: AuthHookContext): Promise<void> {
+async function guardSsoEnforcement(ctx: AuthHookContext): Promise<void> {
   const path = ctx.path;
   const watched =
     path === "/sign-in/email" ||

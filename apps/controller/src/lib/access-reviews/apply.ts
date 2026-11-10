@@ -153,7 +153,7 @@ async function applyConnection(item: ItemRow, actor: ReviewActor): Promise<"appl
   return "applied";
 }
 
-export async function applyItem(item: ItemRow, actor: ReviewActor): Promise<"applied" | "gone"> {
+async function applyItem(item: ItemRow, actor: ReviewActor): Promise<"applied" | "gone"> {
   if (item.decision === "revoke" && (await stillScimManaged(item))) {
     throw domainError("accessReviewScimManaged", {}, { status: 409 });
   }

@@ -9,7 +9,7 @@ const SITEVERIFY: Record<Exclude<CaptchaWidgetConfig["provider"], "cap">, string
 const TIMEOUT_MS = 10_000;
 
 /** "unavailable" is the service not answering, worded differently from a failed solve. */
-export type CaptchaVerdict = "passed" | "failed" | "unavailable";
+type CaptchaVerdict = "passed" | "failed" | "unavailable";
 
 export type CaptchaCheck = {
   provider: CaptchaWidgetConfig["provider"];

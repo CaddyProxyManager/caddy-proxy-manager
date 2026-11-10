@@ -8,7 +8,7 @@ import { domainError, storedErrorCode } from "../errors/domain-error";
 import { raiseProblem, resolveProblem } from "../notifications";
 import { type CronJob, cronHandler, latestSlot, missedSlot, scheduleJobs } from "../cron";
 
-export { type CronFactory, cronHandler, scheduleJobs } from "../cron";
+export { cronHandler, scheduleJobs } from "../cron";
 import { getDestination, openStore } from "./destinations";
 import { applyRetention, backupObjectName } from "./retention";
 import {
@@ -19,12 +19,9 @@ import {
 } from "./schedules";
 import { createBackup } from "./service";
 import { claimRun, failStaleRuns, finishRun, getRun, latestRuns, type RunTrigger } from "./runs";
+import { thrownMessage } from "../errors/thrown-message";
 
 const PROBLEM_PREFIX = "backup:";
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 /**
  * Makes, uploads and prunes one backup for a claimed slot. Null when another process holds the
@@ -78,7 +75,7 @@ export async function runBackupSchedule(
     const code = storedErrorCode(error);
     await finishRun(runId, {
       status: "failed",
-      error: errorText(error),
+      error: thrownMessage(error),
       errorCode: code ? JSON.stringify(code) : null,
       durationMs: now() - started,
       objectKey,
@@ -88,7 +85,7 @@ export async function runBackupSchedule(
     await raiseProblem(`${PROBLEM_PREFIX}${scheduleId}`, {
       kind: "backupFailed",
       schedule: schedule?.name ?? String(scheduleId),
-      error: errorText(error),
+      error: thrownMessage(error),
       errorCode: code,
     });
   }

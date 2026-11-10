@@ -14,6 +14,7 @@ import { getSetting, setSetting } from "../settings";
 import { outsideStagingScope } from "../settings/staging-context";
 import { shareGeoipDatabase } from "./replicas";
 import { checkGeoipUpdates, geoipCredentials } from "./update-check";
+import { thrownMessage } from "../errors/thrown-message";
 
 const DOWNLOAD_URL = "https://download.maxmind.com/geoip/databases";
 
@@ -192,7 +193,7 @@ export function updateGeoipDatabases(fetchImpl: typeof fetch = fetch): Promise<G
   inFlight = run(fetchImpl)
     .catch((error: unknown): GeoipUpdateResult => {
       console.error("[geoip] update failed:", error);
-      return { downloaded: [], error: error instanceof Error ? error.message : String(error) };
+      return { downloaded: [], error: thrownMessage(error) };
     })
     .then(async (result) => {
       const { reportGeoipRun } = await import("../notifications/jobs");
@@ -244,7 +245,7 @@ async function run(fetchImpl: typeof fetch): Promise<GeoipUpdateResult> {
         `[geoip] downloaded ${edition} (${bytes.byteLength} bytes, built ${stamp ?? "unknown"})`,
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = thrownMessage(error);
       console.warn(`[geoip] could not download ${edition}: ${message}`);
       failures.push({ edition, message, code: storedErrorCode(error) });
     }

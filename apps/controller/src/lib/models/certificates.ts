@@ -79,7 +79,7 @@ export async function listCertificates(): Promise<Certificate[]> {
 }
 
 /** What a list needs: no private key, so nothing is decrypted to name a certificate. */
-export type CertificateSummary = Pick<
+type CertificateSummary = Pick<
   Certificate,
   "id" | "name" | "type" | "domainNames" | "certificatePem" | "sourceError" | "sourceReadAt"
 >;

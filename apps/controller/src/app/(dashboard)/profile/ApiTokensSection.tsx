@@ -38,6 +38,7 @@ import {
 } from "@/src/lib/api-tokens/scope";
 import { createApiTokenAction, deleteApiTokenAction } from "../api-tokens/actions";
 import { ProfileSection } from "./ProfileSection";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
 /** Mirrors MAX_TOKENS_PER_USER, which the model enforces; this only greys the button. */
 const TOKEN_LIMIT = 10;
@@ -264,7 +265,7 @@ function CreateTokenDialog({
       if (result.ok) onCreated(result.data.rawToken);
       else setError(result.error);
     } catch (thrown) {
-      setError(thrown instanceof Error ? thrown.message : t("apiTokenCreateFailed"));
+      setError(thrownMessage(thrown, t("apiTokenCreateFailed")));
     } finally {
       setSubmitting(false);
     }

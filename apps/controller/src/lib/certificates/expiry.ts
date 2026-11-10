@@ -90,7 +90,7 @@ export function daysLeft(notAfter: string, now: number): number | null {
   return Number.isFinite(at) ? Math.floor((at - now) / DAY_MS) : null;
 }
 
-export type HostCertificate = {
+type HostCertificate = {
   expiry: CertificateExpiry;
   daysLeft: number | null;
   stage: CertificateStage;
@@ -177,12 +177,6 @@ export async function managedCertificates(budgetMs = 2000): Promise<CertificateE
   } finally {
     clearTimeout(timer);
   }
-}
-
-/** Test seam. */
-export function resetCertificateInventoryForTests(): void {
-  cached = null;
-  refreshing = null;
 }
 
 /** The alert threshold, or the default when alerts are off: trouble is trouble either way. */

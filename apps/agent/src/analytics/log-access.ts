@@ -20,7 +20,7 @@ export function permissionsFor(who: Identity, file: FileInfo): Permissions {
   return { read: (bits & 0o4) !== 0, write: (bits & 0o2) !== 0, execute: (bits & 0o1) !== 0 };
 }
 
-export type LogPaths = { dir: string; access: string; rules: string; audit: string };
+type LogPaths = { dir: string; access: string; rules: string; audit: string };
 
 /**
  * `checkFiles`: whether the agent parses the logs at all; the directory matters either way.

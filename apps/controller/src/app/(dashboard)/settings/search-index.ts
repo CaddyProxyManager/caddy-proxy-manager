@@ -19,7 +19,7 @@ import {
 
 type SettingsTranslator = ReturnType<typeof useTranslations<"settings">>;
 
-export type SettingsSearchEntry = {
+type SettingsSearchEntry = {
   /** Unique: a block id, or `page:<id>` for the pages below. */
   id: string;
   href: string;
@@ -100,7 +100,7 @@ function fold(text: string): string {
 }
 
 /** What `searchEntries` reads: a title, the words it is found by, and where it lives. */
-export type RankedEntry = { title: string; keywords: readonly string[]; context: string };
+type RankedEntry = { title: string; keywords: readonly string[]; context: string };
 
 /**
  * Every word of the query must appear somewhere. A title match outranks a synonym, which outranks

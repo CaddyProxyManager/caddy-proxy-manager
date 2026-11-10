@@ -2,7 +2,7 @@
 
 import { cronCheck } from "../cron";
 
-export type CronProblem = "backupCronInvalid" | "backupTimeZoneInvalid" | "backupCronNeverFires";
+type CronProblem = "backupCronInvalid" | "backupTimeZoneInvalid" | "backupCronNeverFires";
 
 /** Why an expression can't be saved, or null. */
 export function cronProblem(
@@ -17,4 +17,4 @@ export function cronProblem(
 }
 
 export { isOverdue, latestSlot, missedSlot, nextRun } from "../cron";
-export { type SchedulePreset, presetExpression, presetOf } from "./presets";
+export { presetExpression, presetOf } from "./presets";

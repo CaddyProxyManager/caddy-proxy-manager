@@ -27,10 +27,6 @@ export const DASHBOARD_MANDATORY_EXCLUSIONS: readonly WafExclusionRule[] = [
   },
 ];
 
-export function isMandatoryExclusion(id: number): boolean {
-  return DASHBOARD_MANDATORY_EXCLUSIONS.some((exclusion) => exclusion.id === id);
-}
-
 /** The exclusions a dashboard handler applies: its own and the global ones, plus the mandatory. */
 export function dashboardExclusions(
   exclusions: readonly WafExclusionRule[],
@@ -42,9 +38,9 @@ export function dashboardExclusions(
   ];
 }
 
-export const MAX_RULE_ID = 2_147_483_647;
-export const MAX_EXCLUSION_PATH = 512;
-export const MAX_EXCLUSION_REASON = 500;
+const MAX_RULE_ID = 2_147_483_647;
+const MAX_EXCLUSION_PATH = 512;
+const MAX_EXCLUSION_REASON = 500;
 
 /** What the config build needs of an exclusion. */
 export type WafExclusionRule = {
@@ -55,7 +51,7 @@ export type WafExclusionRule = {
   target: string | null;
 };
 
-export type ExclusionErrorCode =
+type ExclusionErrorCode =
   | "wafExclusionRuleIdInvalid"
   | "wafExclusionRuleProtected"
   | "wafExclusionPathInvalid"

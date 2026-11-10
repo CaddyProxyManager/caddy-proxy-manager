@@ -26,13 +26,6 @@ export type TwoFactorPolicySettings = {
   requireForAdmins: boolean;
 };
 
-export const DEFAULT_MFA_POLICY: TwoFactorPolicySettings = {
-  mode: "off",
-  graceDays: DEFAULT_MFA_GRACE_DAYS,
-  since: null,
-  requireForAdmins: false,
-};
-
 export function isMfaPolicyMode(value: unknown): value is MfaPolicyMode {
   return (MFA_POLICY_MODES as readonly unknown[]).includes(value);
 }
@@ -95,7 +88,7 @@ export function coveredByMfaPolicy(policy: TwoFactorPolicySettings, subject: Mfa
   return policy.mode === "all" || subject.role === "admin";
 }
 
-export function hasSecondFactor(subject: Pick<MfaSubject, "twoFactorEnabled" | "passkeyCount">) {
+function hasSecondFactor(subject: Pick<MfaSubject, "twoFactorEnabled" | "passkeyCount">) {
   return subject.twoFactorEnabled || subject.passkeyCount > 0;
 }
 

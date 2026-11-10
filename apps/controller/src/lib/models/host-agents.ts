@@ -16,7 +16,7 @@ const TABLES = {
 } as const;
 
 /** Absent means every agent; read it only through {@link servedByAgent}. */
-export type HostAssignments = Map<number, number[]>;
+type HostAssignments = Map<number, number[]>;
 
 export async function listHostAssignments(kind: HostKind): Promise<HostAssignments> {
   const { table, hostColumn } = TABLES[kind];

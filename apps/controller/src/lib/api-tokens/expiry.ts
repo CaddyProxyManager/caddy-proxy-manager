@@ -16,7 +16,7 @@ export function tokenExpiryPreset(value: unknown): TokenExpiryPreset {
   return isTokenExpiryPreset(value) ? value : DEFAULT_TOKEN_EXPIRY;
 }
 
-export function isTokenExpiryPreset(value: unknown): value is TokenExpiryPreset {
+function isTokenExpiryPreset(value: unknown): value is TokenExpiryPreset {
   return (TOKEN_EXPIRY_PRESETS as readonly unknown[]).includes(value);
 }
 

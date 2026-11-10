@@ -111,7 +111,7 @@ function resolveCertFilesHostDir(): string | null {
 }
 
 /** CLI flags beat the environment: fixing a bad `CONTROLLER_URL` must not need a compose edit. */
-export type ConfigOverrides = {
+type ConfigOverrides = {
   controllerHost?: string | null;
   controllerPort?: number | null;
   pairingCode?: string | null;

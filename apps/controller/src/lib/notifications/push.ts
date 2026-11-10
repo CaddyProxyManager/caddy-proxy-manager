@@ -89,7 +89,7 @@ export async function pushPayload(
   };
 }
 
-export type PushOutcome = { delivered: number; failed: number };
+type PushOutcome = { delivered: number; failed: number };
 
 /** Pushes in flight at once: each waits up to SEND_TIMEOUT_MS on a push service. */
 const SEND_CONCURRENCY = 8;

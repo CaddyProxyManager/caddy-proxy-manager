@@ -18,6 +18,7 @@ import {
 import type { StreamRecord } from "./records";
 import { DEFAULT_PORTS, DEFAULT_HEADER_NAME, type Sink, type SinkEncoding } from "./sinks";
 import { DEFAULT_DATAGRAM_BYTES, formatDatagram, formatSyslog, octetFrame } from "./syslog";
+import { thrownMessage } from "../errors/thrown-message";
 
 const CONNECT_TIMEOUT_MS = 10_000;
 const SEND_TIMEOUT_MS = 30_000;
@@ -38,10 +39,6 @@ function trusted(ca: string | undefined): string[] | undefined {
   return ca ? [...rootCertificates, ca] : undefined;
 }
 
-function reasonOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 /** What the page and the alert say: a code for the reader's language, the English beside it. */
 function failure(error: unknown, target: string): DomainError {
   if (error instanceof DomainError) return error;
@@ -52,7 +49,7 @@ function failure(error: unknown, target: string): DomainError {
       return domainError("auditSinkTimeout", { target });
     }
   }
-  return domainError("auditSinkUnreachable", { target, reason: reasonOf(error) });
+  return domainError("auditSinkUnreachable", { target, reason: thrownMessage(error) });
 }
 
 // ── Syslog ──────────────────────────────────────────────────────────────────
@@ -203,7 +200,7 @@ function encode(body: string, encoding: SinkEncoding): Uint8Array<ArrayBuffer> {
   return bytes;
 }
 
-export type HttpHooks = {
+type HttpHooks = {
   /** A 415 to a compressed body: told once, then the batch goes again uncompressed. */
   onEncodingRefused?: () => Promise<void>;
 };
@@ -256,7 +253,7 @@ async function sendFile(sink: Sink, records: StreamRecord[]): Promise<void> {
       mode: 0o640,
     });
   } catch (error) {
-    throw domainError("auditSinkFileFailed", { reason: reasonOf(error) });
+    throw domainError("auditSinkFileFailed", { reason: thrownMessage(error) });
   }
 }
 

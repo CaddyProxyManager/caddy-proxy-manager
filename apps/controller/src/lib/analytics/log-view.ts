@@ -5,7 +5,7 @@ import { trafficHostName } from "../proxy-hosts/traffic-status";
 export type LogSource = "access" | "waf" | "caddy";
 /** What the viewer offers: the agent's sources, plus ACME, which is Caddy's output filtered. */
 export type LogView = LogSource | "acme";
-export const LOG_VIEWS: readonly LogView[] = ["access", "waf", "caddy", "acme"];
+const LOG_VIEWS: readonly LogView[] = ["access", "waf", "caddy", "acme"];
 
 export function isLogView(value: unknown): value is LogView {
   return (LOG_VIEWS as readonly unknown[]).includes(value);

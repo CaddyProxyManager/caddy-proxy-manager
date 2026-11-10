@@ -31,7 +31,7 @@ export class ReplicaKeyMismatchError extends Error {
   }
 }
 
-export type LiveReplica = { id: string; hostname: string; startedAt: number; heartbeatAt: number };
+type LiveReplica = { id: string; hostname: string; startedAt: number; heartbeatAt: number };
 
 export async function liveReplicas(now = Date.now()): Promise<LiveReplica[]> {
   return db

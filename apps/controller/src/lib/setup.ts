@@ -41,7 +41,7 @@ export type SetupStage =
   /** Setup is finished; the app runs normally. */
   | "complete";
 
-export type SetupState = {
+type SetupState = {
   stage: SetupStage;
   /** True while the app should serve nothing but the setup flow. */
   required: boolean;
@@ -93,7 +93,7 @@ const RESTART_TOKEN_TTL_MS = 15 * 60 * 1000;
 
 /** In the database because it has to outlive the exit it allows. */
 const RESTART_REQUESTED_KEY = "setup:restart_requested_at";
-export const RESTART_COOLDOWN_MS = 60 * 1000;
+const RESTART_COOLDOWN_MS = 60 * 1000;
 
 function hashRestartToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -198,7 +198,7 @@ export async function declineMigration(): Promise<void> {
   await setFlag(MIGRATION_DECLINED_KEY);
 }
 
-export async function isMigrationDeclined(): Promise<boolean> {
+async function isMigrationDeclined(): Promise<boolean> {
   return isFlagSet(MIGRATION_DECLINED_KEY);
 }
 
@@ -206,7 +206,7 @@ export async function isMigrationDeclined(): Promise<boolean> {
  * Declined or migrated. Checked explicitly because a migration can leave the accounts behind,
  * and "can anything sign in" would then offer the same file again.
  */
-export async function isMigrationSettled(): Promise<boolean> {
+async function isMigrationSettled(): Promise<boolean> {
   if (await isMigrationDeclined()) return true;
   return (await getMigrationSource()) !== null;
 }

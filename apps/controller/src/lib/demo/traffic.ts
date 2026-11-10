@@ -5,10 +5,10 @@
 import type { L4ConnectionRow } from "@cpm/shared";
 import type { TrafficEventRow, WafEventRow } from "../clickhouse/client";
 
-export type TrafficShare = { domain: string; share: number };
+type TrafficShare = { domain: string; share: number };
 
 /** A host added in the demo gets the default. */
-export const DEMO_HOST_SHARES: Record<string, number> = {
+const DEMO_HOST_SHARES: Record<string, number> = {
   "jellyfin.example.com": 30,
   "photos.example.com": 18,
   "cloud.example.com": 15,
@@ -22,7 +22,7 @@ export const DEMO_HOST_SHARES: Record<string, number> = {
 const DEFAULT_SHARE = 4;
 
 /** Requests an hour at the peak; everything scales off it. */
-export const PEAK_PER_HOUR = 900;
+const PEAK_PER_HOUR = 900;
 
 const COUNTRIES = [
   ["GB", 26],
@@ -167,12 +167,12 @@ function status(): number {
 }
 
 /** An L4 host's listen port, which is all its connections are known by. */
-export type DemoL4Port = { protocol: "tcp" | "udp"; port: number };
+type DemoL4Port = { protocol: "tcp" | "udp"; port: number };
 
 /** Connections an hour at the peak, per port: far fewer than requests, and far longer. */
 const L4_PEAK_PER_HOUR = 40;
 
-export function generateL4Connections(
+function generateL4Connections(
   from: number,
   to: number,
   ports: readonly DemoL4Port[],

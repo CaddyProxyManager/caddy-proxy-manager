@@ -7,7 +7,7 @@ import type { BackupStore, StoredObject } from "./storage";
 const BACKUP_NAME = /^cpm-backup-[A-Za-z0-9._-]+\.cpmbak$/;
 const STAMP = /^cpm-backup-(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{2})/;
 
-export type RetentionPolicy = { keepLast: number | null; keepDays: number | null };
+type RetentionPolicy = { keepLast: number | null; keepDays: number | null };
 
 /** `cpm-backup-2026-10-06-02-00-00.cpmbak`, the slot in UTC; `-manual` marks a run on request. */
 export function backupObjectName(slot: number, manual = false): string {
@@ -22,7 +22,7 @@ export function isScheduleBackup(key: string, prefix: string): boolean {
 }
 
 /** When a backup was made: the stamp in its name, else when the store last saw it written. */
-export function backupTime(object: StoredObject, prefix: string): number {
+function backupTime(object: StoredObject, prefix: string): number {
   const match = STAMP.exec(object.key.slice(prefix.length));
   if (match) {
     const [, y, mo, d, h, mi, s] = match;

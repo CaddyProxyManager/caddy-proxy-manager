@@ -5,9 +5,9 @@
 
 export type Health = { up: boolean; boot: string | null };
 
-export type RestartOutcome = "restarted" | "stillRunning" | "notBack";
+type RestartOutcome = "restarted" | "stillRunning" | "notBack";
 
-export type RestartWaitDeps = {
+type RestartWaitDeps = {
   health: () => Promise<Health>;
   sleep: (ms: number) => Promise<void>;
   now: () => number;

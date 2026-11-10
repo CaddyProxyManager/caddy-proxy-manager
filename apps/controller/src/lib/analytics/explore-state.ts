@@ -4,7 +4,7 @@
  * one place rather than trusted.
  */
 
-import { TRAFFIC_OUTCOMES, type TrafficOutcome } from "@cpm/shared";
+import { TRAFFIC_OUTCOMES } from "@cpm/shared";
 
 export const ANALYTICS_RANGES = ["1h", "24h", "7d", "30d"] as const;
 export type AnalyticsRange = (typeof ANALYTICS_RANGES)[number];
@@ -19,13 +19,8 @@ export const RANGE_SECONDS: Record<AnalyticsRange, number> = {
 export const MAX_CUSTOM_RANGE_SECONDS = 92 * 86400;
 
 /** Refreshed every 30 seconds; a longer range barely moves in that time. */
-export const AUTO_REFRESH_MAX_SECONDS = 86400;
+const AUTO_REFRESH_MAX_SECONDS = 86400;
 export const AUTO_REFRESH_MS = 30_000;
-
-/** Everything a request that never reached the end of the gates. */
-export const MITIGATED_OUTCOMES: readonly TrafficOutcome[] = TRAFFIC_OUTCOMES.filter(
-  (outcome) => outcome !== "served",
-);
 
 export const FILTER_FIELDS = [
   "host",
@@ -48,7 +43,7 @@ export type AnalyticsFilter = { field: FilterField; op: FilterOp; value: string 
 
 export const MAX_FILTERS = 20;
 /** A host's domains, which its own analytics tab locks the page to. */
-export const MAX_SCOPE_HOSTS = 100;
+const MAX_SCOPE_HOSTS = 100;
 const MAX_FILTER_VALUE = 512;
 
 export const GROUP_BYS = ["none", "outcome", "status", "host"] as const;

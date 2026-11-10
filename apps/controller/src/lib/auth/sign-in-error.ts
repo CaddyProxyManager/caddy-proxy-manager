@@ -4,7 +4,7 @@
  * English wording, which `tests/unit/auth/sign-in-error.test.ts` pins.
  */
 
-export type SignInErrorKey =
+type SignInErrorKey =
   | "emailNotVerified"
   | "invalidUsername"
   | "invalidUsernameOrPassword"

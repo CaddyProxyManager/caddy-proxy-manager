@@ -192,7 +192,7 @@ export function parseL4Row(value: unknown): L4ConnectionRow | null {
 }
 
 /** Whether a connection is on a port of an L4 host this agent serves, by protocol. */
-export function agentL4PortFilter(
+function agentL4PortFilter(
   agentRowId: number,
 ): Promise<(row: Pick<L4ConnectionRow, "network" | "port">) => boolean> {
   return processMemo(`${L4_PORT_FILTERS}:${agentRowId}`, () => loadL4PortFilter(agentRowId));
@@ -244,7 +244,7 @@ function matchesDomain(domains: ReadonlySet<string>, host: string): boolean {
  * Whether a row's host is one this agent may report on: a host it serves, or one no proxy host
  * claims (scanners, the catch-all). A host pinned only to other agents is not its to report.
  */
-export function agentHostFilter(agentRowId: number): Promise<(host: string) => boolean> {
+function agentHostFilter(agentRowId: number): Promise<(host: string) => boolean> {
   // Asked for every batch, so held until a host or assignment changes; each ends in an apply.
   return processMemo(`${HOST_FILTERS}:${agentRowId}`, () => loadHostFilter(agentRowId));
 }

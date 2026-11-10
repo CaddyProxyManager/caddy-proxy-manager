@@ -51,7 +51,7 @@ export type CopyReport = {
   totalRows: number;
 };
 
-export type CopyOptions = {
+type CopyOptions = {
   sqlitePath: string;
   /** An open Bun SQL client for the target; the caller closes it. */
   target: SQL;

@@ -4,7 +4,7 @@
  */
 import { createHash } from "node:crypto";
 
-export type KeyedWafRow = {
+type KeyedWafRow = {
   ts: number;
   clientIp: string;
   method: string;

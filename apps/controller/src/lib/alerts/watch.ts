@@ -27,7 +27,7 @@ export function resetRuleWatchForTests(): void {
   lastRun = 0;
 }
 
-export function ruleKey(ruleId: number, what: string): string {
+function ruleKey(ruleId: number, what: string): string {
   return `rule:${ruleId}:${what}`;
 }
 

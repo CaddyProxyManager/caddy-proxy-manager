@@ -32,7 +32,7 @@ function loadBalancingPolicies(
   ];
 }
 
-export const EMPTY_LOAD_BALANCER: LoadBalancerConfig = {
+const EMPTY_LOAD_BALANCER: LoadBalancerConfig = {
   enabled: true,
   policy: "random",
   policyHeaderField: null,

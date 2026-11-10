@@ -19,7 +19,7 @@ import type { PendingNotice } from "./plan";
 
 export const LEGACY_STATE_KEY = "admin_notifications";
 
-export type LegacyState = {
+type LegacyState = {
   pending: PendingNotice[];
   open: Record<string, { at: string; noticeId: string | null; event?: NotificationEvent }>;
   quiet: Record<string, string>;

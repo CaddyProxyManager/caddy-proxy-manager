@@ -36,7 +36,7 @@ import { GraphQLError } from "graphql";
 /** Per operation: a command result can carry a megabytes-long config readback. */
 const MAX_STATUS_BYTES = 64 * 1024;
 
-export type VerifiedAgent = { id: number; agentId: string; name: string; credential: string };
+type VerifiedAgent = { id: number; agentId: string; name: string; credential: string };
 
 /**
  * Verifies the raw bytes the agent sent (Yoga consumed the original), not a re-serialisation that

@@ -20,8 +20,8 @@ import {
   normalizeCapabilities,
 } from "./capabilities";
 
-export const ROLE_NAME_MAX_LENGTH = 60;
-export const ROLE_DESCRIPTION_MAX_LENGTH = 300;
+const ROLE_NAME_MAX_LENGTH = 60;
+const ROLE_DESCRIPTION_MAX_LENGTH = 300;
 
 export type Role = RoleDefinition & {
   /** Null for a built-in role, which is not stored. */
@@ -32,7 +32,7 @@ export type Role = RoleDefinition & {
   builtIn: boolean;
 };
 
-export type RoleUsage = { users: number; groups: number; mappings: number; providers: number };
+type RoleUsage = { users: number; groups: number; mappings: number; providers: number };
 
 export type RoleInput = {
   name: string;

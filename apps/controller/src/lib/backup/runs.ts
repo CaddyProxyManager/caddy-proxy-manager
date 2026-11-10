@@ -105,7 +105,7 @@ export async function latestRuns(
 }
 
 /** A run longer than this was cut short by a crash: nothing a backup does takes hours. */
-export const STALE_RUN_MS = 6 * 60 * 60_000;
+const STALE_RUN_MS = 6 * 60 * 60_000;
 
 /** Marks runs a dead process left `running`, so they read as failed rather than forever busy. */
 export async function failStaleRuns(now = Date.now()): Promise<number> {

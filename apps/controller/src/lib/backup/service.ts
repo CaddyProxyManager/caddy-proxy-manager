@@ -62,7 +62,7 @@ export const BACKUP_OPTIONAL = {
   hostHistory: "host_revisions",
 };
 
-export type BackupOptions = { auditLog?: boolean; settingsHistory?: boolean };
+type BackupOptions = { auditLog?: boolean; settingsHistory?: boolean };
 
 const RESTORE_BATCH = 250;
 
@@ -122,12 +122,12 @@ export function describeBackup(file: Buffer) {
   };
 }
 
-export function preRestoreBackupDir(): string {
+function preRestoreBackupDir(): string {
   // The same volume the agent bootstrap token uses; see lib/agent/bootstrap.ts.
   return join(process.env.L4_PORTS_DIR || "/app/data", "backups");
 }
 
-export type RestoreResult = { tables: number; rows: number; safetyBackup: string };
+type RestoreResult = { tables: number; rows: number; safetyBackup: string };
 
 /** Everything is converted before one write transaction, so a bad file changes nothing. */
 export async function restoreBackup(

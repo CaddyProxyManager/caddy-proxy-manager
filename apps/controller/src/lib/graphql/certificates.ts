@@ -49,7 +49,7 @@ import { normalizeCertificateProviderOptions } from "../certificates/provider-op
 import type { GraphQLContext } from "./context";
 
 /** The row carries a private key. */
-export function projectCertificate(row: Certificate) {
+function projectCertificate(row: Certificate) {
   return {
     id: row.id,
     name: row.name,

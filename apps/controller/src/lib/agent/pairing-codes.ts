@@ -108,7 +108,7 @@ export async function revokeRepairCode(agentId: string): Promise<void> {
   await db.delete(table).where(eq(table.slot, repairSlot(agentId)));
 }
 
-export type RedeemResult = { ok: true } | { ok: false; error: string };
+type RedeemResult = { ok: true } | { ok: false; error: string };
 
 const EXPIRED: RedeemResult = {
   ok: false,

@@ -5,7 +5,7 @@
 import { schemaDialect } from "./schema";
 import { isDemoMode } from "../demo/mode";
 
-export { SQLITE_NOTICE_COOKIE, SQLITE_NOTICE_DISMISS_SECONDS } from "./sqlite-notice-cookie";
+export { SQLITE_NOTICE_COOKIE } from "./sqlite-notice-cookie";
 
 /** A demo is what SQLite is for. */
 export function sqliteNoticeApplies(): boolean {

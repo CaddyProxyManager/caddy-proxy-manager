@@ -28,7 +28,7 @@ export type BundledImage = {
   file: string;
 };
 export type BundleFile = { sha256: string; bytes: number; name: string };
-export type Manifest = {
+type Manifest = {
   version: string;
   arch: string;
   images: BundledImage[];
@@ -69,7 +69,7 @@ export function composeImages(compose: string): ComposeImage[] {
   return images;
 }
 
-export function isFirstPartyImage(image: string): boolean {
+function isFirstPartyImage(image: string): boolean {
   return FIRST_PARTY_IMAGE.test(image);
 }
 

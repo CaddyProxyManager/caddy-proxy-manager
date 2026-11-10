@@ -20,7 +20,7 @@ export type CaptchaWidgetConfig = {
 };
 
 /** Pinned, not `@latest`: an unreviewed release would run on the sign-in page. */
-export const CAP_WIDGET_VERSION = "0.1.58";
+const CAP_WIDGET_VERSION = "0.1.58";
 
 /** Cap Standalone serves each site key under its own path, widget and siteverify alike. */
 export function capSiteUrl(instanceUrl: string, siteKey: string): string {
@@ -43,7 +43,7 @@ export function captchaScriptUrl(provider: CaptchaProvider, locale?: string): st
 }
 
 /** Sources a page showing the widget has to allow, per CSP directive. */
-export type CspSources = {
+type CspSources = {
   script: string[];
   frame: string[];
   connect: string[];

@@ -24,7 +24,7 @@ import { geoipDir } from "./paths";
 const DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
 
 /** Several times the largest edition. Only there so an endless body cannot fill the volume. */
-export const MAX_DATABASE_BYTES = 200 * 1024 * 1024;
+const MAX_DATABASE_BYTES = 200 * 1024 * 1024;
 
 /** The edition names come from desired state and become a file name, so only known ones pass. */
 export function isGeoipEdition(edition: unknown): edition is GeoipEdition {

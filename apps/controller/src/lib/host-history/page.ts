@@ -20,7 +20,7 @@ function readId(raw: string | string[] | undefined): number | null {
   return Number(raw);
 }
 
-export type HostHistoryData = {
+type HostHistoryData = {
   revisions: HostRevisionSummary[];
   page: number;
   perPage: number;

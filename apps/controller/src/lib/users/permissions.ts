@@ -30,9 +30,7 @@ import {
 import { BUILT_IN_ROLES } from "../roles/built-in";
 import { roleDefinitions } from "../roles";
 
-export type ResourceKind = ObjectKind;
-
-export type ObjectRef = { kind: ObjectKind; id: number };
+type ObjectRef = { kind: ObjectKind; id: number };
 
 /** What the current viewer may do, resolved once per request. */
 export type Access = {
@@ -75,7 +73,7 @@ export function canReach(access: Access, capability: Capability): boolean {
   return reaches(access.capabilities, capability);
 }
 
-export function assertCan(access: Access, capability: Capability, object?: ObjectRef): void {
+function assertCan(access: Access, capability: Capability, object?: ObjectRef): void {
   if (!can(access, capability, object)) throw new ForbiddenError();
 }
 

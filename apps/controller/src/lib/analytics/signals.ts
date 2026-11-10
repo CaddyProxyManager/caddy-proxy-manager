@@ -17,28 +17,28 @@ import { PATH_SQL } from "../clickhouse/explore";
 import type { TimeWindow } from "./explore-state";
 
 /** A burst needs this many 5xx answers... */
-export const BURST_MIN_ERRORS = 10;
+const BURST_MIN_ERRORS = 10;
 /** ...making up at least this share of the requests in its minutes. */
-export const BURST_MIN_SHARE = 0.1;
+const BURST_MIN_SHARE = 0.1;
 /** Minutes with errors this close together are one burst. */
-export const BURST_JOIN_GAP_MINUTES = 2;
+const BURST_JOIN_GAP_MINUTES = 2;
 /** A burst with a 5xx this recent is still going on. */
-export const BURST_ONGOING_SECONDS = 5 * 60;
+const BURST_ONGOING_SECONDS = 5 * 60;
 
-export const SPIKE_MIN_MITIGATED = 50;
-export const SPIKE_MIN_RATIO = 3;
-export const SPIKE_BASELINE_SECONDS = 7 * 86400;
+const SPIKE_MIN_MITIGATED = 50;
+const SPIKE_MIN_RATIO = 3;
+const SPIKE_BASELINE_SECONDS = 7 * 86400;
 
-export const CONCENTRATION_MIN_REQUESTS = 50;
+const CONCENTRATION_MIN_REQUESTS = 50;
 const CONCENTRATION_LIMIT = 50;
 
-export const DEFAULT_SIGNAL_BUDGET_MS = 4000;
+const DEFAULT_SIGNAL_BUDGET_MS = 4000;
 const DEFAULT_SIGNAL_WINDOW_SECONDS = 86400;
 /** The Host header is the client's, so its groups are capped in count and in time. */
 export const MAX_SIGNAL_WINDOW_SECONDS = 92 * 86400;
-export const SIGNAL_GROUP_LIMIT = 10_000;
+const SIGNAL_GROUP_LIMIT = 10_000;
 
-export type SignalSeverity = "critical" | "warning" | "info";
+type SignalSeverity = "critical" | "warning" | "info";
 
 export type ServerErrorBurst = {
   kind: "serverErrorBurst";
@@ -139,7 +139,7 @@ export function findServerErrorBursts(
   return bursts.sort((a, b) => b.to - a.to);
 }
 
-export type MitigatedCount = { host: string; current: number; baseline: number };
+type MitigatedCount = { host: string; current: number; baseline: number };
 
 /** `baseline` rows hold the count over the 7 days before the window, not an average. */
 export function findMitigationSpikes(

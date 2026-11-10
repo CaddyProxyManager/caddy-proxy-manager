@@ -8,7 +8,7 @@ import type { LogReadRequest, LogReadResponse } from "@cpm/shared";
 import { accessLogPath, wafRulesLogPath } from "./analytics/paths";
 
 /** Caps one answer, which travels back as a single GraphQL mutation. */
-export const MAX_LOG_BYTES = 256 * 1024;
+const MAX_LOG_BYTES = 256 * 1024;
 export const MAX_LOG_LINES = 1000;
 /** How far back a first page reaches in a file. */
 const INITIAL_TAIL_BYTES = 64 * 1024;

@@ -12,7 +12,7 @@ const BRANDING_KEY = "branding";
 /** Before base64. Well under the 2 MB action body limit, so the operator gets this message. */
 export const MAX_FAVICON_BYTES = 256 * 1024;
 
-export type FaviconAsset = {
+type FaviconAsset = {
   /** Base64. */
   data: string;
   /** Sniffed, never the browser's claim - see sniffFaviconType. */
@@ -21,7 +21,7 @@ export type FaviconAsset = {
   hash: string;
 };
 
-export type BrandingSettings = { favicon: FaviconAsset | null };
+type BrandingSettings = { favicon: FaviconAsset | null };
 
 export class FaviconValidationError extends DomainError {
   constructor(

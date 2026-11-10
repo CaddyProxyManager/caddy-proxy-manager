@@ -7,7 +7,7 @@ import { Selector } from "@astryxdesign/core/Selector";
 export type DirectoryChoice = { id: string; name: string };
 
 /** The selector's value for the local account; a directory's is its id, a UUID. */
-export const LOCAL_ACCOUNT_CHOICE = "local";
+const LOCAL_ACCOUNT_CHOICE = "local";
 
 export type SignInSource =
   | { kind: "local"; directoryId?: undefined }

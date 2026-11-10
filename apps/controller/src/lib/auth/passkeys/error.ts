@@ -16,14 +16,14 @@ export const TRANSLATED_PASSKEY_CODES = new Set([
 /** The browser's prompt was dismissed or timed out, or another ceremony replaced this one. */
 const CANCELLED = new Set(["AUTH_CANCELLED", "ERROR_CEREMONY_ABORTED", "REGISTRATION_CANCELLED"]);
 
-export type PasskeyErrorKey =
+type PasskeyErrorKey =
   | "passkeyUnknown"
   | "passkeyAlreadyRegistered"
   | "passkeyTooManyAttempts"
   | "passkeySignInFailed"
   | "passkeyAddFailed";
 
-export type PasskeyErrorMessage = { message: string } | { key: PasskeyErrorKey } | null;
+type PasskeyErrorMessage = { message: string } | { key: PasskeyErrorKey } | null;
 
 export function passkeyError(
   error: { status?: number; code?: string; message?: string },

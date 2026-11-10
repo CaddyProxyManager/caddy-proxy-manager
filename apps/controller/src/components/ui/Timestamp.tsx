@@ -10,7 +10,7 @@ import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { useFormatter, useNow } from "next-intl";
 import { formatUtc, toDate } from "@/src/lib/locale/date-format";
 
-export type TimestampStyle = "dateTime" | "dateTimeShort" | "date" | "time";
+type TimestampStyle = "dateTime" | "dateTimeShort" | "date" | "time";
 
 /** No zone: that is the provider's. Not next-intl's type, which the docs site shim lacks. */
 type TimestampOptions = Pick<Intl.DateTimeFormatOptions, "dateStyle" | "timeStyle">;

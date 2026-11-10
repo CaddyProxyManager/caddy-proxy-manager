@@ -22,7 +22,7 @@ export type HistoryFilter = {
   limit?: number | null;
 };
 
-export type HistoryDelivery = {
+type HistoryDelivery = {
   id: number;
   channelId: number;
   channelName: string;
@@ -34,7 +34,7 @@ export type HistoryDelivery = {
   updatedAt: string;
 };
 
-export type HistoryEvent = {
+type HistoryEvent = {
   id: number;
   key: string;
   ruleId: number | null;
@@ -131,7 +131,7 @@ export async function listHistory(filter: HistoryFilter = {}): Promise<HistoryEv
 }
 
 /** History is kept this long; the leader prunes older events with their deliveries. */
-export const HISTORY_DAYS = 90;
+const HISTORY_DAYS = 90;
 
 let prunedAt = 0;
 
@@ -142,7 +142,7 @@ export async function pruneHistoryHourly(now: number): Promise<void> {
   await pruneHistory(now);
 }
 
-export async function pruneHistory(now: number): Promise<void> {
+async function pruneHistory(now: number): Promise<void> {
   const cutoff = new Date(now - HISTORY_DAYS * 86_400_000).toISOString();
   const old = db.select({ id: alertEvents.id }).from(alertEvents).where(lt(alertEvents.at, cutoff));
   await db.delete(alertDeliveries).where(inArray(alertDeliveries.eventId, old));

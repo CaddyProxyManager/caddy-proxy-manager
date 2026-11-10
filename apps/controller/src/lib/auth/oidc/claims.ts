@@ -7,12 +7,12 @@
 import { readClaim } from "./groups";
 import { isMetadataHost } from "../../http/outbound-url";
 
-export type OidcTokens = {
+type OidcTokens = {
   idToken?: string | null;
   accessToken?: string | null;
 };
 
-export type ClaimSourceConfig = {
+type ClaimSourceConfig = {
   issuer: string | null;
   userinfoUrl: string | null;
 };
@@ -21,7 +21,7 @@ export type ClaimSourceConfig = {
 const DISCOVERY_TTL_MS = 10 * 60 * 1000;
 
 /** The endpoints read out of a discovery document. Absent ones stay null and are cached as such. */
-export type DiscoveredEndpoints = {
+type DiscoveredEndpoints = {
   userinfoUrl: string | null;
   jwksUri: string | null;
 };

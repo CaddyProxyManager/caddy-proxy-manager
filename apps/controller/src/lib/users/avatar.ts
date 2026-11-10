@@ -7,7 +7,7 @@
 import { createHash } from "node:crypto";
 
 // outbound: gravatar
-export const GRAVATAR_ORIGIN = "https://www.gravatar.com";
+const GRAVATAR_ORIGIN = "https://www.gravatar.com";
 
 /**
  * Hostnames that only exist inside this deployment: `localhost` plus the RFC 6761/8375 special-use
@@ -24,7 +24,7 @@ const NON_ROUTABLE_EMAIL_DOMAINS = new Set([
   "home.arpa",
 ]);
 
-export type AvatarUser = {
+type AvatarUser = {
   name?: string | null;
   email?: string | null;
   avatarUrl?: string | null;
@@ -85,7 +85,7 @@ export function avatarInitial(user: AvatarUser): string {
   return (match?.[0] ?? "U").toUpperCase();
 }
 
-export type ResolveAvatarOptions = {
+type ResolveAvatarOptions = {
   /**
    * Whether the Gravatar fallback may be used. When false no Gravatar URL is produced at all, so
    * the browser never contacts gravatar.com - see isGravatarEnabled() for where this comes from.

@@ -176,7 +176,7 @@ export async function runNowAudited(scheduleId: number, userId: number | null) {
 export { listRuns };
 
 /** The most a destination listing shows: restoring reaches for a recent one. */
-export const REMOTE_LIST_LIMIT = 100;
+const REMOTE_LIST_LIMIT = 100;
 
 export type RemoteBackup = { key: string; size: number; lastModified: string | null };
 

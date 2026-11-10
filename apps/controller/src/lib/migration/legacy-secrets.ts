@@ -17,7 +17,7 @@ import { mapTextColumn } from "../secrets/walk";
 /** How many samples `probeLegacySecrets` collects before it stops reading. */
 const SAMPLE_LIMIT = 25;
 
-export type LegacySecretProbe = {
+type LegacySecretProbe = {
   /** Whether the database holds any encrypted value at all. */
   hasEncryptedValues: boolean;
   /** True is the ordinary upgrade: the same `SESSION_SECRET` carried over, no key needed. */
@@ -53,7 +53,7 @@ export function verifyLegacyKey(probe: LegacySecretProbe, sessionSecret: string)
 export type Rekeyer = (value: string) => string;
 
 /** Why a legacy secret could not be read: no old key was given, or the one given is wrong. */
-export type LegacySecretReason = "keyMissing" | "keyWrong";
+type LegacySecretReason = "keyMissing" | "keyWrong";
 
 const LEGACY_SECRET_ENGLISH: Record<LegacySecretReason, string> = {
   keyMissing:

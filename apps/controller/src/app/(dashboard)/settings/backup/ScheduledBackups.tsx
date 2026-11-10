@@ -49,6 +49,7 @@ import {
   setScheduleEnabledAction,
   testDestinationAction,
 } from "./actions";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
 /** `MIN_PASSPHRASE_LENGTH` in lib/backup/format.ts, which pulls node:crypto into the bundle. */
 const MIN_PASSPHRASE = 12;
@@ -57,10 +58,6 @@ const MIN_PASSPHRASE = 12;
 const TRIGGER_KEY = { schedule: "schedule", "catch-up": "catchUp", manual: "manual" } as const;
 
 const STATUS_COLOR = { succeeded: "green", failed: "red", running: "blue" } as const;
-
-function message(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
 
 function RunStatus({ run }: { run: Pick<BackupRun, "status"> }) {
   const t = useTranslations("settings.backupSchedules");
@@ -135,7 +132,7 @@ function DestinationDialog({
       onSaved();
       onClose();
     } catch (err) {
-      setError(message(err, t("saveFailed")));
+      setError(thrownMessage(err, t("saveFailed")));
     } finally {
       setSaving(false);
     }
@@ -150,7 +147,7 @@ function DestinationDialog({
         result.ok ? { ok: true, message: t("testPassed") } : { ok: false, message: result.error },
       );
     } catch (err) {
-      setTested({ ok: false, message: message(err, t("testFailed")) });
+      setTested({ ok: false, message: thrownMessage(err, t("testFailed")) });
     } finally {
       setTesting(false);
     }
@@ -311,7 +308,7 @@ function DestinationsCard({
       unwrap(await deleteDestinationAction(destination.id));
       onChanged();
     } catch (err) {
-      setError(message(err, t("deleteFailed")));
+      setError(thrownMessage(err, t("deleteFailed")));
     } finally {
       setDeleting(null);
     }
@@ -611,7 +608,7 @@ function ScheduleDialog({
       onSaved();
       onClose();
     } catch (err) {
-      setError(message(err, t("saveFailed")));
+      setError(thrownMessage(err, t("saveFailed")));
     } finally {
       setSaving(false);
     }
@@ -861,7 +858,7 @@ function SchedulesCard({
     try {
       unwrap(await work());
     } catch (err) {
-      setError(message(err, fallback));
+      setError(thrownMessage(err, fallback));
     } finally {
       onChanged();
     }

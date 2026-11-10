@@ -5,7 +5,7 @@ import { sessions } from "../db/schema";
 import { deleteUserForwardAuthSessions } from "./forward-auth";
 
 /** A management-UI session; forward-auth `_cpm_fa` sessions are tracked separately. */
-export interface UserSession {
+interface UserSession {
   id: number;
   createdAt: string;
   updatedAt: string;

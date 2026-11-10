@@ -15,7 +15,7 @@ export async function mayReachInstance(actorUserId: number): Promise<boolean> {
 }
 
 /** A placeholder can resolve to the admin port at request time; the listener can be a socket. */
-export function isCaddyAdminDialTarget(target: string): boolean {
+function isCaddyAdminDialTarget(target: string): boolean {
   const trimmed = target.trim();
   if (!trimmed) return false;
   if (trimmed.includes("{")) return true;

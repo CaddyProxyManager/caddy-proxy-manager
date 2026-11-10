@@ -8,7 +8,7 @@ import type { TimeWindow } from "../analytics/explore-state";
 import { queryRow, timeFilter, timeParams } from "./client";
 import { hostNamesClause } from "./host-traffic";
 
-export type AccessListTraffic = {
+type AccessListTraffic = {
   /** Refused by the list's rules (or its fail-closed check). */
   stopped: number;
   /** 401s: a password that was missing or wrong. */

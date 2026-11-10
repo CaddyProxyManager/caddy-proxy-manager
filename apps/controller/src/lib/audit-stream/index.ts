@@ -30,14 +30,15 @@ import {
   streamHeads,
 } from "./sinks";
 import { sendRecords } from "./transports";
+import { thrownMessage } from "../errors/thrown-message";
 
 export const TICK_MS = 5_000;
-export const BATCH = 200;
+const BATCH = 200;
 /** Batches per stream per pass, so one sink catching up cannot hold the rest for long. */
 const MAX_BATCHES = 25;
 const LEASE_MS = 60_000;
 /** Failed passes in a row before an alert: a receiver restarting is not worth one. */
-export const FAILURES_BEFORE_ALERT = 3;
+const FAILURES_BEFORE_ALERT = 3;
 const MAX_BACKOFF_MS = 5 * 60_000;
 
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -199,7 +200,7 @@ function backoffMs(failures: number): number {
   return Math.min(MAX_BACKOFF_MS, TICK_MS * 2 ** Math.max(0, failures - 1));
 }
 
-export type PassResult = "skipped" | "delivered" | "failed";
+type PassResult = "skipped" | "delivered" | "failed";
 
 /** One pass for one sink: everything it is owed, up to the per-pass budget. */
 export async function deliverSink(id: number, now = Date.now()): Promise<PassResult> {
@@ -229,7 +230,7 @@ export async function deliverSink(id: number, now = Date.now()): Promise<PassRes
       domainErrorOf(caught) ??
       domainError("auditSinkUnreachable", {
         target: sink.name,
-        reason: caught instanceof Error ? caught.message : String(caught),
+        reason: thrownMessage(caught),
       });
     const failures = sink.failures + 1;
     try {
@@ -261,7 +262,7 @@ export async function deliverSink(id: number, now = Date.now()): Promise<PassRes
 }
 
 /** Every enabled sink at once, then the security queue's pruning. */
-export async function streamTick(now = Date.now()): Promise<void> {
+async function streamTick(now = Date.now()): Promise<void> {
   const sinks = await db
     .select({ id: auditSinks.id })
     .from(auditSinks)
@@ -305,7 +306,7 @@ export function stopAuditStreaming(): void {
 }
 
 /** Whether the receiver refused the configured encoding, so the test went uncompressed. */
-export type SinkTestResult = { encodingRefused: boolean };
+type SinkTestResult = { encodingRefused: boolean };
 
 /** One `test` record, straight to the sink: a saved one, or the form as typed. */
 export async function testSink(

@@ -14,7 +14,7 @@ const REDIRECT_BINDING = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect";
 /** The plugin's own ceiling, so nothing saved here is refused when it is read back. */
 export const MAX_IDP_METADATA_BYTES = 100 * 1024;
 
-export type IdpMetadata = {
+type IdpMetadata = {
   entityId: string;
   ssoUrl: string;
   /** Base64 DER, as the metadata carries them. */

@@ -5,13 +5,14 @@
 
 import { OutboundError, outboundFetch } from "../../http/outbound";
 import { discordRetryAfterMs } from "./discord";
+import { thrownMessage } from "../../errors/thrown-message";
 
-export type SendResult =
+type SendResult =
   | { ok: true; status: number }
   | { ok: false; status: number | null; error: string; retryAfterMs: number | null };
 
 /** Longer than this is not waited for inline: the channel backs off instead. */
-export const INLINE_WAIT_MS = 10_000;
+const INLINE_WAIT_MS = 10_000;
 const INLINE_RETRIES = 2;
 const TIMEOUT_MS = 15_000;
 
@@ -33,7 +34,7 @@ export function retryAfterHeaderMs(value: string | null, now = Date.now()): numb
 
 function describe(error: unknown): string {
   if (error instanceof OutboundError) return `${error.code}: ${error.message}`;
-  return error instanceof Error ? error.message : String(error);
+  return thrownMessage(error);
 }
 
 export async function postJson(

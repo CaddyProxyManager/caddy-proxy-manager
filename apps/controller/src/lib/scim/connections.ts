@@ -24,7 +24,7 @@ import { type CapabilitySet, holds } from "../roles/capabilities";
 import { type RoleGroups, rankedRoleGroups, roleForGroupNames } from "../roles/mappings";
 import { assertMayAssignRole } from "../roles/store";
 
-export const SCIM_TOKEN_PREFIX = "cpm_scim_";
+const SCIM_TOKEN_PREFIX = "cpm_scim_";
 const NAME_MAX_LENGTH = 100;
 const LAST_USED_DEBOUNCE_MS = 60_000;
 
@@ -51,7 +51,7 @@ export type ScimConnectionInput = {
   roleGroups?: RoleGroups;
 };
 
-export type ScimActor = { userId: number; capabilities: CapabilitySet };
+type ScimActor = { userId: number; capabilities: CapabilitySet };
 
 type Row = typeof scimConnections.$inferSelect;
 
@@ -71,7 +71,7 @@ function assertSupported(): void {
   }
 }
 
-export async function scimRoleGroupsFor(
+async function scimRoleGroupsFor(
   connectionIds: readonly number[],
 ): Promise<Map<number, RoleGroups>> {
   if (connectionIds.length === 0) return new Map();

@@ -20,7 +20,7 @@ type AfterHook = {
   handler: ReturnType<typeof createAuthMiddleware>;
 };
 
-export type LdapPluginOptions = {
+type LdapPluginOptions = {
   /** The twoFactor plugin's after-hook, run for this path too so enrolled users get the code step. */
   twoFactorAfterHook: AfterHook["handler"] | null;
   localUsersEnabled: boolean;

@@ -69,7 +69,7 @@ export type StatCard = {
   href: string;
 };
 
-export type RecentEvent = {
+type RecentEvent = {
   id: number;
   action: string;
   entityType: string;

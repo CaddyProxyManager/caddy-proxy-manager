@@ -11,7 +11,7 @@ import { domainError } from "../errors/domain-error";
 import { parseExploreState, serializeExploreState } from "../analytics/explore-state";
 
 export const MAX_ANALYTICS_VIEWS_PER_USER = 100;
-export const MAX_ANALYTICS_VIEW_NAME = 80;
+const MAX_ANALYTICS_VIEW_NAME = 80;
 
 export type AnalyticsView = {
   id: number;
@@ -27,7 +27,7 @@ export type AnalyticsView = {
   updatedAt: string;
 };
 
-export type AnalyticsViewInput = {
+type AnalyticsViewInput = {
   name?: unknown;
   query?: unknown;
   shared?: unknown;

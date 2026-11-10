@@ -51,16 +51,13 @@ import {
   reassignAccessReviewItemsAction,
 } from "./actions";
 import { type ActionResult, unwrap } from "@/src/lib/errors/action-result";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
 type RoleOption = { key: string; name: string | null; builtIn: boolean };
 type Person = { id: number; label: string };
 
 const BUILT_IN = ["admin", "operator", "user", "viewer"] as const;
 type BuiltIn = (typeof BUILT_IN)[number];
-
-function message(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
 
 const STATUS_COLOR: Record<CampaignStatus, "blue" | "yellow" | "purple" | "gray"> = {
   open: "blue",
@@ -330,7 +327,7 @@ function CampaignTable({
           setError(null);
           deleteAccessReviewAction(target.id)
             .then(unwrap)
-            .catch((err: unknown) => setError(message(err, t("actionFailed"))))
+            .catch((err: unknown) => setError(thrownMessage(err, t("actionFailed"))))
             .finally(() => router.refresh());
         }}
       />
@@ -386,7 +383,7 @@ function CreateDialog({
       onClose();
       router.push(`/users/access-reviews?id=${id}`);
     } catch (err) {
-      setError(message(err, t("saveFailed")));
+      setError(thrownMessage(err, t("saveFailed")));
     } finally {
       setSaving(false);
     }
@@ -532,7 +529,7 @@ function CampaignView({
     try {
       unwrap(await work());
     } catch (err) {
-      setError(message(err, t("actionFailed")));
+      setError(thrownMessage(err, t("actionFailed")));
     } finally {
       router.refresh();
     }
@@ -832,7 +829,7 @@ function DecideDialog({
       onSaved();
       onClose();
     } catch (err) {
-      setError(message(err, t("saveFailed")));
+      setError(thrownMessage(err, t("saveFailed")));
     } finally {
       setSaving(false);
     }
@@ -919,7 +916,7 @@ function ReassignDialog({
       onSaved();
       onClose();
     } catch (err) {
-      setError(message(err, t("saveFailed")));
+      setError(thrownMessage(err, t("saveFailed")));
     } finally {
       setSaving(false);
     }

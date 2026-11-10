@@ -53,7 +53,7 @@ function quietly(what: string, work: Promise<unknown>): void {
 
 // ─── Attaching ───────────────────────────────────────────────────────────────
 
-export type AttachedAgent = {
+type AttachedAgent = {
   /** An iterable, not a stream, so the GraphQL layer owns the transport. */
   events: AsyncIterableIterator<AgentServerEvent>;
   push: (state: AgentDesiredState) => void;

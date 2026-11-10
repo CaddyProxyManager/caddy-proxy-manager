@@ -8,7 +8,7 @@
  * `text` is what Coraza evaluates, `lines` the source it came from, `start` the first's 0-based
  * index; `text` is "" for blank/comment lines and null for an unclosed continuation or block.
  */
-export type SeclangDirective = { text: string | null; lines: string[]; start: number };
+type SeclangDirective = { text: string | null; lines: string[]; start: number };
 
 // Go's unicode.IsSpace, which strings.TrimSpace strips: JavaScript's \s minus U+FEFF, plus U+0085.
 const GO_SPACE =
@@ -189,7 +189,7 @@ export type SeclangLintOptions = {
   crsLoaded?: boolean;
 };
 
-export type ParsedAction = { key: string; value: string };
+type ParsedAction = { key: string; value: string };
 
 /**
  * Splits an action list the way parseActions does: commas outside single quotes, `\` escaping,

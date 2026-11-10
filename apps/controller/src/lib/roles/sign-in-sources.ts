@@ -10,7 +10,7 @@ import { type CapabilitySet, covers } from "./capabilities";
 import { type LegacyRoleColumns, type RoleGroups, requestedRoleGroups } from "./mappings";
 import { assertMayAssignRole, isKnownRole } from "./store";
 
-export type SignInGrants = Partial<LegacyRoleColumns> & {
+type SignInGrants = Partial<LegacyRoleColumns> & {
   roleGroups?: RoleGroups | null;
   defaultRole?: string | null;
   autoLink?: boolean;

@@ -36,7 +36,7 @@ export async function countRevisions(): Promise<number> {
   return Number(row?.total ?? 0);
 }
 
-export async function latestRevisionId(): Promise<number> {
+async function latestRevisionId(): Promise<number> {
   const [row] = await db.select({ id: max(settingsRevisions.id) }).from(settingsRevisions);
   return Number(row?.id ?? 0);
 }
@@ -81,10 +81,7 @@ export async function oldestRestorable(): Promise<number> {
  * Keys committed in (`from`, `to`], before the first and after the last. Null if any revision
  * predates recorded values, rather than present a guess as history.
  */
-export async function revisionSpan(
-  from: number,
-  to: number,
-): Promise<Map<string, RevisionChange> | null> {
+async function revisionSpan(from: number, to: number): Promise<Map<string, RevisionChange> | null> {
   const rows = await db
     .select({ changes: settingsRevisions.changes })
     .from(settingsRevisions)

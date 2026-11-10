@@ -112,7 +112,7 @@ export function getForwardAuthPortalTarget(headers: Headers): string | null {
 }
 
 /** The proxy-host ID pinned by the generated route, or null. */
-export function getTrustedForwardAuthProxyHostId(headers: Headers): number | null {
+function getTrustedForwardAuthProxyHostId(headers: Headers): number | null {
   if (!hasValidProxyProof(headers)) return null;
   const raw = headers.get(FORWARD_AUTH_PROXY_HOST_ID_HEADER)?.trim() ?? "";
   if (!/^[1-9]\d{0,9}$/.test(raw)) return null;

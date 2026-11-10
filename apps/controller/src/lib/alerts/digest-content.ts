@@ -9,9 +9,9 @@ import db from "../db";
 import { auditEvents } from "../db/schema";
 import { systemAccess } from "../users/permissions";
 
-export const DIGEST_WINDOW_MS = 24 * 60 * 60_000;
+const DIGEST_WINDOW_MS = 24 * 60 * 60_000;
 /** Countries and networks count as new against this much history before the window. */
-export const NEW_AGAINST_DAYS = 30;
+const NEW_AGAINST_DAYS = 30;
 export const CERTIFICATE_DAYS = 14;
 const TOP = 5;
 const SECTION_BUDGET_MS = 8_000;

@@ -1,7 +1,7 @@
 import type { Certificate } from "../models/certificates";
 
 /** An allowlist, so private keys and future model fields never cross the API by default. */
-export type CertificateApiResponse = {
+type CertificateApiResponse = {
   id: number;
   name: string;
   type: Certificate["type"];

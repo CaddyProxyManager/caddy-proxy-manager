@@ -23,7 +23,7 @@ import { SAML_GROUPS_FIELD, SAML_PROVIDER_TYPE, defaultSpEntityId } from "../aut
 import type { OutboundFetch } from "../http/outbound";
 import { hasForbiddenControlCharacter } from "../settings/validation";
 
-export const DEFAULT_SAML_ATTRIBUTES = {
+const DEFAULT_SAML_ATTRIBUTES = {
   email: "email",
   name: "displayName",
   groups: "groups",

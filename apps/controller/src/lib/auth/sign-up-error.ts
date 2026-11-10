@@ -5,7 +5,7 @@
  */
 import { PASSWORD_POLICY_CODE } from "./signup-policy";
 
-export type SignUpErrorKey =
+type SignUpErrorKey =
   | "emailTaken"
   | "invalidEmail"
   | "passwordTooLong"

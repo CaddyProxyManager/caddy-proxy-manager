@@ -148,7 +148,7 @@ export async function rereadCertificateFile(id: number, actorUserId: number): Pr
   return (await getCertificate(id))!;
 }
 
-export type CertificateFileIngest = {
+type CertificateFileIngest = {
   /** Ids sent without PEM whose fingerprint is not the stored one. */
   resend: number[];
   /** Ids that are not this agent's file certificates. */

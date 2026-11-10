@@ -67,7 +67,7 @@ function ChangeDescription({ change, t }: { change: FieldChange; t: T }) {
   );
 }
 
-export type ReviewChangesDialogProps = {
+type ReviewChangesDialogProps = {
   open: boolean;
   kind: HostKind;
   isCreate: boolean;

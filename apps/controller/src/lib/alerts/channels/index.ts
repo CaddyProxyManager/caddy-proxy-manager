@@ -23,7 +23,7 @@ import {
 } from "./webhook";
 
 export const CHANNEL_KINDS = ["webhook", "discord", "slack", "teams", "ntfy"] as const;
-export type AddedChannelKind = (typeof CHANNEL_KINDS)[number];
+type AddedChannelKind = (typeof CHANNEL_KINDS)[number];
 export type ChannelKind = AddedChannelKind | "email" | "push";
 
 /** Alerts per message: what each service shows well, the rest go in the next. */
@@ -196,7 +196,7 @@ function headersFrom(input: ChannelHeader[], stored: ChannelHeader[]): ChannelHe
   });
 }
 
-export type PreparedChannel = {
+type PreparedChannel = {
   name: string;
   kind: AddedChannelKind;
   enabled: boolean;
@@ -260,7 +260,7 @@ export function prepareChannel(input: ChannelInput, existing: Channel | null): P
   };
 }
 
-export type ChannelRequest = {
+type ChannelRequest = {
   url: string;
   body: string;
   headers: Record<string, string>;

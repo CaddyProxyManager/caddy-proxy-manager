@@ -13,7 +13,7 @@ const BACKCHANNEL_LOGOUT_EVENT = "http://schemas.openid.net/event/backchannel-lo
 /** Clock slack for `iat`: the token is delivered immediately. */
 const MAX_TOKEN_AGE_SECONDS = 5 * 60;
 
-export type LogoutTokenClaims = {
+type LogoutTokenClaims = {
   issuer: string;
   /** Absent when the token identifies a session and not a user. */
   subject: string | null;
@@ -22,9 +22,7 @@ export type LogoutTokenClaims = {
   jti: string;
 };
 
-export type LogoutTokenResult =
-  | { ok: true; claims: LogoutTokenClaims }
-  | { ok: false; reason: string };
+type LogoutTokenResult = { ok: true; claims: LogoutTokenClaims } | { ok: false; reason: string };
 
 /** `jose` caches per set, so one set per URI keeps that cache alive across requests. */
 const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();

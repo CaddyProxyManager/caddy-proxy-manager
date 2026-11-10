@@ -19,6 +19,7 @@ import {
   withGitHubToken,
 } from "./registry";
 import { crsRegistryGithubToken, getCrsRegistrySettings } from "./settings";
+import { thrownMessage } from "../../errors/thrown-message";
 
 const STATE_KEY = "crs_plugin_registry_state";
 
@@ -80,7 +81,7 @@ async function saveState(state: CrsRegistryState): Promise<void> {
 
 function failure(error: unknown): StoredFailure {
   return {
-    message: error instanceof Error ? error.message : String(error),
+    message: thrownMessage(error),
     code: storedErrorCode(error),
   };
 }
@@ -135,7 +136,7 @@ export async function refreshCrsRegistryLists(fetcher: Fetcher = fetch): Promise
   return state;
 }
 
-export type CrsSyncOptions = {
+type CrsSyncOptions = {
   fetcher?: Fetcher;
   /** Installed plugins' repositories, which may be in no configured registry any more. */
   extraRepositories?: readonly string[];

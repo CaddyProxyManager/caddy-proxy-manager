@@ -24,7 +24,7 @@ import {
 } from "../waf/exclusions";
 import type { Row } from "./spec";
 
-export type CheckContext = { globalWaf: WafSettings | null };
+type CheckContext = { globalWaf: WafSettings | null };
 type RowCheck = (row: Row, context: CheckContext) => Row;
 
 const text = (value: unknown) => (typeof value === "string" ? value : "");

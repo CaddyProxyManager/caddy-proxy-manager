@@ -67,12 +67,13 @@ import type { MfaPolicyMode } from "@/src/lib/auth/two-factor/mfa-policy";
 import { isSignInMethod } from "@/src/lib/auth/sign-in-methods";
 import { Token } from "@astryxdesign/core/Token";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
 /** A role key: built-in, or one an administrator made. */
 type Role = string;
 
 /** The roles an administrator made, by key; built-in ones are named from the catalog. */
-export type CustomRole = { key: string; name: string };
+type CustomRole = { key: string; name: string };
 
 const CustomRolesContext = createContext<readonly CustomRole[]>([]);
 
@@ -111,7 +112,7 @@ type UserEntry = {
 };
 
 /** A group, and who is in it - enough to show and change one user's memberships. */
-export type GroupSummary = {
+type GroupSummary = {
   id: number;
   name: string;
   source: string;
@@ -894,9 +895,7 @@ function GroupsCard({
                   setAdding("");
                   onDone(null);
                 } catch (err) {
-                  onDone(
-                    err instanceof Error && err.message ? err.message : t("groupChangeFailed"),
-                  );
+                  onDone(thrownMessage(err, t("groupChangeFailed")));
                 }
               }}
             />

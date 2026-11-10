@@ -26,8 +26,8 @@ export const SSO_DISABLED_PATHS = [
   "/sso/callback",
 ];
 
-export const SAML_SIGN_IN_PATH = "/sign-in/sso";
-export const SAML_ACS_PATH = "/sso/saml2/sp/acs/:providerId";
+const SAML_SIGN_IN_PATH = "/sign-in/sso";
+const SAML_ACS_PATH = "/sso/saml2/sp/acs/:providerId";
 const SP_METADATA_PATH = "/sso/saml2/sp/metadata";
 
 /**
@@ -35,7 +35,7 @@ const SP_METADATA_PATH = "/sso/saml2/sp/metadata";
  * are checked by the plugin unconditionally; `tests/integration/auth/saml-assertions.test.ts` is
  * what proves all of it.
  */
-export const SAML_SECURITY = {
+const SAML_SECURITY = {
   // Its default is five minutes.
   clockSkew: 120_000,
   requireTimestamps: true,

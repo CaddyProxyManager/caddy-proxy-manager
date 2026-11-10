@@ -10,7 +10,7 @@ import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { useTranslations } from "next-intl";
 import type { CaddyFeatureId } from "@/src/lib/caddy/image-build/modules";
 
-export type ModuleGateState = {
+type ModuleGateState = {
   /** Feature -> whether the admin has its module(s) selected. */
   features: Record<CaddyFeatureId, boolean>;
   /** Feature -> human-readable module name(s) to name in the tooltip. */

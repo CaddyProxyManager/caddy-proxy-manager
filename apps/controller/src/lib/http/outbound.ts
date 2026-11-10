@@ -10,8 +10,9 @@ import http from "node:http";
 import https from "node:https";
 import { isIP, type LookupFunction } from "node:net";
 import { isMetadataHost } from "./outbound-url";
+import { thrownMessage } from "../errors/thrown-message";
 
-export type OutboundErrorCode =
+type OutboundErrorCode =
   | "invalid"
   | "metadata"
   | "insecure-redirect"
@@ -184,7 +185,7 @@ function parseTarget(raw: string | URL): URL {
 function classify(error: unknown): OutboundError {
   if (error instanceof OutboundError) return error;
   const code = String((error as { code?: unknown })?.code ?? "");
-  const message = error instanceof Error ? error.message : String(error);
+  const message = thrownMessage(error);
   if (/CERT|TLS|SSL|SELF_SIGNED|UNABLE_TO_VERIFY|DEPTH_ZERO/.test(code)) {
     return new OutboundError("tls", message, { cause: error });
   }

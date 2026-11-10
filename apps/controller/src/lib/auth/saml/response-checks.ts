@@ -10,7 +10,7 @@ import { DOMParser, type Element as XmlElement } from "@xmldom/xmldom";
 const DSIG_NS = "http://www.w3.org/2000/09/xmldsig#";
 const ASSERTION_NS = "urn:oasis:names:tc:SAML:2.0:assertion";
 
-export const ALLOWED_SIGNATURE_ALGORITHMS = new Set([
+const ALLOWED_SIGNATURE_ALGORITHMS = new Set([
   "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
   "http://www.w3.org/2001/04/xmldsig-more#rsa-sha384",
   "http://www.w3.org/2001/04/xmldsig-more#rsa-sha512",
@@ -19,7 +19,7 @@ export const ALLOWED_SIGNATURE_ALGORITHMS = new Set([
   "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha512",
 ]);
 
-export const ALLOWED_DIGEST_ALGORITHMS = new Set([
+const ALLOWED_DIGEST_ALGORITHMS = new Set([
   "http://www.w3.org/2001/04/xmlenc#sha256",
   "http://www.w3.org/2001/04/xmldsig-more#sha384",
   "http://www.w3.org/2001/04/xmlenc#sha512",
@@ -29,7 +29,7 @@ export const ALLOWED_DIGEST_ALGORITHMS = new Set([
 const DEFAULT_REMEMBER_MS = 60 * 60 * 1000;
 const MAX_REMEMBER_MS = 24 * 60 * 60 * 1000;
 
-export type ResponseFacts = {
+type ResponseFacts = {
   /** Every signature uses an algorithm on the lists above. */
   strongAlgorithms: boolean;
   /** The sole assertion's ID; null with none or several, which the plugin refuses itself. */

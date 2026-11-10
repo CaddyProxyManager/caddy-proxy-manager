@@ -4,7 +4,7 @@
  */
 import type { CaddyAdminProxyRequest, CaddyAdminProxyResponse } from "@cpm/shared";
 
-export type SimulatedCaddy = (request: CaddyAdminProxyRequest) => CaddyAdminProxyResponse;
+type SimulatedCaddy = (request: CaddyAdminProxyRequest) => CaddyAdminProxyResponse;
 
 const JSON_HEADERS = { "content-type": "application/json" };
 

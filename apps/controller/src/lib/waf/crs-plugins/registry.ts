@@ -7,6 +7,7 @@
 import { findCrsPluginRejections } from "../caddy";
 import { DomainError, type DomainErrorDetail, domainError } from "../../errors/domain-error";
 import { outboundAllowed } from "../../offline";
+import { thrownMessage } from "../../errors/thrown-message";
 
 /** The OWASP registry; an operator may point at a registry of their own instead. */
 export const OFFICIAL_CRS_REGISTRY_URL =
@@ -49,7 +50,7 @@ export type CrsUnsupportedReason =
   | "noRules"
   | "directives";
 
-export type CrsPluginRelease = {
+type CrsPluginRelease = {
   version: string;
   description: string | null;
   /** The plugins/ rule files the release shipped, sorted. */
@@ -145,7 +146,7 @@ async function get(fetcher: Fetcher, url: string, accept?: string): Promise<Resp
   } catch (error) {
     throw domainError(
       "crsPluginFetchFailed",
-      { url, reason: error instanceof Error ? error.message : String(error) },
+      { url, reason: thrownMessage(error) },
       { status: 400 },
     );
   }
@@ -273,7 +274,7 @@ async function fetchDescriptor(
 }
 
 /** What a release is fetched and checked by; a registry entry, or an installed plugin. */
-export type CrsPluginSource = Pick<CrsRegistryEntry, "repository" | "ruleIdStart" | "ruleIdEnd">;
+type CrsPluginSource = Pick<CrsRegistryEntry, "repository" | "ruleIdStart" | "ruleIdEnd">;
 
 /** Throws, naming each refused line, rather than returning a plugin that would be half emitted. */
 export async function fetchCrsPluginRelease(

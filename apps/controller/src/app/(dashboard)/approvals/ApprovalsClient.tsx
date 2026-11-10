@@ -55,6 +55,7 @@ import {
 } from "./actions";
 import { unwrap } from "@/src/lib/errors/action-result";
 import { wideMeasure } from "@/components/ui/measure";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
 type RoleOption = { key: string; name: string | null; builtIn: boolean };
 type GroupOption = { id: number; name: string };
@@ -76,10 +77,6 @@ const STATUS_COLOR: Record<ChangeStatus, "blue" | "purple" | "green" | "red" | "
 const FILTERS = ["pending", "decided", "all"] as const;
 type Filter = (typeof FILTERS)[number];
 
-function message(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
-
 function useRoleName(roles: readonly RoleOption[]) {
   const tUsers = useTranslations("users");
   return (key: string) => {
@@ -89,7 +86,7 @@ function useRoleName(roles: readonly RoleOption[]) {
 }
 
 /** "Edit proxy host shop", from the kind and the name the target had when submitted. */
-export function useChangeTitle() {
+function useChangeTitle() {
   const t = useTranslations("changeApprovals");
   return (request: Pick<ChangeRequestView, "kind" | "targetName" | "targetId" | "id">) =>
     t(`kinds.${request.kind}`, {
@@ -353,7 +350,7 @@ function RequestView({ me, request }: { me: number; request: ChangeRequestView }
       setDialog(null);
       router.refresh();
     } catch (err) {
-      setError(message(err, t("actionFailed")));
+      setError(thrownMessage(err, t("actionFailed")));
     } finally {
       setBusy(false);
     }
@@ -636,7 +633,7 @@ function PolicyTab({
       setResult({ ok: true, text });
       router.refresh();
     } catch (err) {
-      setResult({ ok: false, text: message(err, t("saveFailed")) });
+      setResult({ ok: false, text: thrownMessage(err, t("saveFailed")) });
     } finally {
       setSaving(false);
     }

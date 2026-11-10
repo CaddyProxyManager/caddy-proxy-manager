@@ -26,7 +26,7 @@ import { ActiveSectionProvider } from "./editor-section";
 import { ReviewChangesDialog } from "./ReviewChangesDialog";
 import { useUnsavedChanges } from "./useUnsavedChanges";
 
-export type EditorSectionLink = { id: string; anchor: string };
+type EditorSectionLink = { id: string; anchor: string };
 
 function scrollToAnchor(anchor: string) {
   document.getElementById(anchor)?.scrollIntoView({ block: "start", behavior: "smooth" });

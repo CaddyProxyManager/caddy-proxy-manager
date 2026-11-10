@@ -7,7 +7,7 @@
 let fallbackCounter = 0;
 
 /** Mints an id unique within the page. */
-export function newRowId(): string {
+function newRowId(): string {
   // randomUUID is only exposed in a secure context, which a plain-HTTP LAN install is not. The
   // counter covers that case: ids need to be unique among the rows on one page, not globally.
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {

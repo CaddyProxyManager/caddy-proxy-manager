@@ -98,7 +98,7 @@ function toCampaign(
   };
 }
 
-export function toItem(row: ItemRow, reviewerLabel: string | null): ReviewItem {
+function toItem(row: ItemRow, reviewerLabel: string | null): ReviewItem {
   return {
     id: row.id,
     campaignId: row.campaignId,

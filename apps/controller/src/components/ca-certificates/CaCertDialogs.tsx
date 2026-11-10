@@ -26,6 +26,7 @@ import {
   revokeIssuedClientCertificateAction,
 } from "@/src/app/(dashboard)/certificates/ca-actions";
 import { unwrap } from "@/src/lib/errors/action-result";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
 function downloadFile(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
@@ -133,7 +134,7 @@ export function IssueClientCertDialog({
         });
         router.refresh();
       } catch (e) {
-        setError(e instanceof Error ? e.message : t("issueFailed"));
+        setError(thrownMessage(e, t("issueFailed")));
       }
     });
   }
@@ -287,7 +288,7 @@ export function ManageIssuedClientCertsDialog({
         );
         router.refresh();
       } catch (e) {
-        setError(e instanceof Error ? e.message : t("revokeFailed"));
+        setError(thrownMessage(e, t("revokeFailed")));
       }
     });
   }

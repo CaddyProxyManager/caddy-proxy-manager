@@ -50,6 +50,7 @@ import {
   samlFormOf,
   samlInputOf,
 } from "./SamlProviderFields";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
 interface OAuthProvidersSectionProps {
   initialProviders: OAuthProviderView[];
@@ -186,7 +187,7 @@ export default function OAuthProvidersSection({
       }
       closeDialog();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("unexpectedError"));
+      setError(thrownMessage(err, t("unexpectedError")));
     } finally {
       setSaving(false);
     }
@@ -331,7 +332,7 @@ export default function OAuthProvidersSection({
       }
       closeDialog();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("unexpectedError"));
+      setError(thrownMessage(err, t("unexpectedError")));
     } finally {
       setSaving(false);
     }

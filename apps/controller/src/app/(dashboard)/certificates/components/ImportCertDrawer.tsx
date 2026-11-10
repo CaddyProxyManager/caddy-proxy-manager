@@ -46,7 +46,7 @@ const FORM_ID = "import-cert-form";
 const DEFAULT_DNS_PROVIDER = "default";
 
 /** certbot's pair first, then the usual names beside the certificate. Empty when unsure. */
-export function pairedKeyPath(certPath: string, entries: CertificateFileEntry[]): string {
+function pairedKeyPath(certPath: string, entries: CertificateFileEntry[]): string {
   const keys = entries.filter((entry) => entry.kind === "key").map((entry) => entry.path);
   const slash = certPath.lastIndexOf("/");
   const dir = slash === -1 ? "" : certPath.slice(0, slash + 1);
@@ -59,7 +59,7 @@ export function pairedKeyPath(certPath: string, entries: CertificateFileEntry[])
 }
 
 /** certbot's `live/<name>/fullchain.pem` when there is one, else the first certificate. */
-export function defaultCertificatePath(entries: CertificateFileEntry[]): string {
+function defaultCertificatePath(entries: CertificateFileEntry[]): string {
   const certs = entries.filter((entry) => entry.kind === "certificate");
   const preferred =
     certs.find(

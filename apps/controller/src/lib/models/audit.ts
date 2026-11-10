@@ -135,7 +135,7 @@ export async function createAuditEvent(data: {
   ]);
 }
 
-export type AuditActivityBucket = {
+type AuditActivityBucket = {
   /** ISO truncated to the hour, e.g. 2026-09-10T14. */
   hour: string;
   count: number;

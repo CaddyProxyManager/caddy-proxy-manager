@@ -200,13 +200,3 @@ export async function stop(): Promise<void> {
   await syncParsers(false, false, false);
   configureAnalytics(null);
 }
-
-/** At startup, so a restarted agent keeps writing analytics before the controller notices. */
-export async function resumeFleetConfig(store: AgentStore): Promise<void> {
-  const stored = store.fleetConfig();
-  if (!stored) return;
-  // An agent polls exactly one controller.
-  const controller = store.listControllers()[0];
-  if (!controller) return;
-  await applyFleetConfig(store, stored, controller.controllerId);
-}

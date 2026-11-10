@@ -6,7 +6,7 @@ import { directivePolicyIssues } from "@/lib/waf/caddy";
 import { type SeclangLintOptions, lintSeclang } from "@/lib/waf/seclang";
 import type { CodeEditorIssue } from "./CodeEditor";
 
-export type SeclangIssueOptions = SeclangLintOptions & {
+type SeclangIssueOptions = SeclangLintOptions & {
   /** The global WAF setting: risky lines are errors with it, warnings without. */
   strictDirectives?: boolean;
 };

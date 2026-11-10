@@ -41,7 +41,7 @@ const PERMISSIONS: ReadonlySet<string> = new Set(
   TOKEN_AREAS.flatMap((area) => [`${area}:read`, `${area}:write`]),
 );
 
-export function isTokenPermission(value: unknown): value is TokenPermission {
+function isTokenPermission(value: unknown): value is TokenPermission {
   return typeof value === "string" && PERMISSIONS.has(value);
 }
 

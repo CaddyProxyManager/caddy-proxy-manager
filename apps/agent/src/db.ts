@@ -16,7 +16,7 @@ import type {
   ManagedServicesStatus,
 } from "@cpm/shared";
 
-export type PairedController = {
+type PairedController = {
   controllerId: string;
   controllerName: string | null;
   secret: string;

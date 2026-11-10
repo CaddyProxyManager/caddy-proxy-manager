@@ -7,10 +7,10 @@ import type { TimeWindow } from "../analytics/explore-state";
 import { queryRow, queryRows, timeFilter, timeParams } from "./client";
 
 /** A chart point every half hour, as the proxy host page has. */
-export const L4_TRAFFIC_BUCKET_SECONDS = 1800;
-export const L4_TOP_CLIENTS = 10;
+const L4_TRAFFIC_BUCKET_SECONDS = 1800;
+const L4_TOP_CLIENTS = 10;
 
-export type L4Ports = { protocol: string; start: number; end: number };
+type L4Ports = { protocol: string; start: number; end: number };
 
 export type L4TrafficTotals = {
   connections: number;

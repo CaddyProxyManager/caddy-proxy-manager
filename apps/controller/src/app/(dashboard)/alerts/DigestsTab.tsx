@@ -34,7 +34,8 @@ import {
   saveDigestAction,
   sendDigestNowAction,
 } from "./actions";
-import { message, useChannelName } from "./shared";
+import { useChannelName } from "./shared";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
 const RUN_COLOR = { running: "blue", sent: "green", partial: "orange", failed: "red" } as const;
 type RunStatus = keyof typeof RUN_COLOR;
@@ -157,7 +158,7 @@ function DigestDialog({
       onSaved();
       onClose();
     } catch (err) {
-      setError(message(err, t("saveFailed")));
+      setError(thrownMessage(err, t("saveFailed")));
     } finally {
       setSaving(false);
     }
@@ -237,7 +238,7 @@ function PreviewDialog({ digest, onClose }: { digest: DigestView; onClose: () =>
         if (result.ok) setPreview(result.data);
         else setError(result.error);
       },
-      (err: unknown) => current && setError(message(err, t("previewFailed"))),
+      (err: unknown) => current && setError(thrownMessage(err, t("previewFailed"))),
     );
     return () => {
       current = false;
@@ -306,7 +307,7 @@ export function DigestsTab({
     try {
       unwrap(await work());
     } catch (err) {
-      setError(message(err, fallback));
+      setError(thrownMessage(err, fallback));
     } finally {
       onChanged();
     }

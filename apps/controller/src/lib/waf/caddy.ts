@@ -33,14 +33,14 @@ export const CORAZA_MAX_BODY_LIMIT = 1_073_741_824; // 1 GiB
 export const CORAZA_MIN_BODY_LIMIT = 1_024;
 
 /** Coraza's built-in default when no SecRequestBodyLimit directive is parsed. */
-export const CORAZA_DEFAULT_BODY_LIMIT = 134_217_728; // 128 MiB
+const CORAZA_DEFAULT_BODY_LIMIT = 134_217_728; // 128 MiB
 
 /**
  * The limits `@coraza.conf-recommended` sets when the CRS is on. The 12.5 MiB is why large uploads
  * (Nextcloud/Immich chunks) fail with the CRS enabled and work with it off.
  */
-export const CRS_BODY_LIMIT = 13_107_200; // 12.5 MiB
-export const CRS_IN_MEMORY_BODY_LIMIT = 131_072; // 128 KiB
+const CRS_BODY_LIMIT = 13_107_200; // 12.5 MiB
+const CRS_IN_MEMORY_BODY_LIMIT = 131_072; // 128 KiB
 
 export function isValidBodyLimit(value: unknown): value is number {
   return (
@@ -52,7 +52,7 @@ export function isValidBodyLimit(value: unknown): value is number {
 }
 
 /** Stored in bytes (what SecLang takes), asked for in MiB; finer values go in custom directives. */
-export const BYTES_PER_MIB = 1_048_576;
+const BYTES_PER_MIB = 1_048_576;
 export const MIN_BODY_LIMIT_MIB = 1;
 export const MAX_BODY_LIMIT_MIB = CORAZA_MAX_BODY_LIMIT / BYTES_PER_MIB; // 1024
 
@@ -61,7 +61,7 @@ export function bytesToMib(bytes: number | undefined): string {
 }
 
 /** One message per field rather than a spliced label: not every language puts the field first. */
-export type BodyLimitErrorCode = Extract<
+type BodyLimitErrorCode = Extract<
   DomainErrorCode,
   | "wafRequestBodyLimitInvalid"
   | "wafInMemoryBodyLimitInvalid"
@@ -107,7 +107,7 @@ export function findInvalidBodyLimitDirective(
  * Why a custom SecLang line never reaches Caddy, or (one of RISKY_REASONS, without the strict
  * setting) why it is worth a warning - a code, so the wording lives in the catalog.
  */
-export type DroppedWafDirectiveReason =
+type DroppedWafDirectiveReason =
   | "wafDirectiveDroppedInclude"
   | "wafDirectiveDroppedRuleMutation"
   | "wafDirectiveDroppedCtlRuleEngine"
@@ -130,7 +130,7 @@ export type DroppedWafDirectiveReason =
  * refusing them; otherwise they are sent and flagged. The rest fail Coraza's load, and with it
  * Caddy's whole config, so those are dropped either way.
  */
-export const RISKY_DIRECTIVE_REASONS: ReadonlySet<DroppedWafDirectiveReason> = new Set([
+const RISKY_DIRECTIVE_REASONS: ReadonlySet<DroppedWafDirectiveReason> = new Set([
   "wafDirectiveDroppedInclude",
   "wafDirectiveDroppedRuleMutation",
   "wafDirectiveDroppedCtlRuleEngine",
@@ -560,7 +560,7 @@ export function riskyDirectiveWarnings(
  * the strict setting, and a directive Coraza does not know. The other reasons a line is dropped
  * (an unparseable rule, a duplicate id) are the linter's, or the save's, to report.
  */
-export type DirectivePolicyIssue = Omit<SeclangIssue, "code"> & {
+type DirectivePolicyIssue = Omit<SeclangIssue, "code"> & {
   code: DroppedWafDirectiveReason;
 };
 
@@ -710,7 +710,7 @@ export const normalizeWafPluginIds = normalizeWafPresetIds;
 export type CrsPluginRules = { config: string; before: string; after: string };
 
 /** Why a CRS plugin file cannot be loaded - a code, so the sentence lives in the catalog. */
-export type CrsPluginRejectionReason =
+type CrsPluginRejectionReason =
   | "crsPluginDirectiveNotAllowed"
   | "crsPluginNeedsFile"
   | "wafDirectiveDroppedCtlRuleEngine"
@@ -720,7 +720,7 @@ export type CrsPluginRejectionReason =
   | "wafDirectiveDroppedUnterminated"
   | "crsPluginInvalidSeclang";
 
-export type CrsPluginRejection = {
+type CrsPluginRejection = {
   line: string;
   reason: CrsPluginRejectionReason;
   /** The linter's own reason, as a sentence, for `crsPluginInvalidSeclang`. */
@@ -817,7 +817,7 @@ export const GLOBAL_WAF_SOURCE = "global WAF settings";
  * Where an effective config's custom directives come from: the global ones it starts with, then
  * the host's own, named by `label`. Build it with wafDirectiveSource.
  */
-export type WafDirectiveSource = {
+type WafDirectiveSource = {
   label: string;
   globalDirectives: string | null;
   /** The global settings' own CRS state, which decides what they drop on their own. */

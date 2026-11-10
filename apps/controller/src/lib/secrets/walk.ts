@@ -9,7 +9,7 @@ export const BETTER_AUTH_ENCRYPTED_COLUMNS: Readonly<Record<string, readonly str
 };
 
 /** `map` applied to every string in a parsed JSON value, keeping the structure around them. */
-export function mapStrings(input: unknown, map: (text: string) => string): unknown {
+function mapStrings(input: unknown, map: (text: string) => string): unknown {
   if (typeof input === "string") return map(input);
   if (Array.isArray(input)) return input.map((entry) => mapStrings(entry, map));
   if (input !== null && typeof input === "object") {

@@ -97,7 +97,7 @@ async function loadHostRefs(): Promise<HostRef[]> {
   });
 }
 
-export type AttentionOptions = {
+type AttentionOptions = {
   /** Only items about this proxy host, from the providers that can name one. */
   proxyHostId?: number;
   now?: number;

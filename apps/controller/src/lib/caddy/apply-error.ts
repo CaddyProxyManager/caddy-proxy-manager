@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { type DomainError, type DomainErrorCode, domainError } from "../errors/domain-error";
 
-export type CaddyApplyErrorCode = "CADDY_REJECTED" | "CADDY_UNREACHABLE" | "CADDY_REQUEST_FAILED";
+type CaddyApplyErrorCode = "CADDY_REJECTED" | "CADDY_UNREACHABLE" | "CADDY_REQUEST_FAILED";
 
 /** Read out of Caddy's body without repeating any of it. */
-export type WafRejection = {
+type WafRejection = {
   /** Coraza could not build a WAF handler: a directive it will not compile. */
   wafFailed: boolean;
   /** Point at whatever defined them. */
@@ -46,7 +46,7 @@ export function describeWafRejection(responseBody: string): WafRejection {
   return { wafFailed: true, ruleIds: [...new Set(ruleIds)] };
 }
 
-export function safeSystemErrorCode(error: unknown): string | null {
+function safeSystemErrorCode(error: unknown): string | null {
   if (typeof error !== "object" || error === null || !("code" in error)) return null;
   const code = (error as { code?: unknown }).code;
   return typeof code === "string" && /^[A-Z0-9_-]{1,64}$/.test(code) ? code : null;

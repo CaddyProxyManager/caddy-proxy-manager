@@ -96,7 +96,7 @@ export async function queryWafEventPage(
   };
 }
 
-export type OutcomeCount = { outcome: string; count: number };
+type OutcomeCount = { outcome: string; count: number };
 
 /** Mitigated requests per outcome. */
 export async function queryMitigatedByOutcome(
@@ -112,7 +112,7 @@ export async function queryMitigatedByOutcome(
   return rows.map((row) => ({ outcome: String(row.outcome ?? ""), count: num(row.requests) }));
 }
 
-export type OutcomeComparison = { current: OutcomeCount[]; previous: OutcomeCount[] };
+type OutcomeComparison = { current: OutcomeCount[]; previous: OutcomeCount[] };
 
 function byCount(rows: OutcomeCount[]): OutcomeCount[] {
   return rows
@@ -156,7 +156,7 @@ export async function queryMitigatedByOutcomeCompared(
   return { current: pick("current"), previous: pick("previous") };
 }
 
-export type WafTotals = { events: number; blocked: number; sources: number };
+type WafTotals = { events: number; blocked: number; sources: number };
 
 export async function queryWafTotals(
   window: TimeWindow,

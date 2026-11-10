@@ -231,7 +231,7 @@ function parseValue(raw: string | null | undefined): unknown {
 }
 
 /** The changed keys, their fields, and the Caddy config with the change laid over it. */
-export async function settingsPreview(entries: readonly SettingsEntry[]): Promise<ChangePreview> {
+async function settingsPreview(entries: readonly SettingsEntry[]): Promise<ChangePreview> {
   const keys = entries.map((entry) => entry.key);
   const stored = await (await load.staging()).storedValues(keys);
   const changes = diffAuditRecords(

@@ -17,7 +17,7 @@ export type DefaultResponseSettings = {
   redirectUrl?: string;
 };
 
-export type CaddyDefaultResponseRoute = {
+type CaddyDefaultResponseRoute = {
   handle: Array<Record<string, unknown>>;
   terminal: true;
 };

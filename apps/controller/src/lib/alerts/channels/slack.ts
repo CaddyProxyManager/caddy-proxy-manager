@@ -17,7 +17,7 @@ type Block =
       elements: { type: "button"; text: { type: "plain_text"; text: string }; url: string }[];
     };
 
-export type SlackPayload = { text: string; blocks: Block[] };
+type SlackPayload = { text: string; blocks: Block[] };
 
 /** Slack reads `&`, `<` and `>` as markup. */
 function mrkdwn(text: string): string {

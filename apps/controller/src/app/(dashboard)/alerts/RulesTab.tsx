@@ -37,7 +37,8 @@ import {
   silenceRuleAction,
   testRuleAction,
 } from "./actions";
-import { message, SEVERITIES, SeverityToken, useChannelName, useRuleName } from "./shared";
+import { SEVERITIES, SeverityToken, useChannelName, useRuleName } from "./shared";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
 const SOURCES = ["event", "attention", "signal", "metric"] as const;
 type Source = (typeof SOURCES)[number];
@@ -216,7 +217,7 @@ function RuleDialog({
       onSaved();
       onClose();
     } catch (err) {
-      setError(message(err, t("saveFailed")));
+      setError(thrownMessage(err, t("saveFailed")));
     } finally {
       setSaving(false);
     }
@@ -484,7 +485,7 @@ function SilenceDialog({
       onSilenced();
       onClose();
     } catch (err) {
-      setError(message(err, t("saveFailed")));
+      setError(thrownMessage(err, t("saveFailed")));
     } finally {
       setSaving(false);
     }
@@ -575,7 +576,7 @@ export function RulesTab({
     try {
       unwrap(await work());
     } catch (err) {
-      setError(message(err, fallback));
+      setError(thrownMessage(err, fallback));
     } finally {
       onChanged();
     }

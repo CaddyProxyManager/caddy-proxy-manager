@@ -27,7 +27,7 @@ export const DISCORD_COLOURS: Record<AlertSeverity | "resolved", number> = {
   resolved: 0x12b76a,
 };
 
-export type DiscordEmbed = {
+type DiscordEmbed = {
   title: string;
   description: string;
   color: number;
@@ -37,7 +37,7 @@ export type DiscordEmbed = {
   footer: { text: string };
 };
 
-export type DiscordPayload = { content: string; embeds: DiscordEmbed[] };
+type DiscordPayload = { content: string; embeds: DiscordEmbed[] };
 
 function embedSize(embed: DiscordEmbed): number {
   return (

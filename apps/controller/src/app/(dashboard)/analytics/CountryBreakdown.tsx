@@ -19,7 +19,7 @@ import { useAppFormatter } from "@/src/components/locale/use-app-formatter";
 import { regionName } from "@/src/lib/locale/region-names";
 import { FlagIcon } from "@/src/components/ui/CountryFlag";
 
-export type CountryBreakdownData = {
+type CountryBreakdownData = {
   countryCode: string;
   total: number;
   blocked: number;
@@ -106,7 +106,7 @@ export function CountryBreakdown({
   );
 }
 
-export function CountryBreakdownView({
+function CountryBreakdownView({
   code,
   data,
   error = false,

@@ -18,7 +18,7 @@ import {
 } from "./index";
 import { BETTER_AUTH_ENCRYPTED_COLUMNS, mapTextColumn } from "./walk";
 
-export type SecretRotationResult = {
+type SecretRotationResult = {
   /** Values rewritten under the current key. */
   reencrypted: number;
   /** Values no known key opens, left as they are. */

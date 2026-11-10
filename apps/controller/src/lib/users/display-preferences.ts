@@ -16,11 +16,6 @@ export type DisplayPreferences = {
   numberFormat: NumberFormatPreference;
 };
 
-export const DEFAULT_DISPLAY_PREFERENCES: DisplayPreferences = {
-  timeZone: null,
-  numberFormat: "auto",
-};
-
 export async function getDisplayPreferences(userId: number): Promise<DisplayPreferences> {
   const [row] = await db
     .select({ timeZone: users.timeZone, numberFormat: users.numberFormat })

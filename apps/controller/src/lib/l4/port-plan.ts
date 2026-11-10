@@ -14,7 +14,7 @@ import { listHostAssignments } from "../models/host-agents";
 /** Caddy opens a listener per port and Docker a proxy process per port and address family. */
 export const MAX_L4_PORTS_PER_HOST = 1000;
 /** Keeps an agent's status report, which lists every published port, well inside its limits. */
-export const MAX_L4_PORTS_PER_AGENT = 2000;
+const MAX_L4_PORTS_PER_AGENT = 2000;
 
 export type L4PortClaim = {
   /** Null for a host not created yet. */

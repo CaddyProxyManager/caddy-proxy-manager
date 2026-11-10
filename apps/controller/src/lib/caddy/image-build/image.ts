@@ -6,8 +6,8 @@
 
 import { APP_VERSION } from "../../runtime/app-version";
 
-export const CADDY_IMAGE_SOURCE = "https://github.com/CaddyProxyManager/caddy-proxy-manager.git";
-export const CADDY_IMAGE_DOCKERFILE = "docker/caddy/Dockerfile";
+const CADDY_IMAGE_SOURCE = "https://github.com/CaddyProxyManager/caddy-proxy-manager.git";
+const CADDY_IMAGE_DOCKERFILE = "docker/caddy/Dockerfile";
 /** A tag of the operator's own: building under the shipped name, the load's pull would replace it. */
 export const SUGGESTED_CADDY_IMAGE = "caddy-proxy-manager-caddy:custom";
 const DEFAULT_ID = "10000";
@@ -31,7 +31,7 @@ export function caddyImageSourceRef(version: string = APP_VERSION): string {
 }
 
 /** Whether an agent still runs the shipped image, so it has no CADDY_IMAGE of its own yet. */
-export function isShippedCaddyImage(image: string | null): boolean {
+function isShippedCaddyImage(image: string | null): boolean {
   return image === null || SHIPPED_IMAGE.test(image);
 }
 

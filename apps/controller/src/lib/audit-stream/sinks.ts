@@ -160,9 +160,9 @@ function redactedUrl(url: string | undefined): string {
   }
 }
 
-export type StreamHeads = { audit: number; security: number };
+type StreamHeads = { audit: number; security: number };
 
-export function sinkView(sink: Sink, heads: StreamHeads): SinkView {
+function sinkView(sink: Sink, heads: StreamHeads): SinkView {
   const { config, secret, ...rest } = sink;
   return {
     ...rest,
@@ -256,7 +256,7 @@ function caPem(raw: string | null | undefined): string | undefined {
   return pem;
 }
 
-export type PreparedSink = {
+type PreparedSink = {
   name: string;
   kind: SinkKind;
   enabled: boolean;
@@ -266,7 +266,7 @@ export type PreparedSink = {
 };
 
 /** Validates an add or an edit; blank secret fields keep what `existing` stores. */
-export function prepareSink(input: SinkInput, existing: Sink | null): PreparedSink {
+function prepareSink(input: SinkInput, existing: Sink | null): PreparedSink {
   const name = input.name?.trim() ?? "";
   if (!name || name.length > 100) throw domainError("auditSinkNameRequired", {}, { status: 400 });
   const kind = input.kind as SinkKind;

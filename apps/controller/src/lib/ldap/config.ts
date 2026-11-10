@@ -64,7 +64,7 @@ export function normalizeLdapConfig(value: Record<string, unknown>): LdapConfig 
   };
 }
 
-export type ParsedLdapUrl = { secure: boolean; host: string; port: number; url: string };
+type ParsedLdapUrl = { secure: boolean; host: string; port: number; url: string };
 
 /** ldap:// or ldaps:// with a host and nothing else; anything more is not a server address. */
 export function parseLdapUrl(raw: string | null | undefined): ParsedLdapUrl | null {

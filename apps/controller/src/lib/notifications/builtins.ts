@@ -12,10 +12,9 @@ import { NOTIFICATION_CATEGORIES, type NotificationCategory } from "./events";
 export const ALERT_SEVERITIES = ["critical", "warning", "info"] as const;
 export type AlertSeverity = (typeof ALERT_SEVERITIES)[number];
 
-export const BUILTIN_CHANNELS = ["email", "push"] as const;
-export type BuiltinChannel = (typeof BUILTIN_CHANNELS)[number];
+const BUILTIN_CHANNELS = ["email", "push"] as const;
 
-export const CATEGORY_SEVERITY: Record<NotificationCategory, AlertSeverity> = {
+const CATEGORY_SEVERITY: Record<NotificationCategory, AlertSeverity> = {
   accountDisabled: "warning",
   adminLocked: "warning",
   adminAdded: "info",

@@ -7,8 +7,8 @@ import type { TrafficSignal } from "../analytics/signals";
 import type { AttentionSeverity } from "../attention/types";
 
 /** A 5xx share this high, over at least this many requests, is a problem without a burst. */
-export const SERVER_ERROR_SHARE_MIN = 0.05;
-export const SERVER_ERROR_SHARE_MIN_REQUESTS = 20;
+const SERVER_ERROR_SHARE_MIN = 0.05;
+const SERVER_ERROR_SHARE_MIN_REQUESTS = 20;
 
 export type HostProblemCode =
   | "serverErrorBurst"

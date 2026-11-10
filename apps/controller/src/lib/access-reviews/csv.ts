@@ -5,7 +5,7 @@
  */
 import type { ReviewItem } from "./model";
 
-export const CSV_COLUMNS = [
+const CSV_COLUMNS = [
   "item",
   "kind",
   "subject",
@@ -20,9 +20,9 @@ export const CSV_COLUMNS = [
   "outcome",
   "outcomeReason",
 ] as const;
-export type CsvColumn = (typeof CSV_COLUMNS)[number];
+type CsvColumn = (typeof CSV_COLUMNS)[number];
 
-export type CsvLabels = {
+type CsvLabels = {
   header: (column: CsvColumn) => string;
   /** A role key as its name; anything else (a grant's view or manage) as it is. */
   value: (kind: ReviewItem["kind"], value: string) => string;

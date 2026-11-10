@@ -7,6 +7,7 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { databaseDialect, resolveSqlitePath } from "../db/dialect";
 import { MIGRATION_GROUPS, type MigrationGroupId } from "./selection";
+import { thrownMessage } from "../errors/thrown-message";
 
 /** Docker path, repo default, bare `bun start`. `LEGACY_SQLITE_PATH` overrides all of them. */
 const SEARCH_DIRECTORIES = ["/app/data", "./data", "."];
@@ -35,7 +36,7 @@ export type LegacyRejection = {
   missingTables?: string[];
 };
 
-export type LegacyScan = {
+type LegacyScan = {
   candidates: LegacyCandidate[];
   /** Kept so the UI can say why. */
   rejected: LegacyRejection[];
@@ -92,7 +93,7 @@ export function inspectLegacyDatabase(path: string): LegacyCandidate | LegacyRej
   try {
     database = new Database(path, { readonly: true });
   } catch (error) {
-    return { path, reason: "unreadable", detail: describe(error) };
+    return { path, reason: "unreadable", detail: thrownMessage(error) };
   }
 
   try {
@@ -115,14 +116,10 @@ export function inspectLegacyDatabase(path: string): LegacyCandidate | LegacyRej
       lastUpdatedAt: newestUpdate(database, present),
     };
   } catch (error) {
-    return { path, reason: "readFailed", detail: describe(error) };
+    return { path, reason: "readFailed", detail: thrownMessage(error) };
   } finally {
     database.close(true);
   }
-}
-
-function describe(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 /** The live SQLite file, which sits in /app/data beside the legacy ones. */

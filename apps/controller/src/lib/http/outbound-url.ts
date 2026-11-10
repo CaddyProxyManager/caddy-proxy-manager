@@ -62,7 +62,7 @@ export function isMetadataHost(hostname: string): boolean {
   return /^fe[89ab]/.test(host);
 }
 
-export type OutboundUrlProblem = "invalid" | "https" | "metadata";
+type OutboundUrlProblem = "invalid" | "https" | "metadata";
 
 /**
  * The URL without its trailing slashes, or why it is refused. Credentials, a query or a fragment

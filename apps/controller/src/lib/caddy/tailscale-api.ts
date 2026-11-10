@@ -6,13 +6,14 @@
 
 import { type DomainError, domainError } from "../errors/domain-error";
 import { isCaddyPlaceholder, tailscaleKeyId } from "./tailscale";
+import { thrownMessage } from "../errors/thrown-message";
 
 const API_BASE = "https://api.tailscale.com/api/v2";
 
 /** Short: this runs inside a settings save, and a hung request would hang the page. */
 const REQUEST_TIMEOUT_MS = 10_000;
 
-export type TailscaleKeyCheck =
+type TailscaleKeyCheck =
   | { status: "ok" }
   /** Must let the save through: a Headscale key or `{env.*}` placeholder is legitimate. */
   | { status: "unknown"; reason: string }
@@ -71,7 +72,7 @@ export async function checkTailscaleAuthKey(options: {
     return {
       status: "rejected",
       error: domainError("tailscaleKeyCheckUnreachable", {
-        detail: error instanceof Error ? error.message : String(error),
+        detail: thrownMessage(error),
       }),
     };
   }

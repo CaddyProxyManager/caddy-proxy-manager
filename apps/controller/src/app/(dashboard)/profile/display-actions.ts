@@ -9,7 +9,7 @@ import { setTableDensity } from "@/src/lib/models/table-density";
 import { isTableDensity } from "@/src/lib/users/table-density";
 import { setDisplayPreferences } from "@/src/lib/users/display-preferences";
 
-export type SaveDensityResult = { ok: true } | { ok: false; error: string };
+type SaveDensityResult = { ok: true } | { ok: false; error: string };
 
 async function failure(error: unknown): Promise<SaveDensityResult> {
   unstable_rethrow(error);

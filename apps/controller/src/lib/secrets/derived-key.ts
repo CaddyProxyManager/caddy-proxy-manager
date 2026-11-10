@@ -5,7 +5,7 @@ import { config } from "../config";
  * An independent key per purpose, derived from SESSION_SECRET, so a value one feature signs can
  * never pass another's check - the public probe once answered with the forward-auth proof.
  */
-export type KeyPurpose =
+type KeyPurpose =
   | "secret:v1"
   | "reachability-probe:v1"
   | "forward-auth-proxy-proof:v2"

@@ -11,8 +11,8 @@ import { parseOutboundBaseUrl } from "../http/outbound-url";
 import { decryptSecret, encryptSecret } from "../secrets";
 import { type BackupStore, localStore, s3Store } from "./storage";
 
-export const DESTINATION_KINDS = ["s3", "local"] as const;
-export type DestinationKind = (typeof DESTINATION_KINDS)[number];
+const DESTINATION_KINDS = ["s3", "local"] as const;
+type DestinationKind = (typeof DESTINATION_KINDS)[number];
 
 export type BackupDestination = {
   id: number;
@@ -97,7 +97,7 @@ async function requireDestination(id: number): Promise<BackupDestination> {
 }
 
 /** The whole destination a form describes, validated, with a blank secret taken from `existing`. */
-export function prepareDestination(
+function prepareDestination(
   input: BackupDestinationInput,
   existing: BackupDestination | null,
 ): Omit<BackupDestination, "id" | "createdAt" | "updatedAt"> {

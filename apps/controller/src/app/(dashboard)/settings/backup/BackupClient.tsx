@@ -25,6 +25,7 @@ import { unwrap } from "@/src/lib/errors/action-result";
 import { type BackupOverview, listRemoteBackupsAction } from "./actions";
 import { ConfigTransfer } from "./ConfigTransfer";
 import { ScheduledBackups } from "./ScheduledBackups";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
 type Preview = {
   createdAt: string;
@@ -199,7 +200,7 @@ function RestoreCard({ destinations }: { destinations: BackupOverview["destinati
     try {
       setRemote(unwrap(await listRemoteBackupsAction(Number(id))));
     } catch (err) {
-      setError(err instanceof Error && err.message ? err.message : t("listFailed"));
+      setError(thrownMessage(err, t("listFailed")));
     }
   };
 

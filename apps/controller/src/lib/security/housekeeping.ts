@@ -22,7 +22,7 @@ let timer: NodeJS.Timeout | null = null;
 let running = false;
 let ticks = 0;
 
-export async function runSecurityHousekeeping(tick: number): Promise<void> {
+async function runSecurityHousekeeping(tick: number): Promise<void> {
   await pruneExpiredBlockedSources();
   await pruneExpiredAccessListRules();
   await expireWafOverrides();

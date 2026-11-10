@@ -14,9 +14,9 @@ export const MIN_PASSPHRASE_LENGTH = 12;
 /** Large enough for years of audit log; small enough that a stray upload can't fill memory. */
 export const MAX_BACKUP_BYTES = 64 * 1024 * 1024;
 /** What a payload may unpack to: past this a tiny file could exhaust memory before JSON.parse. */
-export const MAX_PAYLOAD_BYTES = 512 * 1024 * 1024;
+const MAX_PAYLOAD_BYTES = 512 * 1024 * 1024;
 
-export type BackupHeader = {
+type BackupHeader = {
   format: "cpm-backup";
   /** 2 authenticates the header; 1 left it open to tampering and is refused. 3 adds compression. */
   version: 2 | 3;

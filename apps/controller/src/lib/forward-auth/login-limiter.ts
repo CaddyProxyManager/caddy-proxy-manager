@@ -10,7 +10,7 @@ import {
 } from "../auth/rate-limit";
 
 /** Ended by the first call to any of these. */
-export type PortalLoginAttempt = {
+type PortalLoginAttempt = {
   /** Counts against the client, the (account, client) pair and the account. */
   fail(source: SignInSource): Promise<void>;
   succeed(): Promise<void>;

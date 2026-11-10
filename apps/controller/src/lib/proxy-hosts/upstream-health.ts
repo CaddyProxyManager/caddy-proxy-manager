@@ -61,7 +61,7 @@ async function readUpstreams(agentId: string | undefined): Promise<CaddyUpstream
   }
 }
 
-export type HostnameLookup = (hostname: string) => Promise<string[]>;
+type HostnameLookup = (hostname: string) => Promise<string[]>;
 
 const systemLookup: HostnameLookup = async (hostname) =>
   (await withTimeout(lookup(hostname, { all: true }), LOOKUP_TIMEOUT_MS)).map(

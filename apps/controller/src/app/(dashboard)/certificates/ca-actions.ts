@@ -163,7 +163,7 @@ export async function generateCaCertificateAction(
   });
 }
 
-export type IssuedClientCert = {
+type IssuedClientCert = {
   pkcs12Base64: string;
   passwordProtected: boolean;
 };

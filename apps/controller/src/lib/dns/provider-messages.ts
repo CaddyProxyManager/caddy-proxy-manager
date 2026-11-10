@@ -47,7 +47,7 @@ export function dnsProviderDescription(
   return dynamic(t)(`dnsProviders.${dnsMessageName(provider.name)}.description`);
 }
 
-export type DnsProviderFieldText = {
+type DnsProviderFieldText = {
   label: string;
   description?: string;
   placeholder?: string;

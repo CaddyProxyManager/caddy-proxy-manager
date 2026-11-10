@@ -7,7 +7,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { ACCENTS, type Hue, hueAt } from "./accent";
 import { CARD_TITLE_CLASS } from "./card-title";
 
-export type StatTile = {
+type StatTile = {
   id: string;
   /** What the number is. Sits above it, as the card's title. */
   label: string;

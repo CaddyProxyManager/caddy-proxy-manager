@@ -31,6 +31,7 @@ import {
 } from "./docker";
 import type { AgentConfig } from "./config";
 import type { AgentStore } from "./db";
+import { thrownMessage } from "./thrown-message";
 
 type OperationKind = "l4-ports" | "caddy-build" | "services";
 
@@ -221,7 +222,7 @@ export class Operations {
         appliedAt: new Date().toISOString(),
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = thrownMessage(error);
       this.store.setL4PortsStatus({
         state: "failed",
         ...said("l4Failed", `Applying port changes failed: ${message}`, { detail: message }),
@@ -367,7 +368,7 @@ export class Operations {
         appliedAt: new Date().toISOString(),
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = thrownMessage(error);
       failed(
         said("imageLoadFailed", `Loading the Caddy image failed: ${message}`, { detail: message }),
         message,
@@ -469,7 +470,7 @@ export class Operations {
         appliedAt: new Date().toISOString(),
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = thrownMessage(error);
       this.store.setCaddyBuildStatus({
         state: "failed",
         ...said("buildFailed", `The rebuild failed: ${message}`, { detail: message }),
@@ -562,7 +563,7 @@ export class Operations {
         appliedAt: new Date().toISOString(),
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = thrownMessage(error);
       this.store.setManagedServicesStatus({
         state: "failed",
         ...said("servicesFailed", `Applying the optional services failed: ${message}`, {

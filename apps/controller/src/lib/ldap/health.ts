@@ -7,16 +7,10 @@ import type { LdapDirectory } from "../models/ldap-directories";
 
 const LDAP_CHECK_TTL_MS = 5 * 60_000;
 
-export type LdapCheck = { at: number; failure: string | null };
+type LdapCheck = { at: number; failure: string | null };
 
 const checks = new Map<string, LdapCheck>();
 const running = new Map<string, Promise<void>>();
-
-/** Test seam. */
-export function resetLdapChecksForTests(): void {
-  checks.clear();
-  running.clear();
-}
 
 /** The latest result per directory id; a check still running is absent. */
 export async function checkLdapDirectories(

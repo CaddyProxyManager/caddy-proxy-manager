@@ -37,12 +37,12 @@ export type DynamicDnsSettings = {
   ipEndpoints: string[];
 };
 
-export const DYNAMIC_DNS_DEFAULT_INTERVAL = "5m";
+const DYNAMIC_DNS_DEFAULT_INTERVAL = "5m";
 export const DYNAMIC_DNS_MAX_RECORD_SETS = 100;
-export const DYNAMIC_DNS_MAX_NAMES = 50;
+const DYNAMIC_DNS_MAX_NAMES = 50;
 export const DYNAMIC_DNS_MAX_ENDPOINTS = 10;
 /** Every check calls the echo services, which rate-limit anyone polling harder. */
-export const DYNAMIC_DNS_MIN_INTERVAL_MS = 60_000;
+const DYNAMIC_DNS_MIN_INTERVAL_MS = 60_000;
 
 /** acme-dns only serves TXT records, so it cannot hold an address. */
 const UNSUPPORTED_PROVIDERS = new Set(["acmedns"]);
@@ -235,7 +235,7 @@ export type HostDynamicDnsConfig = {
   hostnames: string[];
 };
 
-export const HOST_DYNAMIC_DNS_MAX_HOSTNAMES = DYNAMIC_DNS_MAX_NAMES;
+const HOST_DYNAMIC_DNS_MAX_HOSTNAMES = DYNAMIC_DNS_MAX_NAMES;
 
 /** Lenient: for a stored blob, where a bad value means "never configured" rather than an error. */
 export function sanitizeHostDynamicDns(value: unknown): HostDynamicDnsConfig | null {

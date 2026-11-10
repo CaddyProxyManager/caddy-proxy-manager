@@ -34,7 +34,8 @@ import {
   saveChannelAction,
   testChannelAction,
 } from "./actions";
-import { message, useChannelName } from "./shared";
+import { useChannelName } from "./shared";
+import { thrownMessage } from "@/src/lib/errors/thrown-message";
 
 /** `CHANNEL_KINDS` in lib/alerts/channels, which pulls the secrets module into the bundle. */
 const KINDS = ["webhook", "discord", "slack", "teams", "ntfy"] as const;
@@ -162,7 +163,7 @@ function ChannelDialog({
       onSaved(saved.signingSecret);
       onClose();
     } catch (err) {
-      setError(message(err, t("saveFailed")));
+      setError(thrownMessage(err, t("saveFailed")));
     } finally {
       setSaving(false);
     }
@@ -174,7 +175,7 @@ function ChannelDialog({
     try {
       setTested(await testChannelAction(editing?.id ?? null, inputOf(form)));
     } catch (err) {
-      setTested({ ok: false, error: message(err, t("testFailed")) });
+      setTested({ ok: false, error: thrownMessage(err, t("testFailed")) });
     } finally {
       setTesting(false);
     }
@@ -423,7 +424,7 @@ export function ChannelsTab({
     try {
       unwrap(await deleteChannelAction(channel.id));
     } catch (err) {
-      setError(message(err, t("deleteFailed")));
+      setError(thrownMessage(err, t("deleteFailed")));
     } finally {
       onChanged();
     }
@@ -437,7 +438,7 @@ export function ChannelsTab({
     } catch (err) {
       setTested({
         name: channelName(channel),
-        result: { ok: false, error: message(err, t("testFailed")) },
+        result: { ok: false, error: thrownMessage(err, t("testFailed")) },
       });
     } finally {
       setTesting(null);

@@ -176,12 +176,12 @@ export async function getAnalyticsBlocked(
 
 // ── Overview ─────────────────────────────────────────────────────────────────
 
-export type OverviewTimelineBucket = TimelineBucket & {
+type OverviewTimelineBucket = TimelineBucket & {
   /** Audit rows - changes made on the controller - in the same bucket. */
   serverEvents: number;
 };
 
-export interface OverviewAnalytics {
+interface OverviewAnalytics {
   summary: AnalyticsSummary;
   statusClasses: StatusClassCounts;
   wafBlocked: number;
@@ -303,7 +303,7 @@ export interface HostTraffic {
   serverErrors: number;
 }
 
-export interface HostTrafficResult {
+interface HostTrafficResult {
   /**
    * Analytics is on and ClickHouse answered. Distinct from an empty `byHost`, which is a zero worth
    * showing, not an absence to hide.
@@ -378,7 +378,7 @@ export async function getTrafficByProxyHost(
 
 // ── Hosts ────────────────────────────────────────────────────────────────────
 
-export interface AnalyticsHost {
+interface AnalyticsHost {
   host: string;
   /** true when this host matches a domain configured on a proxy host in Caddy */
   configured: boolean;

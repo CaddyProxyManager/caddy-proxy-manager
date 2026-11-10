@@ -119,10 +119,10 @@ export type NotificationEvent =
   /** Settings' "send a test notification"; belongs to no category, so no switch stops it. */
   | { kind: "test" };
 
-export type NotificationKind = NotificationEvent["kind"];
+type NotificationKind = NotificationEvent["kind"];
 
 /** Kinds with no category, so no Settings switch or mute: rules' own, and the tests. */
-export const RULE_KINDS = [
+const RULE_KINDS = [
   "attention",
   "attentionResolved",
   "metricThreshold",

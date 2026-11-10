@@ -14,7 +14,7 @@ export type MigrationGroupId =
   | "settings"
   | "auditLog";
 
-export type MigrationGroup = {
+type MigrationGroup = {
   id: MigrationGroupId;
   /** Mirrored in `setup.migrationGroups.<id>`: change both, or migration-messages.test.ts fails. */
   label: string;
@@ -208,7 +208,7 @@ export function groupForTable(table: string): MigrationGroup | null {
   return MIGRATION_GROUPS.find((group) => group.tables.includes(table)) ?? null;
 }
 
-export function isMigrationGroupId(value: string): value is MigrationGroupId {
+function isMigrationGroupId(value: string): value is MigrationGroupId {
   return BY_ID.has(value as MigrationGroupId);
 }
 

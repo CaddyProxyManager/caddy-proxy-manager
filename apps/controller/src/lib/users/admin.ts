@@ -13,7 +13,7 @@ import type { CapabilitySet } from "../roles/capabilities";
 import { assertMayAssignRole, assertMayManageAccount } from "../roles/store";
 
 export const USER_STATUSES = ["active", "disabled"] as const;
-export type UserStatus = (typeof USER_STATUSES)[number];
+type UserStatus = (typeof USER_STATUSES)[number];
 
 export function isUserRole(value: unknown): value is AppRole {
   return typeof value === "string" && (APP_ROLES as readonly string[]).includes(value);

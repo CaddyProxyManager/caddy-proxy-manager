@@ -328,7 +328,7 @@ export async function sendTestNotification(now = Date.now()): Promise<string[]> 
   return recipients;
 }
 
-export type NotificationStatus = {
+type NotificationStatus = {
   lastSentAt: string | null;
   /** English, as the SMTP server or the job said it; null after a good send. */
   lastError: string | null;
@@ -394,13 +394,13 @@ type Watcher = (now: number) => Promise<void>;
 const watchers: Watcher[] = [];
 
 /** Something a tick checks, e.g. how long an agent has been gone. */
-export function addNotificationWatcher(watcher: Watcher): void {
+function addNotificationWatcher(watcher: Watcher): void {
   // Once, though a replica that takes the lead again starts this module over.
   if (!watchers.includes(watcher)) watchers.push(watcher);
 }
 
 /** One pass: every watcher, then whatever is due. */
-export async function notificationTick(now = Date.now()): Promise<void> {
+async function notificationTick(now = Date.now()): Promise<void> {
   for (const watcher of watchers) await quietly("run a notification check", () => watcher(now));
   await flushNotifications(now);
 }

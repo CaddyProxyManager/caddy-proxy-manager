@@ -47,7 +47,7 @@ export class SettingsValidationError extends DomainError {
   }
 }
 
-export const MAX_SETTINGS_BYTES = 1024 * 1024;
+const MAX_SETTINGS_BYTES = 1024 * 1024;
 const MAX_SHORT_STRING = 2048;
 const MAX_SECRET_LENGTH = 16 * 1024;
 const MAX_LIST_ITEMS = 1024;
@@ -605,7 +605,7 @@ export function validateHostGeoBlock(input: unknown): void {
 }
 
 /** The stored global WAF settings an update replaces. */
-export type PreviousWafSettings = {
+type PreviousWafSettings = {
   custom_directives?: string | null;
   load_owasp_crs?: boolean;
   strict_directives?: boolean;
@@ -688,7 +688,7 @@ function validateWaf(value: Record<string, unknown>, previous: PreviousWafSettin
 }
 
 /** Global and per-host WAF. Past Coraza's 1 GiB ceiling Caddy rejects the whole config. */
-export function validateBodyLimits(value: Record<string, unknown>, prefix: string): void {
+function validateBodyLimits(value: Record<string, unknown>, prefix: string): void {
   for (const key of ["request_body_limit", "request_body_in_memory_limit"] as const) {
     const raw = value[key];
     if (raw === undefined || raw === null) continue;

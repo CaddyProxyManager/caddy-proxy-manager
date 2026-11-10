@@ -9,7 +9,7 @@ import db, { nowIso } from "../db";
 import { groupIdpMappings, groups } from "../db/schema";
 import { normalizeGroupName } from "../auth/oidc/groups";
 
-export type GroupIdpMapping = {
+type GroupIdpMapping = {
   id: number;
   groupId: number;
   /** The provider this applies to, or null for "any provider". */
@@ -28,15 +28,6 @@ function toMapping(row: typeof groupIdpMappings.$inferSelect): GroupIdpMapping {
     providerId: row.providerId,
     externalName: row.externalName,
   };
-}
-
-export async function listMappingsForGroup(groupId: number): Promise<GroupIdpMapping[]> {
-  const rows = await db
-    .select()
-    .from(groupIdpMappings)
-    .where(eq(groupIdpMappings.groupId, groupId))
-    .orderBy(groupIdpMappings.externalName);
-  return rows.map(toMapping);
 }
 
 /** Every mapping, keyed by group id - for the page that lists all the groups at once. */

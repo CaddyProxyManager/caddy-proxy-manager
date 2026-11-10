@@ -30,7 +30,7 @@ const DASHBOARD_BUDGET_MS = 15_000;
 const COOLDOWN_BUDGET_MS = 90_000;
 
 /** The two flows share the machinery, not the sentences. */
-export type RestartCopy = {
+type RestartCopy = {
   heading: string;
   lead: string;
   title: string;

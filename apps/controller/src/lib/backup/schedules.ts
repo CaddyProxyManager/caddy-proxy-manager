@@ -16,14 +16,14 @@ import { MIN_PASSPHRASE_LENGTH } from "./format";
 /** The announcement the scheduler listens for. */
 export const SCHEDULES_CHANGED = "backup-schedules";
 
-export const MAX_KEEP_LAST = 1000;
-export const MAX_KEEP_DAYS = 3650;
+const MAX_KEEP_LAST = 1000;
+const MAX_KEEP_DAYS = 3650;
 
 export type BackupSchedule = Omit<typeof backupSchedules.$inferSelect, "passphrase"> & {
   passphrase: string;
 };
 
-export type BackupScheduleView = Omit<BackupSchedule, "passphrase"> & {
+type BackupScheduleView = Omit<BackupSchedule, "passphrase"> & {
   destinationName: string;
 };
 
@@ -66,7 +66,7 @@ export async function listEnabledSchedules(): Promise<BackupSchedule[]> {
   return rows.map(parseRow);
 }
 
-export async function getSchedule(id: number): Promise<BackupSchedule | null> {
+async function getSchedule(id: number): Promise<BackupSchedule | null> {
   const [row] = await db.select().from(backupSchedules).where(eq(backupSchedules.id, id));
   return row ? parseRow(row) : null;
 }

@@ -20,9 +20,10 @@ import { BATCH_MS } from "../notifications/plan";
 import { BATCH_SIZE, type Channel, channelRequest, parseChannel } from "./channels";
 import { postJson } from "./channels/send";
 import { alertBatch } from "./message";
+import { thrownMessage } from "../errors/thrown-message";
 
 /** Failures in a row before the channel counts as failing. */
-export const CHANNEL_FAILING_STREAK = 3;
+const CHANNEL_FAILING_STREAK = 3;
 const BACKOFF_BASE_MS = 30_000;
 const BACKOFF_MAX_MS = 60 * 60_000;
 
@@ -33,13 +34,13 @@ export function backoffMs(failures: number, retryAfterMs: number | null = null):
   return Math.max(grown, retryAfterMs ?? 0);
 }
 
-export function failingKey(channelId: number): string {
+function failingKey(channelId: number): string {
   return `channel-failing:${channelId}`;
 }
 
 type RuleName = { name: string; settingKey: string | null };
 
-export async function ruleNames(ids: readonly (number | null)[]): Promise<Map<number, RuleName>> {
+async function ruleNames(ids: readonly (number | null)[]): Promise<Map<number, RuleName>> {
   const wanted = [...new Set(ids.filter((id): id is number => id !== null))];
   if (wanted.length === 0) return new Map();
   const rows = await db
@@ -130,7 +131,7 @@ export async function flushChannel(channel: Channel, now: number): Promise<void>
     result = {
       ok: false,
       status: null,
-      error: error instanceof Error ? error.message : String(error),
+      error: thrownMessage(error),
       retryAfterMs: null,
     };
   }

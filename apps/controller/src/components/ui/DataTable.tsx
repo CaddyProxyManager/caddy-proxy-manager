@@ -53,7 +53,7 @@ export type { TableRowStatus };
 type TableRow = Record<string, unknown>;
 
 /** Row checkboxes over the rendered page. The set is the caller's, so a bulk bar can read it. */
-export type RowSelection<T> = {
+type RowSelection<T> = {
   selectedKeys: Set<string>;
   onChange: Dispatch<SetStateAction<Set<string>>>;
   /** A row that fails this shows a disabled checkbox, e.g. a host an operator may only view. */

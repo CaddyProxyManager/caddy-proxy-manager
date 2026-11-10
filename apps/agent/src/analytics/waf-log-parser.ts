@@ -3,7 +3,6 @@
  * offset lives in the agent's SQLite and the rows are relayed to the controller.
  */
 import { existsSync, statSync, truncateSync } from "node:fs";
-import maxmind, { type CountryResponse } from "maxmind";
 import {
   type WafEventRow,
   auditEntryCarriesCredentials,
@@ -14,7 +13,8 @@ import {
 import type { AgentStore } from "../db";
 import { relayWafEvents } from "./relay";
 import { readLines } from "./log-read";
-import { geoipCountryDb, wafAuditLogPath, wafRulesLogPath } from "./paths";
+import { ensureGeoIP, lookupCountry } from "./log-parser";
+import { wafAuditLogPath, wafRulesLogPath } from "./paths";
 
 const AUDIT_LOG = wafAuditLogPath();
 const RULES_LOG = wafRulesLogPath();
@@ -22,9 +22,6 @@ const BATCH_SIZE = 200;
 // SecAuditLog has no rotation of its own (unlike the Caddy-written logs), so once fully ingested
 // it is truncated in place past this size.
 const AUDIT_LOG_TRUNCATE_THRESHOLD = 100 * 1024 * 1024;
-
-let geoReader: Awaited<ReturnType<typeof maxmind.open<CountryResponse>>> | null = null;
-const geoCache = new Map<string, string | null>();
 
 let stopped = false;
 
@@ -42,33 +39,6 @@ async function getState(key: string): Promise<string | null> {
 
 async function setState(key: string, value: string): Promise<void> {
   store?.setParseState(key, value);
-}
-
-// ── GeoIP ─────────────────────────────────────────────────────────────────────
-
-async function initGeoIP(): Promise<void> {
-  const database = geoipCountryDb();
-  if (!existsSync(database)) return;
-  try {
-    geoReader = await maxmind.open<CountryResponse>(database);
-  } catch {
-    // GeoIP optional
-  }
-}
-
-function lookupCountry(ip: string): string | null {
-  if (!geoReader) return null;
-  if (geoCache.has(ip)) return geoCache.get(ip)!;
-  if (geoCache.size > 10_000) geoCache.clear();
-  try {
-    const result = geoReader.get(ip);
-    const code = result?.country?.iso_code ?? null;
-    geoCache.set(ip, code);
-    return code;
-  } catch {
-    geoCache.set(ip, null);
-    return null;
-  }
 }
 
 // ── WAF rules log parsing ─────────────────────────────────────────────────────
@@ -99,7 +69,7 @@ function isAnomalyEvaluationRule(ruleId: number | null): boolean {
 }
 
 /** RuleInfo from a ModSecurity rule string, or null if it is not a specific attack rule. */
-export function ruleInfoFromMessage(msg: string): RuleInfo | null {
+function ruleInfoFromMessage(msg: string): RuleInfo | null {
   const ruleIdStr = extractBracketField(msg, "id");
   const ruleId = ruleIdStr ? parseInt(ruleIdStr, 10) : null;
   if (isAnomalyEvaluationRule(ruleId)) return null;
@@ -259,7 +229,7 @@ async function insertBatch(rows: WafEventRow[]): Promise<void> {
 
 export async function initWafLogParser(): Promise<void> {
   stopped = false;
-  await initGeoIP();
+  await ensureGeoIP();
   console.log("[waf-log-parser] initialized");
 }
 

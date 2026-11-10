@@ -91,14 +91,3 @@ export function subscribeLiveStatus(listener: StatusListener): () => void {
 export function liveConnected(): boolean {
   return connected;
 }
-
-/** Test seam. */
-export function resetLiveClient(): void {
-  source?.close();
-  source = null;
-  openedFor = "";
-  connected = false;
-  everOpened = false;
-  handlers.clear();
-  statusListeners.clear();
-}

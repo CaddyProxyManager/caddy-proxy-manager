@@ -47,7 +47,7 @@ export function jsonArray(text: string): unknown[] {
   return Array.isArray(parsed) ? parsed : [];
 }
 
-export function jsonObject(text: string): Record<string, unknown> {
+function jsonObject(text: string): Record<string, unknown> {
   const parsed = parse(text);
   return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
     ? (parsed as Record<string, unknown>)

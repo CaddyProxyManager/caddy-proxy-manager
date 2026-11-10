@@ -44,7 +44,7 @@ function rate(part: number, whole: number): number {
   return whole > 0 ? part / whole : 0;
 }
 
-export function kpisFor(
+function kpisFor(
   totals: ExploreTotals,
   previous: ExploreTotals | null,
   timeline: readonly ExploreBucket[],

@@ -50,7 +50,7 @@ export type DnsProviderApiStatus = {
   acmeDnsAccounts: Record<string, { fulldomain: string }>;
 };
 
-export type LegacyCloudflareApiStatus = {
+type LegacyCloudflareApiStatus = {
   hasApiToken: boolean;
   zoneId?: string;
   accountId?: string;

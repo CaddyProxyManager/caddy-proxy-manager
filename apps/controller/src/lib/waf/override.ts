@@ -89,7 +89,7 @@ const MAX_MATCHES = 5;
 const MAX_PATHS = 5;
 
 /** What the aggregation reads of a stored event; the model hands it redacted events. */
-export type WafOverrideEvent = {
+type WafOverrideEvent = {
   uri: string;
   rawData: string | null;
   blocked: boolean;
@@ -152,7 +152,7 @@ export function collectOverrideRules(
   return [...rules.values()].sort((a, b) => b.hits - a.hits || a.ruleId - b.ruleId);
 }
 
-export type OverrideRuleSelectionError =
+type OverrideRuleSelectionError =
   | "wafOverrideNoRules"
   | "wafOverrideTooManyRules"
   | "wafExclusionRuleIdInvalid"

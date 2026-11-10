@@ -5,7 +5,7 @@
 import { type SQL, sql } from "drizzle-orm";
 import type { AnyColumn } from "drizzle-orm";
 
-export function escapeLikePattern(input: string): string {
+function escapeLikePattern(input: string): string {
   return input.replace(/[%_\\]/g, (ch) => `\\${ch}`);
 }
 

@@ -31,7 +31,7 @@ export function countChangedFields(baseline: Snapshot, current: Snapshot): numbe
   return count;
 }
 
-export type UnsavedChanges = {
+type UnsavedChanges = {
   /** Fields that differ from what the form opened with. */
   changed: number;
   /** Fields the browser would refuse to submit, once the user has touched the form. */

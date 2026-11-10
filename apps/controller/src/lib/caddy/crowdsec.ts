@@ -44,7 +44,7 @@ export type CrowdSecSettings = {
   tickerInterval: string;
 };
 
-export const DEFAULT_CROWDSEC_TICKER = "60s";
+const DEFAULT_CROWDSEC_TICKER = "60s";
 
 export const DEFAULT_CROWDSEC_SETTINGS: CrowdSecSettings = {
   enabled: false,
@@ -220,7 +220,7 @@ export function assertCrowdSecComplete(
   }
 }
 
-export function isCrowdSecConfigured(settings: CrowdSecSettings | null | undefined): boolean {
+function isCrowdSecConfigured(settings: CrowdSecSettings | null | undefined): boolean {
   if (!settings?.enabled) return false;
   if (settings.mode === "managed") return settings.managedApiKey.length > 0;
   return Boolean(settings.apiUrl && settings.apiKey);
@@ -234,7 +234,7 @@ export function wantsManagedCrowdSec(settings: CrowdSecSettings | null | undefin
 // ─── Caddy JSON ──────────────────────────────────────────────────────────────
 
 /** What config generation reads. `apiKey` is still encrypted; the caller decrypts it. */
-export type CrowdSecConnection = {
+type CrowdSecConnection = {
   apiUrl: string;
   apiKey: string;
   appsecUrl: string;
@@ -338,7 +338,7 @@ export function storedHostCrowdSec(enabled: boolean): HostCrowdSecMeta | undefin
 
 const PROBE_TIMEOUT_MS = 5000;
 
-export type CrowdSecProbeResult =
+type CrowdSecProbeResult =
   | { status: "ok" }
   | { status: "rejected" }
   | { status: "unexpected"; httpStatus: number }
