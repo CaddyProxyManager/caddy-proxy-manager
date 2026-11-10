@@ -1,42 +1,30 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiRoute } from "@/src/lib/api/auth";
 import { getGroup, updateGroup, deleteGroup } from "@/src/lib/models/groups";
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function GET(request: NextRequest, { params }: Params) {
-  try {
-    await requireApiUser(request);
-    const { id } = await params;
-    const group = await getGroup(Number(id));
-    if (!group) {
-      return NextResponse.json({ error: "Group not found" }, { status: 404 });
-    }
-    return NextResponse.json(group);
-  } catch (error) {
-    return apiErrorResponse(error);
+export const GET = apiRoute(async (request: NextRequest, { params }: Params) => {
+  await requireApiUser(request);
+  const { id } = await params;
+  const group = await getGroup(Number(id));
+  if (!group) {
+    return NextResponse.json({ error: "Group not found" }, { status: 404 });
   }
-}
+  return NextResponse.json(group);
+});
 
-export async function PATCH(request: NextRequest, { params }: Params) {
-  try {
-    const { userId } = await requireApiUser(request);
-    const { id } = await params;
-    const body = await request.json();
-    const group = await updateGroup(Number(id), body, userId);
-    return NextResponse.json(group);
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+export const PATCH = apiRoute(async (request: NextRequest, { params }: Params) => {
+  const { userId } = await requireApiUser(request);
+  const { id } = await params;
+  const body = await request.json();
+  const group = await updateGroup(Number(id), body, userId);
+  return NextResponse.json(group);
+});
 
-export async function DELETE(request: NextRequest, { params }: Params) {
-  try {
-    const { userId } = await requireApiUser(request);
-    const { id } = await params;
-    await deleteGroup(Number(id), userId);
-    return new NextResponse(null, { status: 204 });
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+export const DELETE = apiRoute(async (request: NextRequest, { params }: Params) => {
+  const { userId } = await requireApiUser(request);
+  const { id } = await params;
+  await deleteGroup(Number(id), userId);
+  return new NextResponse(null, { status: 204 });
+});

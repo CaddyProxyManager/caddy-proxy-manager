@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiUser, apiErrorResponse, ApiAuthError } from "@/src/lib/api/auth";
+import { requireApiUser, apiRoute, ApiAuthError } from "@/src/lib/api/auth";
 import {
   getUserById,
   updateUserAccount,
@@ -25,8 +25,8 @@ function stripPasswordHash(user: Record<string, unknown>) {
   return rest;
 }
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
+export const GET = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     const auth = await requireApiUser(request);
     const { id } = await params;
     const targetId = Number(id);
@@ -40,13 +40,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.json(stripPasswordHash(user as unknown as Record<string, unknown>));
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);
 
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
+export const PUT = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     const auth = await requireApiUser(request);
     const { id } = await params;
     const targetId = Number(id);
@@ -123,16 +121,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.json(stripPasswordHash(user as unknown as Record<string, unknown>));
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const DELETE = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     const auth = await requireApiUser(request);
     const { id } = await params;
     const targetId = Number(id);
@@ -148,7 +141,5 @@ export async function DELETE(
 
     await deleteUser(targetId);
     return new NextResponse(null, { status: 204 });
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);

@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getFormatter, getTranslations } from "next-intl/server";
-import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiErrorResponse, apiRoute } from "@/src/lib/api/auth";
 import { extractErrorMessage } from "@/src/lib/errors/action-error";
 import { caddyBuildAgents } from "@/src/lib/agent/client";
 import {
@@ -16,27 +16,23 @@ import { DomainError } from "@/src/lib/errors/domain-error";
  * panel: compiling Caddy takes minutes, too long for a server action to hold open. `external`
  * lists the agents that load an operator-built image instead, and `builders` the rest.
  */
-export async function GET(request: NextRequest) {
-  try {
-    await requireApiUser(request);
-    // `?agent=<row id>` narrows both to one agent, which is what the settings panel polls with
-    // once an agent is being edited separately. Absent is the fleet-wide answer.
-    const agentRowId = parseAgentRowId(request.nextUrl.searchParams.get("agent"));
-    const [diff, status] = await Promise.all([
-      getCaddyBuildDiff(agentRowId),
-      getCaddyBuildStatus(agentRowId),
-    ]);
-    const { external, builders } = caddyBuildAgents(agentRowId);
-    return NextResponse.json({
-      diff,
-      status,
-      builders,
-      external: external.map(({ name, external: image }) => ({ name, ...image })),
-    });
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+export const GET = apiRoute(async (request: NextRequest) => {
+  await requireApiUser(request);
+  // `?agent=<row id>` narrows both to one agent, which is what the settings panel polls with
+  // once an agent is being edited separately. Absent is the fleet-wide answer.
+  const agentRowId = parseAgentRowId(request.nextUrl.searchParams.get("agent"));
+  const [diff, status] = await Promise.all([
+    getCaddyBuildDiff(agentRowId),
+    getCaddyBuildStatus(agentRowId),
+  ]);
+  const { external, builders } = caddyBuildAgents(agentRowId);
+  return NextResponse.json({
+    diff,
+    status,
+    builders,
+    external: external.map(({ name, external: image }) => ({ name, ...image })),
+  });
+});
 
 /** POST /api/caddy-build - write the build override and trigger the agent. */
 export async function POST(request: NextRequest) {

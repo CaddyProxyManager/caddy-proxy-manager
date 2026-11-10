@@ -1,13 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiRoute } from "@/src/lib/api/auth";
 import { apiSubmitter, submitOrApply } from "@/src/lib/approvals";
 import { getMtlsAccessRule } from "@/src/lib/models/mtls-access-rules";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string; ruleId: string }> },
-) {
-  try {
+export const GET = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string; ruleId: string }> }) => {
     await requireApiUser(request);
     const { ruleId } = await params;
     const rule = await getMtlsAccessRule(Number(ruleId));
@@ -15,16 +12,11 @@ export async function GET(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.json(rule);
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string; ruleId: string }> },
-) {
-  try {
+export const PUT = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string; ruleId: string }> }) => {
     const caller = await requireApiUser(request);
     const { ruleId } = await params;
     const body = await request.json();
@@ -33,16 +25,11 @@ export async function PUT(
       payload: { id: Number(ruleId), input: body },
     });
     return NextResponse.json(rule);
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string; ruleId: string }> },
-) {
-  try {
+export const DELETE = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string; ruleId: string }> }) => {
     const caller = await requireApiUser(request);
     const { ruleId } = await params;
     await submitOrApply(apiSubmitter(caller), {
@@ -50,7 +37,5 @@ export async function DELETE(
       payload: { id: Number(ruleId) },
     });
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);

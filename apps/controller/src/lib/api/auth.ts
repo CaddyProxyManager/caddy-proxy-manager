@@ -161,6 +161,19 @@ export function apiErrorResponse(error: unknown): NextResponse {
   );
 }
 
+/** A route handler whose every throw is answered by apiErrorResponse. */
+export function apiRoute<Args extends unknown[]>(
+  handler: (...args: Args) => Promise<Response>,
+): (...args: Args) => Promise<Response> {
+  return async (...args) => {
+    try {
+      return await handler(...args);
+    } catch (error) {
+      return apiErrorResponse(error);
+    }
+  };
+}
+
 /** Correlatable metadata only - never raw messages, bodies, URLs or stacks into shared logs. */
 export function logUnexpectedApiError(context: string, error: unknown): string {
   const errorId = randomUUID();

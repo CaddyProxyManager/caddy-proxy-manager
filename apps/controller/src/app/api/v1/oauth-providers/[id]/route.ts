@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiRoute } from "@/src/lib/api/auth";
 import {
   getOAuthProvider,
   updateOAuthProvider,
@@ -27,8 +27,8 @@ async function redactClientId(provider: OAuthProviderView) {
   };
 }
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
+export const GET = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     await requireApiUser(request);
     const { id } = await params;
     const provider = await getOAuthProvider(id);
@@ -38,13 +38,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json(await redactClientId(toOAuthProviderView(provider)), {
       headers: PRIVATE_RESPONSE_HEADERS,
     });
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);
 
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
+export const PUT = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     const { userId, access } = await requireApiUser(request);
     const { id } = await params;
     const body = await request.json();
@@ -87,16 +85,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json(await redactClientId(toOAuthProviderView(updated)), {
       headers: PRIVATE_RESPONSE_HEADERS,
     });
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const DELETE = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     const { userId } = await requireApiUser(request);
     const { id } = await params;
 
@@ -126,7 +119,5 @@ export async function DELETE(
     });
 
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);

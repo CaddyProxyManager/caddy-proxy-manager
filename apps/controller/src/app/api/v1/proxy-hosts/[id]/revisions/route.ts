@@ -1,11 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { resolveProxyHostId } from "@/src/lib/models/proxy-hosts";
-import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiRoute } from "@/src/lib/api/auth";
 import { countHostRevisions, listHostRevisions } from "@/src/lib/host-history";
 
 /** Newest first, without the stored rows; GraphQL's hostRevision answers one in full. */
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
+export const GET = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     await requireApiUser(request);
     const { id } = await params;
     const hostId = await resolveProxyHostId(id);
@@ -18,7 +18,5 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       countHostRevisions("http", hostId),
     ]);
     return NextResponse.json({ items, total });
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);

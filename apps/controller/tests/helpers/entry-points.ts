@@ -170,7 +170,11 @@ export function restHandlers(): EntryPoint[] {
       ownBody: functions.get(method) ?? '',
     }));
     for (const match of reexported) {
-      const assignment = source.slice(match.index).split(';')[0];
+      const rest = source.slice(match.index);
+      // `apiRoute(async (...) => { ... })`: the whole arrow body, whose parameter types may hold a `;`.
+      const arrow = /^export\s+const\s+\w+\s*=\s*apiRoute\(/.test(rest) ? rest.indexOf('=>') : -1;
+      const open = arrow < 0 ? -1 : rest.indexOf('{', arrow);
+      const assignment = open < 0 ? rest.split(';')[0] : rest.slice(0, matchBrace(rest, open));
       entries.push({
         id: `${match[1]} ${path}`,
         file,

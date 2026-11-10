@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiRoute } from "@/src/lib/api/auth";
 import { listWafEvents, countWafEvents } from "@/src/lib/models/waf-events";
 
 const RANGE_SECONDS = {
@@ -27,26 +27,22 @@ function resolveRange(searchParams: URLSearchParams): { from?: number; to?: numb
   return {};
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    await requireApiUser(request);
-    const { searchParams } = request.nextUrl;
-    const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
-    const perPage = Math.min(
-      200,
-      Math.max(1, parseInt(searchParams.get("per_page") ?? "50", 10) || 50),
-    );
-    const search = searchParams.get("search")?.trim() || undefined;
-    const { from, to } = resolveRange(searchParams);
-    const offset = (page - 1) * perPage;
+export const GET = apiRoute(async (request: NextRequest) => {
+  await requireApiUser(request);
+  const { searchParams } = request.nextUrl;
+  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
+  const perPage = Math.min(
+    200,
+    Math.max(1, parseInt(searchParams.get("per_page") ?? "50", 10) || 50),
+  );
+  const search = searchParams.get("search")?.trim() || undefined;
+  const { from, to } = resolveRange(searchParams);
+  const offset = (page - 1) * perPage;
 
-    const [events, total] = await Promise.all([
-      listWafEvents(perPage, offset, search, from, to),
-      countWafEvents(search, from, to),
-    ]);
+  const [events, total] = await Promise.all([
+    listWafEvents(perPage, offset, search, from, to),
+    countWafEvents(search, from, to),
+  ]);
 
-    return NextResponse.json({ events, total, page, perPage });
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  return NextResponse.json({ events, total, page, perPage });
+});

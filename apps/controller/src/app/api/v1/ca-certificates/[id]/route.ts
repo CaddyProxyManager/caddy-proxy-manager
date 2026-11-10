@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiRoute } from "@/src/lib/api/auth";
 import {
   getCaCertificate,
   updateCaCertificate,
   deleteCaCertificate,
 } from "@/src/lib/models/ca-certificates";
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
+export const GET = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     await requireApiUser(request);
     const { id } = await params;
     const cert = await getCaCertificate(Number(id));
@@ -15,33 +15,24 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.json(cert);
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);
 
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
+export const PUT = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     const { userId } = await requireApiUser(request);
     const { id } = await params;
     const body = await request.json();
     const cert = await updateCaCertificate(Number(id), body, userId);
     return NextResponse.json(cert);
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const DELETE = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     const { userId } = await requireApiUser(request);
     const { id } = await params;
     await deleteCaCertificate(Number(id), userId);
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);

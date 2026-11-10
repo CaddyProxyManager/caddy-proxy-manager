@@ -1,24 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiRoute } from "@/src/lib/api/auth";
 import { listGroups, createGroup } from "@/src/lib/models/groups";
 
-export async function GET(request: NextRequest) {
-  try {
-    await requireApiUser(request);
-    const allGroups = await listGroups();
-    return NextResponse.json(allGroups);
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+export const GET = apiRoute(async (request: NextRequest) => {
+  await requireApiUser(request);
+  const allGroups = await listGroups();
+  return NextResponse.json(allGroups);
+});
 
-export async function POST(request: NextRequest) {
-  try {
-    const { userId } = await requireApiUser(request);
-    const body = await request.json();
-    const group = await createGroup(body, userId);
-    return NextResponse.json(group, { status: 201 });
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+export const POST = apiRoute(async (request: NextRequest) => {
+  const { userId } = await requireApiUser(request);
+  const body = await request.json();
+  const group = await createGroup(body, userId);
+  return NextResponse.json(group, { status: 201 });
+});

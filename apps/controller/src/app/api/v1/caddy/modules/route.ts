@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { pushDesiredState } from "@/src/lib/agent/desired-state";
-import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiRoute } from "@/src/lib/api/auth";
 import { getCaddyBuildDiff, sanitizeCaddyBuildSettings } from "@/src/lib/caddy/image-build";
 import { describeModuleConflicts } from "@/src/lib/caddy/image-build/conflicts";
 import { applyCaddyConfig } from "@/src/lib/caddy";
@@ -18,51 +18,43 @@ const AVAILABLE = CADDY_MODULES.map((m) => ({
 }));
 
 /** GET /api/v1/caddy/modules - with the catalog, since module ids are what PUT expects. */
-export async function GET(request: NextRequest) {
-  try {
-    await requireApiUser(request);
-    const [settings, diff] = await Promise.all([getCaddyBuildSettings(), getCaddyBuildDiff()]);
-    return NextResponse.json({
-      available: AVAILABLE,
-      selection: {
-        modules: settings?.modules ?? {},
-        customModules: settings?.customModules ?? [],
-      },
-      diff,
-    });
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+export const GET = apiRoute(async (request: NextRequest) => {
+  await requireApiUser(request);
+  const [settings, diff] = await Promise.all([getCaddyBuildSettings(), getCaddyBuildDiff()]);
+  return NextResponse.json({
+    available: AVAILABLE,
+    selection: {
+      modules: settings?.modules ?? {},
+      customModules: settings?.customModules ?? [],
+    },
+    diff,
+  });
+});
 
 /**
  * PUT /api/v1/caddy/modules - as Settings: the selection is desired state, so an agent that builds
  * its own image starts rebuilding on save.
  */
-export async function PUT(request: NextRequest) {
-  try {
-    await requireApiUser(request);
-    const body = await request.json();
-    const settings = sanitizeCaddyBuildSettings({
-      modules: body?.modules,
-      customModules: body?.customModules,
-    });
+export const PUT = apiRoute(async (request: NextRequest) => {
+  await requireApiUser(request);
+  const body = await request.json();
+  const settings = sanitizeCaddyBuildSettings({
+    modules: body?.modules,
+    customModules: body?.customModules,
+  });
 
-    // As in Settings, or disabling an in-use module would silently drop that feature's handlers.
-    const conflict = await describeModuleConflicts(settings);
-    if (conflict) {
-      return NextResponse.json({ error: conflict }, { status: 409 });
-    }
-
-    await saveCaddyBuildSettings(settings);
-
-    // Before the push: a Caddy the rebuild recreates resumes its autosave, which must not name a
-    // module the new binary lacks.
-    await applyCaddyConfig();
-    await pushDesiredState();
-
-    return NextResponse.json({ selection: settings, diff: await getCaddyBuildDiff() });
-  } catch (error) {
-    return apiErrorResponse(error);
+  // As in Settings, or disabling an in-use module would silently drop that feature's handlers.
+  const conflict = await describeModuleConflicts(settings);
+  if (conflict) {
+    return NextResponse.json({ error: conflict }, { status: 409 });
   }
-}
+
+  await saveCaddyBuildSettings(settings);
+
+  // Before the push: a Caddy the rebuild recreates resumes its autosave, which must not name a
+  // module the new binary lacks.
+  await applyCaddyConfig();
+  await pushDesiredState();
+
+  return NextResponse.json({ selection: settings, diff: await getCaddyBuildDiff() });
+});

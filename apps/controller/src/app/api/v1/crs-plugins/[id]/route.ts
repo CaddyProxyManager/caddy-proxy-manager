@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiRoute } from "@/src/lib/api/auth";
 import { apiSubmitter, submitOrApply } from "@/src/lib/approvals";
 import { getCrsPlugin } from "@/src/lib/models/crs-plugins";
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
+export const GET = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     await requireApiUser(request);
     const { id } = await params;
     const plugin = await getCrsPlugin(Number(id));
@@ -12,14 +12,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.json(plugin);
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);
 
 /** Only the -config file is the operator's to change; the rest is the release as fetched. */
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
+export const PUT = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     const caller = await requireApiUser(request);
     const { id } = await params;
     const body = await request.json();
@@ -31,16 +29,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       payload: { id: Number(id), config: body.config },
     });
     return NextResponse.json(plugin);
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const DELETE = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     const caller = await requireApiUser(request);
     const { id } = await params;
     await submitOrApply(apiSubmitter(caller), {
@@ -48,7 +41,5 @@ export async function DELETE(
       payload: { id: Number(id) },
     });
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);

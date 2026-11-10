@@ -1,15 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiRoute } from "@/src/lib/api/auth";
 import { apiSubmitter, submitOrApply } from "@/src/lib/approvals";
 import { DefaultResponseValidationError } from "@/src/lib/caddy/default-response";
 import { isSettingsGroup, readSettingsGroup, SettingsApplyError } from "@/src/lib/settings/api";
 import { assertSettingsPayloadSize, SettingsValidationError } from "@/src/lib/settings/validation";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ group: string }> },
-) {
-  try {
+export const GET = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ group: string }> }) => {
     await requireApiUser(request);
     const { group } = await params;
 
@@ -22,16 +19,11 @@ export async function GET(
       settings.value,
       settings.sensitive ? { headers: { "Cache-Control": "no-store" } } : undefined,
     );
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ group: string }> },
-) {
-  try {
+export const PUT = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ group: string }> }) => {
     const caller = await requireApiUser(request);
     const { group } = await params;
     let body: unknown;
@@ -77,7 +69,5 @@ export async function PUT(
     }
 
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);

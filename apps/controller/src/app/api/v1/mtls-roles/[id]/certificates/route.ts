@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiRoute } from "@/src/lib/api/auth";
 import { assignRoleToCertificate, getMtlsRole } from "@/src/lib/models/mtls-roles";
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
+export const POST = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     const { userId } = await requireApiUser(request);
     const { id } = await params;
     const body = await request.json();
@@ -13,7 +13,5 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     await assignRoleToCertificate(Number(id), body.certificateId, userId);
     const role = await getMtlsRole(Number(id));
     return NextResponse.json(role, { status: 201 });
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);

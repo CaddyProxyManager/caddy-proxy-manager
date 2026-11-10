@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireApiUser, apiErrorResponse } from "@/src/lib/api/auth";
+import { requireApiUser, apiRoute } from "@/src/lib/api/auth";
 import { apiSubmitter, submitOrApply } from "@/src/lib/approvals";
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
+export const POST = apiRoute(
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     const caller = await requireApiUser(request);
     const { id } = await params;
     const body = await request.json();
@@ -12,7 +12,5 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       payload: { id: Number(id), entry: body },
     });
     return NextResponse.json(list, { status: 201 });
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
+  },
+);
