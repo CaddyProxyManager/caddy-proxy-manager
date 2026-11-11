@@ -155,7 +155,8 @@ export function parseJson<T>(value: string | null, fallback: T): T {
   try {
     return JSON.parse(value) as T;
   } catch (error) {
-    console.warn("Failed to parse JSON value", value, error);
+    // Not the value itself: a stored column can carry credentials.
+    console.warn(`Failed to parse a ${value.length}-character JSON value:`, error);
     return fallback;
   }
 }

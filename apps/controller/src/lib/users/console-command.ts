@@ -4,7 +4,8 @@
  * Dependency-free: `cpm-server` imports it apart from the app, whose config would validate the
  * whole environment first.
  */
-import { createHmac, hkdfSync, timingSafeEqual } from "node:crypto";
+import { createHmac, hkdfSync } from "node:crypto";
+import { constantTimeEqual } from "../security/constant-time";
 
 export const CONSOLE_RESET_TWO_FACTOR_PATH = "/api/internal/reset-2fa";
 export const CONSOLE_ENABLE_USER_PATH = "/api/internal/enable-user";
@@ -53,9 +54,9 @@ export function verifyConsoleCommand(
   if (typeof timestamp !== "number" || !Number.isInteger(timestamp)) return null;
   if (typeof signature !== "string") return null;
   if (Math.abs(now - timestamp) > CONSOLE_COMMAND_MAX_AGE_MS) return null;
-  const expected = Buffer.from(signConsoleCommand(secret, username, timestamp, purpose));
-  const given = Buffer.from(signature);
-  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
+  if (!constantTimeEqual(signature, signConsoleCommand(secret, username, timestamp, purpose))) {
+    return null;
+  }
   return username;
 }
 

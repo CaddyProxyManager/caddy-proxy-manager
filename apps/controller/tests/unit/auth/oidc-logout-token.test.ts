@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { SignJWT, exportJWK, generateKeyPair } from 'jose';
 import { vi } from '@/tests/helpers/vi';
-import { clearDiscoveryCache } from '@/src/lib/auth/oidc/claims';
+import { clearDiscoveryCache, useOidcFetcher } from '@/src/lib/auth/oidc/claims';
 import { createTestDb } from '@/tests/helpers/db';
 import { dbModuleMock } from '@/tests/helpers/db-module';
 import { spentNonces } from '@/src/lib/db/schema';
@@ -29,6 +29,9 @@ const jwk = { ...(await exportJWK(publicKey)), kid: 'test-key', alg: 'RS256', us
 const other = await generateKeyPair('RS256');
 
 const originalFetch = globalThis.fetch;
+// The tests stub the global fetch; the module reaches it only through this hook.
+const viaGlobalFetch = (url: string | URL, init?: object) =>
+  globalThis.fetch(url, init as RequestInit);
 
 function jsonResponse(body: unknown): Response {
   return { ok: true, status: 200, json: async () => body } as unknown as Response;
@@ -70,6 +73,7 @@ const provider = { issuer: ISSUER, clientId: CLIENT_ID };
 
 beforeEach(async () => {
   clearDiscoveryCache();
+  useOidcFetcher(viaGlobalFetch);
   clearJwksCache();
   await testDb.delete(spentNonces);
   serveIdp();
@@ -77,6 +81,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  useOidcFetcher();
   vi.restoreAllMocks();
 });
 

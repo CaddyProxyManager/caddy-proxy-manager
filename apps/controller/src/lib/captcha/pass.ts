@@ -3,7 +3,8 @@
  * server: clearing the cookie stops only a browser, not a script replaying it.
  */
 
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
+import { constantTimeEqual } from "../security/constant-time";
 import { claimNonce, isNonceSpent } from "../cluster/nonces";
 import { derivePurposeKey } from "../secrets/derived-key";
 import { accountKey } from "../auth/rate-limit";
@@ -43,9 +44,7 @@ function verify(
   const expiresAt = Number(expiry);
   // A pass is never minted further out than the TTL.
   if (expiresAt <= now || expiresAt > now + CAPTCHA_PASS_TTL_MS) return null;
-  const expected = Buffer.from(signature(accountKey(username), expiresAt, nonce));
-  const given = Buffer.from(sig);
-  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
+  if (!constantTimeEqual(sig, signature(accountKey(username), expiresAt, nonce))) return null;
   return { nonce, expiresAt };
 }
 

@@ -9,7 +9,7 @@ import { vi } from '@/tests/helpers/vi';
 import { POST, GET } from '@/src/app/api/auth/oidc/backchannel-logout/route';
 import * as providerModel from '@/src/lib/models/oauth-providers';
 import * as logoutService from '@/src/lib/services/oidc-logout';
-import { clearDiscoveryCache } from '@/src/lib/auth/oidc/claims';
+import { clearDiscoveryCache, useOidcFetcher } from '@/src/lib/auth/oidc/claims';
 import { clearJwksCache } from '@/src/lib/auth/oidc/logout-token';
 import { createTestDb } from '@/tests/helpers/db';
 import { dbModuleMock } from '@/tests/helpers/db-module';
@@ -34,6 +34,9 @@ const { privateKey, publicKey } = await generateKeyPair('RS256');
 const jwk = { ...(await exportJWK(publicKey)), kid: 'test-key', alg: 'RS256', use: 'sig' };
 
 const originalFetch = globalThis.fetch;
+// The tests stub the global fetch; the module reaches it only through this hook.
+const viaGlobalFetch = (url: string | URL, init?: object) =>
+  globalThis.fetch(url, init as RequestInit);
 
 function jsonResponse(body: unknown): Response {
   return { ok: true, status: 200, json: async () => body } as unknown as Response;
@@ -87,6 +90,7 @@ const provider = {
 
 beforeEach(async () => {
   clearDiscoveryCache();
+  useOidcFetcher(viaGlobalFetch);
   clearJwksCache();
   await testDb.delete(spentNonces);
   serveIdp();
@@ -100,6 +104,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  useOidcFetcher();
   vi.restoreAllMocks();
 });
 

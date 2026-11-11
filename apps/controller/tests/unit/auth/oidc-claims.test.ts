@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { vi } from '@/tests/helpers/vi';
 import {
   clearDiscoveryCache,
+  useOidcFetcher,
   decodeJwtPayload,
   fetchOidcClaims,
   resolveUserinfoUrl,
@@ -22,13 +23,18 @@ function jsonResponse(body: unknown): Response {
 }
 
 const originalFetch = globalThis.fetch;
+// The tests stub the global fetch; the module reaches it only through this hook.
+const viaGlobalFetch = (url: string | URL, init?: object) =>
+  globalThis.fetch(url, init as RequestInit);
 
 beforeEach(() => {
   clearDiscoveryCache();
+  useOidcFetcher(viaGlobalFetch);
 });
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  useOidcFetcher();
   vi.restoreAllMocks();
 });
 
@@ -152,6 +158,18 @@ describe('fetchOidcClaims', () => {
     );
 
     expect(claims).toMatchObject({ sub: 'u1', email: 'u1@example.com' });
+    expect(claims?.groups).toBeUndefined();
+  });
+
+  it('never sends the access token to a metadata address', async () => {
+    useOidcFetcher();
+    const claims = await fetchOidcClaims(
+      { issuer: null, userinfoUrl: 'http://169.254.169.254/latest/meta-data' },
+      { idToken: makeIdToken({ sub: 'u1', email: 'u1@example.com' }), accessToken: 'token-123' },
+      'groups',
+    );
+
+    expect(claims).toMatchObject({ sub: 'u1' });
     expect(claims?.groups).toBeUndefined();
   });
 

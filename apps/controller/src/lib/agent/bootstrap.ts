@@ -4,7 +4,8 @@
  * never after an operator unpaired the bundled agent. Remote agents use the six-letter code.
  */
 
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
+import { constantTimeEqual } from "../security/constant-time";
 import { chmodSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { AGENT_BOOTSTRAP_FILE, AGENT_BOOTSTRAP_TOKEN_PATTERN } from "@cpm/shared";
@@ -53,13 +54,6 @@ function dataDir(): string {
 
 export function bootstrapPath(): string {
   return join(dataDir(), AGENT_BOOTSTRAP_FILE);
-}
-
-function secureEquals(a: string, b: string): boolean {
-  // timingSafeEqual throws on a length mismatch, itself an oracle for the token's length.
-  const left = createHmac("sha256", "compare").update(Buffer.from(a, "utf8")).digest();
-  const right = createHmac("sha256", "compare").update(Buffer.from(b, "utf8")).digest();
-  return timingSafeEqual(left, right);
 }
 
 async function removeToken(): Promise<void> {
@@ -150,7 +144,7 @@ export async function redeemBootstrapToken(
     await removeToken();
     return false;
   }
-  if (!secureEquals(live.hash, hashToken(submitted.trim()))) return false;
+  if (!constantTimeEqual(live.hash, hashToken(submitted.trim()))) return false;
   // Displacing an existing agent takes an operator's re-pair, which binds the token.
   if (live.agentId === null ? alreadyPaired : live.agentId !== agentId) return false;
 

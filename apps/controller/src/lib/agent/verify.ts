@@ -3,7 +3,8 @@
  * same symmetric secret; inverting the dial direction changed who proves itself, not the primitive.
  */
 
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac } from "node:crypto";
+import { constantTimeEqual } from "../security/constant-time";
 import {
   AGENT_CLOCK_SKEW_MS,
   AGENT_ID_HEADER,
@@ -26,15 +27,6 @@ const DENY: VerifyResult = {
   status: 401,
   error: "The request is not signed by a paired agent.",
 };
-
-/** Constant-time comparison that tolerates length differences without leaking them by timing. */
-function secureEquals(a: string, b: string): boolean {
-  // timingSafeEqual throws on a length mismatch, which would itself be an oracle. Hashing both to
-  // a fixed width first makes every comparison the same shape.
-  const left = createHmac("sha256", "compare").update(Buffer.from(a, "utf8")).digest();
-  const right = createHmac("sha256", "compare").update(Buffer.from(b, "utf8")).digest();
-  return timingSafeEqual(left, right);
-}
 
 async function sha256Hex(body: string): Promise<string> {
   const hasher = new Bun.CryptoHasher("sha256");
@@ -99,7 +91,7 @@ async function verify(request: Request, body: string, now: number): Promise<Veri
     )
     .digest("hex");
 
-  if (!secureEquals(expected, signature)) return DENY;
+  if (!constantTimeEqual(expected, signature)) return DENY;
 
   // Agents before 3.0.0-rc.4 sign without a nonce. A replay is byte-identical, so its signature
   // rejects it as well as a nonce would. Remove this fallback in the first release after 3.0.0.

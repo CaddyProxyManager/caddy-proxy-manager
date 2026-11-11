@@ -3,7 +3,8 @@
  * hold the challenge, so the browser carries a signed, short-lived one, like `captcha/pass.ts`.
  */
 
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
+import { constantTimeEqual } from "../security/constant-time";
 import { eq, sql } from "drizzle-orm";
 import db from "../db";
 import { rateLimitCounters } from "../db/schema";
@@ -42,9 +43,7 @@ export async function redeemPortalChallenge(
   const expiresAt = Number(expiry);
   if (expiresAt <= now || expiresAt > now + PORTAL_CHALLENGE_TTL_MS) return null;
 
-  const expected = Buffer.from(signature(userId, rid, expiresAt, nonce));
-  const given = Buffer.from(sig);
-  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
+  if (!constantTimeEqual(sig, signature(userId, rid, expiresAt, nonce))) return null;
 
   const [row] = await db
     .insert(rateLimitCounters)

@@ -5,6 +5,7 @@
  */
 
 import { readClaim } from "./groups";
+import { outboundFetch, type OutboundFetch } from "../../http/outbound";
 import { isMetadataHost } from "../../http/outbound-url";
 
 type OidcTokens = {
@@ -33,6 +34,13 @@ export function clearDiscoveryCache(): void {
   discoveryCache.clear();
 }
 
+let fetcher: OutboundFetch = outboundFetch;
+
+/** Exposed for tests; no argument restores the outbound client. */
+export function useOidcFetcher(next: OutboundFetch = outboundFetch): void {
+  fetcher = next;
+}
+
 /** Decodes a JWT payload without verifying it. */
 export function decodeJwtPayload(token: string | null | undefined): Record<string, unknown> | null {
   if (!token) return null;
@@ -50,18 +58,11 @@ export function decodeJwtPayload(token: string | null | undefined): Record<strin
   }
 }
 
-// The issuer is admin-configured, so these are bounds rather than a guard: a provider that hangs or
-// streams forever must not hold a sign-in open. The global fetch stays, since the issuer may well be
-// a private address the outbound client's checks are not written for.
+// Through the outbound client: userinfo comes out of a remote document and carries the user's
+// access token, so it must not reach a metadata address. Private issuers stay allowed.
 const DISCOVERY_TIMEOUT_MS = 10_000;
 const MAX_DOCUMENT_BYTES = 256 * 1024;
-
-/** The body, with a declared length capped: a discovery document or userinfo is a few kilobytes. */
-async function readJsonDocument(response: Response): Promise<unknown> {
-  const declared = Number(response.headers?.get?.("content-length") ?? 0);
-  if (declared > MAX_DOCUMENT_BYTES) throw new Error("response too large");
-  return response.json() as Promise<unknown>;
-}
+const DOCUMENT_LIMITS = { timeoutMs: DISCOVERY_TIMEOUT_MS, maxResponseBytes: MAX_DOCUMENT_BYTES };
 
 function pointsAtMetadataHost(url: string): boolean {
   try {
@@ -80,12 +81,12 @@ async function discover(issuer: string): Promise<DiscoveredEndpoints> {
   const endpoints: DiscoveredEndpoints = { userinfoUrl: null, jwksUri: null };
   try {
     // outbound: oidcProvider
-    const response = await fetch(discoveryUrl, {
+    const response = await fetcher(discoveryUrl, {
       headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS),
+      ...DOCUMENT_LIMITS,
     });
     if (response.ok) {
-      const doc = (await readJsonDocument(response)) as Record<string, unknown>;
+      const doc = (await response.json()) as Record<string, unknown>;
       const userinfo = doc.userinfo_endpoint;
       if (typeof userinfo === "string" && userinfo) endpoints.userinfoUrl = userinfo;
       // The JWKS is fetched by jose, outside the guarded client, so the one check that matters
@@ -125,15 +126,15 @@ async function fetchUserinfoClaims(
   if (!url) return null;
   try {
     // outbound: oidcProvider
-    const response = await fetch(url, {
+    const response = await fetcher(url, {
       headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
-      signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS),
+      ...DOCUMENT_LIMITS,
     });
     if (!response.ok) {
       console.warn(`[oidc-claims] userinfo request failed with status ${response.status}`);
       return null;
     }
-    const body: unknown = await readJsonDocument(response);
+    const body: unknown = await response.json();
     if (!body || typeof body !== "object" || Array.isArray(body)) return null;
     return body as Record<string, unknown>;
   } catch (error) {

@@ -5,7 +5,8 @@
  * a default.
  */
 
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
+import { constantTimeEqual } from "../security/constant-time";
 import { derivePurposeKey } from "../secrets/derived-key";
 
 /** Path the probe asks for. Public, and already exempt from authentication in `proxy.ts`. */
@@ -32,8 +33,5 @@ export function createProbeNonce(): string {
 
 /** Constant-time, so a wrong answer cannot be walked towards a right one. */
 export function probeSignatureMatches(nonce: string, answer: string): boolean {
-  const expected = Buffer.from(signProbe(nonce), "utf8");
-  const received = Buffer.from(answer, "utf8");
-  if (expected.length !== received.length) return false;
-  return timingSafeEqual(expected, received);
+  return constantTimeEqual(signProbe(nonce), answer);
 }

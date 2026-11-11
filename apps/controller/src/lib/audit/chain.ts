@@ -11,7 +11,8 @@
  * runInTransaction's synchronous callback, so nothing interleaves. Events are ordered by `seq`,
  * never by id, which a sequence hands out before commit.
  */
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac } from "node:crypto";
+import { constantTimeEqual } from "../security/constant-time";
 import { and, asc, desc, eq, gt, isNotNull, isNull, lt, lte } from "drizzle-orm";
 import { config } from "../config";
 import db, { nowIso, runInTransaction } from "../db";
@@ -35,11 +36,7 @@ function mac(key: Buffer, ...parts: string[]): string {
 }
 
 function same(stored: string | null, expected: string): boolean {
-  return (
-    stored !== null &&
-    stored.length === expected.length &&
-    timingSafeEqual(Buffer.from(stored), Buffer.from(expected))
-  );
+  return stored !== null && constantTimeEqual(stored, expected);
 }
 
 /** What the chain covers: everything a reader sees except the user's display name. */

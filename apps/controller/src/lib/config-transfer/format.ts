@@ -4,14 +4,8 @@
  * An HMAC over the whole file, under a subkey of the same passphrase, makes the rest tamper-evident:
  * a file edited without the passphrase is refused before anything in it is planned.
  */
-import {
-  createCipheriv,
-  createDecipheriv,
-  createHmac,
-  hkdfSync,
-  randomBytes,
-  timingSafeEqual,
-} from "node:crypto";
+import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes } from "node:crypto";
+import { constantTimeEqual } from "../security/constant-time";
 import { MIN_PASSPHRASE_LENGTH, SCRYPT, deriveKey } from "../backup/format";
 import { MARKER } from "../backup/secrets";
 import { domainError } from "../errors/domain-error";
@@ -311,7 +305,7 @@ export async function openConfigFile(bytes: Buffer, passphrase: string): Promise
   const { mac, ...body } = file;
   const expected = Buffer.from(macOf(keys.mac, body), "base64");
   const given = Buffer.from(mac, "base64");
-  if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
+  if (!constantTimeEqual(given, expected)) {
     throw domainError("configFileTampered", {}, { status: 400 });
   }
 

@@ -3,7 +3,8 @@
  * found only after everything else is entered. The stage is derived from what exists, so it
  * resumes and survives the back button; only completion is stored, being otherwise invisible.
  */
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
+import { constantTimeEqual } from "./security/constant-time";
 import { and, eq, lt } from "drizzle-orm";
 import db, { nowIso } from "./db";
 import { accounts, settings, users } from "./db/schema";
@@ -134,7 +135,7 @@ async function matchRestartToken(token: string | null): Promise<{ value: string 
 
   const presented = Buffer.from(hashRestartToken(token), "hex");
   const expected = Buffer.from(stored.hash, "hex");
-  if (presented.length !== expected.length || !timingSafeEqual(presented, expected)) return null;
+  if (!constantTimeEqual(presented, expected)) return null;
   return row;
 }
 

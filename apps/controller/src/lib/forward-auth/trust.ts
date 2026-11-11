@@ -1,4 +1,5 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac } from "node:crypto";
+import { constantTimeEqual } from "../security/constant-time";
 import { config } from "../config";
 import { derivePurposeKey } from "../secrets/derived-key";
 import { type ForwardAuthAudience, resolveForwardAuthAudience } from "../models/forward-auth";
@@ -37,9 +38,7 @@ export function getForwardAuthProxyProof(): string {
 }
 
 function hexEqual(a: string, b: string): boolean {
-  const left = Buffer.from(a, "hex");
-  const right = Buffer.from(b, "hex");
-  return left.length === right.length && timingSafeEqual(left, right);
+  return constantTimeEqual(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
 }
 
 let warnedLegacyProof = false;

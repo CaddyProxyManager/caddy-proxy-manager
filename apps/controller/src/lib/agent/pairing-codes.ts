@@ -4,7 +4,8 @@
  * the TTL retires one, as a restart once did.
  */
 
-import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
+import { randomInt } from "node:crypto";
+import { constantTimeEqual } from "../security/constant-time";
 import { PAIRING_CODE_ALPHABET, PAIRING_CODE_LENGTH, PAIRING_CODE_TTL_MS } from "@cpm/shared";
 import { and, eq, like, lte, or, sql } from "drizzle-orm";
 import { resetSharedWindows, sharedWindowSpent, takeFromSharedWindow } from "../auth/rate-limit";
@@ -30,12 +31,6 @@ const LIVE_SLOT = "code";
 const REPAIR_PREFIX = "repair:";
 /** Keyed by the agentId it may re-pair. */
 const repairSlot = (agentId: string) => `${REPAIR_PREFIX}${agentId}`;
-
-function secureEquals(a: string, b: string): boolean {
-  const left = createHmac("sha256", "compare").update(Buffer.from(a, "utf8")).digest();
-  const right = createHmac("sha256", "compare").update(Buffer.from(b, "utf8")).digest();
-  return timingSafeEqual(left, right);
-}
 
 function mintCode(): string {
   return Array.from(
@@ -132,7 +127,7 @@ async function redeem(
     return EXPIRED;
   }
 
-  if (!secureEquals(live.code, submitted.trim().toUpperCase())) {
+  if (!constantTimeEqual(live.code, submitted.trim().toUpperCase())) {
     const [counted] = await db
       .update(table)
       .set({ failures: sql`${table.failures} + 1` })
