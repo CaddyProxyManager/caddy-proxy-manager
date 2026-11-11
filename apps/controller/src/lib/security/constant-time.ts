@@ -1,12 +1,12 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 
 /**
- * The one comparison for secrets and signatures. Both sides are hashed to a fixed width first:
- * `timingSafeEqual` throws on a length mismatch, which would leak the length and, for strings
- * whose UTF-8 width differs from their `.length`, crash the caller.
+ * The one comparison for secrets and signatures. Every caller's expected value has a fixed,
+ * public length, so a length mismatch may return early; it is checked in bytes, since
+ * `timingSafeEqual` throws when a string's UTF-8 width differs from its `.length`.
  */
 export function constantTimeEqual(a: string | Uint8Array, b: string | Uint8Array): boolean {
-  const left = createHmac("sha256", "compare").update(a).digest();
-  const right = createHmac("sha256", "compare").update(b).digest();
-  return timingSafeEqual(left, right);
+  const left = typeof a === "string" ? Buffer.from(a, "utf8") : a;
+  const right = typeof b === "string" ? Buffer.from(b, "utf8") : b;
+  return left.byteLength === right.byteLength && timingSafeEqual(left, right);
 }
