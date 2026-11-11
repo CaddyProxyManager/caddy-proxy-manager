@@ -5,7 +5,7 @@
 
 import db, { nowIso } from "../db";
 import { settings, settingsStaged } from "../db/schema";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { getSetting } from "./index";
 import { withStagedReads } from "./staging-context";
 
@@ -35,29 +35,32 @@ export async function stagedOverlay(userId: number): Promise<Map<string, string>
   return new Map(entries.map((entry) => [entry.key, entry.value]));
 }
 
-export async function countStagedSettings(userId: number): Promise<number> {
-  return (await listStagedSettings(userId)).length;
-}
-
 /** A write matching the stored value is *unstaged*, so an edit put back leaves nothing pending. */
 export async function stageWrites(userId: number, writes: Map<string, string>): Promise<void> {
   if (writes.size === 0) return;
   const now = nowIso();
   const stored = await storedValues([...writes.keys()]);
 
+  const unstaged: string[] = [];
+  const staged: (typeof settingsStaged.$inferInsert)[] = [];
   for (const [key, value] of writes) {
     // A clear of a key that is not stored changes nothing either.
-    if (stored.get(key) === value || (value === "null" && !stored.has(key))) {
-      await discardStagedKey(userId, key);
-      continue;
-    }
+    if (stored.get(key) === value || (value === "null" && !stored.has(key))) unstaged.push(key);
+    else staged.push({ key, userId, value, stagedAt: now });
+  }
 
+  if (unstaged.length > 0) {
+    await db
+      .delete(settingsStaged)
+      .where(and(eq(settingsStaged.userId, userId), inArray(settingsStaged.key, unstaged)));
+  }
+  if (staged.length > 0) {
     await db
       .insert(settingsStaged)
-      .values({ key, userId, value, stagedAt: now })
+      .values(staged)
       .onConflictDoUpdate({
         target: [settingsStaged.userId, settingsStaged.key],
-        set: { value, stagedAt: now },
+        set: { value: sql`excluded.value`, stagedAt: now },
       });
   }
 }

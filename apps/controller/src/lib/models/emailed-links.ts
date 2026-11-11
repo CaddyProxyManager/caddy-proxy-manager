@@ -5,7 +5,7 @@
  */
 
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, gt, like, lt } from "drizzle-orm";
+import { and, eq, gt, inArray, like, lt } from "drizzle-orm";
 import db, { nowIso } from "../db";
 import { verifications } from "../db/schema";
 
@@ -99,9 +99,6 @@ export async function revokeEmailedLinks(userId: number): Promise<void> {
     .select({ id: verifications.id, value: verifications.value })
     .from(verifications)
     .where(like(verifications.identifier, `${PREFIX}%`));
-  for (const row of rows) {
-    if (parseValue(row.value)?.userId === userId) {
-      await db.delete(verifications).where(eq(verifications.id, row.id));
-    }
-  }
+  const ids = rows.filter((row) => parseValue(row.value)?.userId === userId).map((row) => row.id);
+  if (ids.length > 0) await db.delete(verifications).where(inArray(verifications.id, ids));
 }
