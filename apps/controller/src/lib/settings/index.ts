@@ -397,8 +397,6 @@ export async function saveTrustedProxiesSettings(settings: TrustedProxiesSetting
 /** HTTP/1.1 is always on. Caddy sets protocols per listener, so this is global, not per host. */
 export type HttpProtocolsSettings = { http2: boolean; http3: boolean };
 
-export const DEFAULT_HTTP_PROTOCOLS: HttpProtocolsSettings = { http2: true, http3: true };
-
 export function normalizeHttpProtocols(value: unknown): HttpProtocolsSettings {
   const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   return { http2: raw.http2 !== false, http3: raw.http3 !== false };

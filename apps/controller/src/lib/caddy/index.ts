@@ -4102,11 +4102,6 @@ async function noteAppliedConfig(agentId?: string): Promise<void> {
   else appliedConfigHashes.delete(key);
 }
 
-/** Test seam: forget every recorded fingerprint. */
-export function resetAppliedConfigHashes(): void {
-  appliedConfigHashes.clear();
-}
-
 /**
  * Build and load a document per agent: each serves its pinned hosts and its binary's modules.
  * A rejection anywhere fails the whole apply and names the host - a partial apply is a state

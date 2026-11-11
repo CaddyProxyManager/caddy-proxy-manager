@@ -207,10 +207,6 @@ export type PathRewriteRule = {
   to: string; // internal target URI, e.g. "/dns-query"
 };
 
-// Suggested status codes for the error-page UI. The sanitizer accepts any 4xx/5xx code; this
-// list only drives the picker.
-export const ERROR_PAGE_STATUS_CODES = [400, 401, 403, 404, 408, 429, 500, 502, 503, 504] as const;
-
 export type ErrorPageRule = {
   statuses: number[]; // error codes this rule handles, e.g. [502, 503, 504]; empty = all errors
   body: string; // response body (HTML/text); the original status code is preserved

@@ -10,7 +10,6 @@ import {
   decideItem,
   deleteCampaign,
   reassignItems,
-  updateCampaign,
 } from "@/src/lib/access-reviews";
 import { closeCampaign, confirmCampaign } from "@/src/lib/access-reviews/apply";
 import { requireUser } from "@/src/lib/auth";
@@ -30,16 +29,6 @@ export async function createAccessReviewAction(
     const campaign = await createCampaign(input, await actor());
     revalidatePath(PAGE);
     return campaign.id;
-  });
-}
-
-export async function updateAccessReviewAction(
-  id: number,
-  input: { name?: string; dueOn?: string },
-): Promise<ActionResult> {
-  return runAction(async () => {
-    await updateCampaign(id, input, await actor());
-    revalidatePath(PAGE);
   });
 }
 
