@@ -37,7 +37,7 @@ require (
 	github.com/caddy-dns/ovh v1.1.0
 	github.com/caddy-dns/porkbun v0.3.1
 	github.com/caddy-dns/rfc2136 v1.0.0
-	github.com/caddy-dns/route53 v1.6.2
+	github.com/caddy-dns/route53 v1.6.3
 	github.com/caddy-dns/spaceship v1.0.0
 	github.com/caddy-dns/vultr v0.0.0-20250723121531-55bf3e9768be
 	github.com/caddyserver/cache-handler v0.17.0
@@ -51,7 +51,7 @@ require (
 	github.com/fuomag9/caddy-blocker-plugin v0.0.0-20261108162404-6723383546a3
 	github.com/hslatman/caddy-crowdsec-bouncer v0.15.0
 	github.com/mholt/caddy-dynamicdns v0.0.0-20260805195708-67d107a42c02
-	github.com/mholt/caddy-l4 v0.1.2
+	github.com/mholt/caddy-l4 v0.1.3
 	github.com/mholt/caddy-ratelimit v0.1.1-0.20260612195517-5625512f24f6
 	github.com/tailscale/caddy-tailscale v0.0.0-20260826180304-de41b249af4f
 )
@@ -74,21 +74,21 @@ require (
 	github.com/alexbrainman/sspi v0.0.0-20250919150558-7d374ff0d59e // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/aryann/difflib v0.0.0-20210328193216-ff5ff6dc229b // indirect
-	github.com/aws/aws-sdk-go-v2 v1.47.0 // indirect
-	github.com/aws/aws-sdk-go-v2/config v1.33.4 // indirect
-	github.com/aws/aws-sdk-go-v2/credentials v1.20.4 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.20.0 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.3 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.3 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.19 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/route53 v1.58.5 // indirect
-	github.com/aws/aws-sdk-go-v2/service/signin v1.10.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.38.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.43.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.50.0 // indirect
-	github.com/aws/smithy-go v1.28.2 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.48.0 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.33.18 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.21.0 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.20.9 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.12 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.12 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.12 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.25 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.12 // indirect
+	github.com/aws/aws-sdk-go-v2/service/route53 v1.70.10 // indirect
+	github.com/aws/aws-sdk-go-v2/service/signin v1.13.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.39.5 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.44.5 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.52.0 // indirect
+	github.com/aws/smithy-go v1.28.9 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.25.0 // indirect
 	github.com/boombuler/barcode v1.0.2 // indirect
@@ -224,7 +224,7 @@ require (
 	github.com/libdns/ovh v1.1.0 // indirect
 	github.com/libdns/porkbun v1.0.1 // indirect
 	github.com/libdns/rfc2136 v1.0.0 // indirect
-	github.com/libdns/route53 v1.6.2 // indirect
+	github.com/libdns/route53 v1.6.3 // indirect
 	github.com/libdns/spaceship v1.0.0 // indirect
 	github.com/libdns/vultr/v2 v2.0.4 // indirect
 	github.com/linode/linodego v1.56.0 // indirect
@@ -251,7 +251,7 @@ require (
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/petar-dambovaliev/aho-corasick v0.0.0-20250424160509-463d218d4745 // indirect
 	github.com/pierrec/lz4/v4 v4.1.29 // indirect
-	github.com/pires/go-proxyproto v0.15.0 // indirect
+	github.com/pires/go-proxyproto v0.16.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/power-devops/perfstat v0.0.0-20260805114148-88456608a4f6 // indirect
 	github.com/pquerna/cachecontrol v0.2.0 // indirect
@@ -262,7 +262,7 @@ require (
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
 	github.com/prometheus/procfs v0.22.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
-	github.com/quic-go/quic-go v0.63.0 // indirect
+	github.com/quic-go/quic-go v0.64.1 // indirect
 	github.com/redis/rueidis v1.0.73 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
@@ -289,7 +289,7 @@ require (
 	github.com/tailscale/tscert v0.0.0-20251216020129-aea342f6d747 // indirect
 	github.com/tailscale/web-client-prebuilt v0.0.0-20260917222731-e0ed2d0d0fea // indirect
 	github.com/tailscale/wireguard-go v0.0.0-20260715223240-2e01ba5b00f0 // indirect
-	github.com/things-go/go-socks5 v0.1.3 // indirect
+	github.com/things-go/go-socks5 v0.1.4 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.2.0 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
@@ -297,6 +297,7 @@ require (
 	github.com/tklauser/numcpus v0.12.0 // indirect
 	github.com/urfave/cli v1.22.17 // indirect
 	github.com/valllabh/ocsf-schema-golang v1.0.3 // indirect
+	github.com/vnxme/hybrid v0.1.1 // indirect
 	github.com/vultr/govultr/v3 v3.21.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
@@ -341,7 +342,7 @@ require (
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20261030153154-30a33513ff6d // indirect
 	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
-	golang.org/x/net v0.61.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
