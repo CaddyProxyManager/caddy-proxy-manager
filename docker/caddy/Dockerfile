@@ -3,7 +3,7 @@
 # On BUILDPLATFORM, cross-compiling, to avoid QEMU for arm64. The -builder image ships xcaddy and a
 # pinned Go toolchain, so cold builds skip compiling xcaddy. This tag pins only those; go.mod pins
 # Caddy and the plugins, and the two may drift.
-FROM --platform=$BUILDPLATFORM caddy:2.11.9-builder@sha256:345264d8c6b50f44f4a4d507d4e6b6bcae40eef2f210d70f76e717fd8cc31baf AS builder
+FROM --platform=$BUILDPLATFORM caddy:2.11.9-builder@sha256:f9beaa5ddbe7df6f26ebbcf9cbf44e05a1917b9bba464f0c3229038d7e2e6e13 AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
