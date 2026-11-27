@@ -52,7 +52,7 @@ if mail_wait "$MAILBOX" "$to" "test message"; then
   pass "it arrives at the server that requires STARTTLS"
   t_eq "from the configured address" "$FROM" "$(printf '%s' "$MAIL_JSON" | jq -r '.From.Address')"
   t_eq "under the app's name" "CPM Docker Test" "$(printf '%s' "$MAIL_JSON" | jq -r '.From.Name')"
-  t_contains "naming the server it went through" "mailpit" "$(printf '%s' "$MAIL_JSON" | jq -r '.Text')"
+  t_not_contains "without naming the server it went through" "mailpit" "$(printf '%s' "$MAIL_JSON" | jq -r '.Text')"
 else
   fail "it arrives at the server that requires STARTTLS" "nothing for $to in $MAILBOX"
 fi

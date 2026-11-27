@@ -228,11 +228,13 @@ trap cleanup_tracked EXIT
 
 # create_resource COLLECTION JSON - sets NEW_ID and tracks it; non-zero on failure.
 # Does not echo the id: a $(...) subshell would lose the `track` on the caller's cleanup stack.
+# A host's REST path takes its uuid, so NEW_ID is that; bulk and GraphQL want NEW_SERIAL.
 NEW_ID=
+NEW_SERIAL=
 
 create_resource() {
   local collection="$1" body="$2"
-  NEW_ID=
+  NEW_ID=; NEW_SERIAL=
   api POST "/api/v1/$collection" "$body"
   case "$API_STATUS" in
     200|201) ;;
@@ -245,16 +247,23 @@ create_resource() {
         local orphan
         while read -r orphan; do
           [ -n "$orphan" ] && track "$collection/$orphan"
-        done < <(printf '%s' "$API_BODY" | jq -r --arg n "$name" '.[]? | select(.name == $n) | .id' 2>/dev/null)
+        done < <(printf '%s' "$API_BODY" | jq -r --arg n "$name" '.[]? | select(.name == $n) | .uuid // .id' 2>/dev/null)
       fi
       API_STATUS="$status_backup"; API_BODY="$body_backup"
       return 1 ;;
   esac
-  local id; id=$(jqr '.id')
+  local id; id=$(jqr '.uuid // .id')
   [ -n "$id" ] && [ "$id" != "null" ] || return 1
   NEW_ID="$id"
+  NEW_SERIAL=$(jqr '.id')
   track "$collection/$id"
   return 0
+}
+
+# host_uuid SERIAL [COLLECTION] - the uuid REST addresses a host by, from its serial id.
+host_uuid() {
+  api GET "/api/v1/${2:-proxy-hosts}"
+  jqr '.[]? | select(.id == ($i | tonumber)) | .uuid' --arg i "$1"
 }
 
 create_host() { create_resource proxy-hosts "$1"; }

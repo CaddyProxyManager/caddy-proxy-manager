@@ -55,7 +55,7 @@ wild="*.wild.$ZONE"
 api POST /api/v1/proxy-hosts "$(jq -nc --arg d "$wild" \
   '{name:"docker-test rfc2136 refused", domains:[$d], upstreams:["origin-a:8080"]}')"
 t_eq "a wildcard host with no provider for it is refused" "400" "$API_STATUS"
-[ "$API_STATUS" = "201" ] && track "proxy-hosts/$(jqr '.id')"
+[ "$API_STATUS" = "201" ] && track "proxy-hosts/$(jqr '.uuid')"
 
 if create_resource certificates "$(jq -nc --arg w "$wild" --arg a "wild.$ZONE" '{
      name: "docker-test rfc2136 wildcard", type: "managed", domainNames: [$a, $w],

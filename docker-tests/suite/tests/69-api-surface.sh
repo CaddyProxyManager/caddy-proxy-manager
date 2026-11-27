@@ -50,12 +50,12 @@ t_eq "a preset a host uses cannot be deleted" "409" "$API_STATUS"
 
 a=$(domain_for "bulk-a") b=$(domain_for "bulk-b")
 create_host_or_fail "a first bulk host" "$(jq -nc --arg d "$a" '{name:"docker-test bulk a", domains:[$d], upstreams:["origin-a:8080"]}')"
-bulk_a=$NEW_ID
+bulk_a=$NEW_ID bulk_a_serial=$NEW_SERIAL
 create_host_or_fail "a second bulk host" "$(jq -nc --arg d "$b" '{name:"docker-test bulk b", domains:[$d], upstreams:["origin-b:8080"]}')"
-bulk_b=$NEW_ID
+bulk_b_serial=$NEW_SERIAL
 wait_for_https "$a" 120 && wait_for_https "$b" 120
 
-bulk() { api POST /api/v1/proxy-hosts/bulk "$(jq -nc --arg a "$1" --argjson i "[$bulk_a,$bulk_b]" '{action:$a, ids:$i}' | jq -c ". + ${2:-{\}}")"; }
+bulk() { api POST /api/v1/proxy-hosts/bulk "$(jq -nc --arg a "$1" --argjson i "[$bulk_a_serial,$bulk_b_serial]" '{action:$a, ids:$i}' | jq -c ". + ${2:-{\}}")"; }
 both_are() { [ "$(http_code "https://$a/")" = "$1" ] && [ "$(http_code "https://$b/")" = "$1" ]; }
 
 bulk maintenanceOn
@@ -85,7 +85,7 @@ wait_for "both to serve" 30 both_are 200 && pass "and enabled again" || fail "an
 
 api POST /api/v1/proxy-hosts/bulk '{"action":"disable","ids":[]}'
 t_eq "an empty batch is refused" "400" "$API_STATUS"
-api POST /api/v1/proxy-hosts/bulk "$(jq -nc --argjson i "[$bulk_a]" '{action:"explode", ids:$i}')"
+api POST /api/v1/proxy-hosts/bulk "$(jq -nc --argjson i "[$bulk_a_serial]" '{action:"explode", ids:$i}')"
 t_eq "an unknown action is refused" "400" "$API_STATUS"
 
 # ── An access list's IP rules ───────────────────────────────────────────────

@@ -38,7 +38,7 @@ tls_policy() {
 }
 
 check_status() {  # check_status DOMAIN - from the last checkDnsDelegationsAction result
-  printf '%s' "$ACTION_RESULT" | jq -r --arg d "$1" 'first(.[] | select(.domain == $d)) | .status'
+  printf '%s' "$ACTION_RESULT" | jq -r --arg d "$1" 'first(.data[] | select(.domain == $d)) | .status'
 }
 
 # The challenge's resolvers come from the global DNS settings; point them at the rig's.
@@ -146,7 +146,7 @@ server_action "$SETTINGS_PAGE" checkDnsDelegationsAction
 t_eq "the check reports ok once the CNAME exists" "ok" "$(check_status "$act_domain")"
 t_eq "having found the account's name" "$act_target" \
   "$(printf '%s' "$ACTION_RESULT" | jq -r --arg d "$act_domain" \
-    'first(.[] | select(.domain == $d)) | .found[0] | rtrimstr(".")')"
+    'first(.data[] | select(.domain == $d)) | .found[0] | rtrimstr(".")')"
 
 # ── A name and its wildcard on the registered account ───────────────────────
 #

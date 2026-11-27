@@ -48,7 +48,7 @@ probe_id=$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')
 t_eq "a code that was never issued is refused" "401" "$(preview "$probe_id" ABCDEF)"
 
 server_action "$AGENT_PAGE" pairingCodeAction
-code=$(printf '%s' "$ACTION_RESULT" | jq -r '.code')
+code=$(printf '%s' "$ACTION_RESULT" | jq -r '.data.code')
 t_matches "an admin can issue a six-letter code" '^[A-HJ-NP-Z]{6}$' "$code"
 
 t_eq "the preview names the controller for a valid code" "200" "$(preview "$probe_id" "$code")"
@@ -84,7 +84,7 @@ shared=$(domain_for "fleet-shared")
 create_host_or_fail "a host for every agent can be created" "$(jq -nc --arg d "$shared" \
   '{name:"docker-test fleet shared", domains:[$d], upstreams:["origin-a:8080"], sslForced:false}')" \
   && pass "a host for every agent can be created"
-shared_id=$NEW_ID
+shared_serial=$NEW_SERIAL
 both() { [ "$(via_caddy1 "$shared")" = "200" ] && [ "$(via_caddy2 "$shared")" = "200" ]; }
 if wait_for "both Caddies to serve it" 60 both; then
   pass "it is served by both agents' Caddies"
@@ -114,7 +114,7 @@ wait_for "the host to move to the first agent" 60 moved && pass "re-pinning move
 docker stop "$CADDY2" >/dev/null 2>&1
 wait_for "the second Caddy to stop" 30 stopped "$CADDY2"
 # The agent waits out its own timeout on a Caddy that is gone, so give the action longer.
-SERVER_ACTION_TIMEOUT=240 server_action /proxy-hosts toggleProxyHostAction --args "[$shared_id, false]"
+SERVER_ACTION_TIMEOUT=240 server_action /proxy-hosts toggleProxyHostAction --args "[$shared_serial, false]"
 t_contains "an apply that cannot reach a Caddy names its agent" "$agent2_name" "$ACTION_RESULT"
 API_MAX_TIME=240 api POST /api/v1/caddy/apply
 t_eq "and fails over REST too as a 503" "503" "$API_STATUS"

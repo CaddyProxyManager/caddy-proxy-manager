@@ -29,7 +29,7 @@ gql 'mutation($in: JSON!) { createProxyHost(input: $in) { id name domains enable
 host_id=$(gqr '.data.createProxyHost.id')
 if [ -n "$host_id" ] && [ "$host_id" != "null" ]; then
   pass "a proxy host can be created through GraphQL"
-  track "proxy-hosts/$host_id"
+  track "proxy-hosts/$(host_uuid "$host_id")"
 else
   fail "a proxy host can be created through GraphQL" "HTTP $GQL_STATUS: $(printf '%.300s' "$GQL_BODY")"
   finish

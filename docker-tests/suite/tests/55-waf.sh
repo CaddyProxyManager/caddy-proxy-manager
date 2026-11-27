@@ -116,8 +116,11 @@ fi
 # ── Directive allowlist ─────────────────────────────────────────────────────
 #
 # Directives that could switch the engine off or read container files are
-# refused at save, naming the lines, rather than quietly dropped.
+# refused at save, naming the lines, rather than quietly dropped. Only with
+# strict_directives: by default they are sent with a warning.
 
+api PUT /api/v1/settings/waf "$(jq -c '. + {strict_directives: true}' <<<"$empty_waf")"
+t_eq "strict directives can be switched on" "200" "$API_STATUS"
 smuggle=$(domain_for "waf-smuggle")
 api_expect "a host with hostile directives is refused" 400 POST /api/v1/proxy-hosts "$(jq -nc --arg d "$smuggle" \
   --arg rules "$BLOCK_RULE"$'\n'"SecRuleEngine Off"$'\n'"Include /etc/passwd" '{
@@ -128,6 +131,7 @@ api_expect "a host with hostile directives is refused" 400 POST /api/v1/proxy-ho
 }')"
 t_contains "the refusal names the engine directive" "SecRuleEngine Off" "$API_BODY"
 t_contains "the refusal names the Include" "Include /etc/passwd" "$API_BODY"
+restore_global
 
 # ── WebSockets through the WAF ──────────────────────────────────────────────
 #
