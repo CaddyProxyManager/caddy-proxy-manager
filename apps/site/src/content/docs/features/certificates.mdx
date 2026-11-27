@@ -47,6 +47,16 @@ Each host's menu has three tools:
 For an internal CA, set the ACME directory URL under **Settings → General → ACME server** and
 supply its root so Caddy trusts it.
 
+### IP addresses
+
+A host can answer for an IP address, such as `203.0.113.10` or `2001:db8::10`, alongside or instead
+of domains. A private, loopback or other non-public address gets its certificate from Caddy's own
+local CA, which browsers warn about until its root is trusted. A public one is requested from
+Let's Encrypt on its short-lived profile over HTTP-01, with the local CA as the fallback; DNS-01
+never applies to an address. Browsers send no server name for an IP address, so one IP host is
+picked to answer such connections. HTTPS by IP fails with 421 while any host uses mutual TLS,
+because Caddy then requires the server name to match the requested host.
+
 ## DNS-01
 
 HTTP-01 needs port 80 reachable from the internet. DNS-01 does not, which is what makes wildcard

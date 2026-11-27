@@ -20,7 +20,8 @@ import UpstreamHealthDemo from "../../../demos/samples/UpstreamHealthDemo";
 import ProxyHostDetailDemo from "../../../demos/samples/ProxyHostDetailDemo";
 
 A proxy host maps one or more domains onto one or more upstreams. It is what CPM is mostly for, and
-most other features attach to it.
+most other features attach to it. A domain can also be an IP address, for requests made to the
+server by address; see [certificates](../certificates/#ip-addresses) for how those get HTTPS.
 
 Every host, HTTP or L4, can carry **notes**: free text for whatever the next person needs to know,
 up to 2000 characters. They show as an icon beside the host's name in the list, with the text on

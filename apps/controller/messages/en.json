@@ -3150,7 +3150,7 @@
     "dnsResolvers": "DNS resolvers",
     "dnsResolversDescription": "Configure per-host DNS resolution for upstream discovery and health checks",
     "dnsResolversHelp": "One resolver per line (e.g., 1.1.1.1, 9.9.9.9). Used for dynamic upstream DNS resolution.",
-    "domainsHelp": "One per line or comma-separated. Wildcards like *.example.com are supported.",
+    "domainsHelp": "One per line or comma-separated. Wildcards like *.example.com and IP addresses like 203.0.113.10 are supported.",
     "editAccessRule": "Edit access rule",
     "editProxyHost": "Edit proxy host",
     "enableAuthentikForwardAuth": "Enable Authentik forward auth",

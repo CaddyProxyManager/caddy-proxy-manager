@@ -5,6 +5,7 @@ import { CADDY_DIGEST_HEADER } from "@cpm/shared";
 import { buildDashboardHostRow, DASHBOARD_HOST_ID } from "../dashboard-host";
 import { join, dirname } from "node:path";
 import { isIP } from "node:net";
+import { buildIpAutomationPolicies, isIpSubject, noSniPolicyForIpHosts } from "./ip-subjects";
 import { isConnectionError } from "../errors/net-errors";
 import {
   type DnsResolverRouteConfig,
@@ -2686,8 +2687,11 @@ function buildTlsConnectionPolicies(context: TlsConnectionPolicyContext) {
     }
   }
 
+  const sorted = sortTlsPoliciesBySniPriority(policies);
+  // Last: a client that sent no SNI matches nothing above it anyway.
+  const noSni = noSniPolicyForIpHosts(sorted);
   return {
-    policies: sortTlsPoliciesBySniPriority(policies),
+    policies: noSni ? [...sorted, noSni] : sorted,
     readyCertificates,
     importedCertPems,
   };
@@ -2840,6 +2844,27 @@ export async function buildTlsAutomation(
   };
   const warnings = new Set<string>();
 
+  const acmeIssuer = ({ ipProfile = false } = {}) => {
+    const issuer: Record<string, unknown> = { module: "acme" };
+    applyAcmeOverrides(issuer);
+    if (options.acmeEmail) {
+      issuer.email = options.acmeEmail;
+    }
+    if (ipProfile) {
+      issuer.profile = "shortlived";
+    }
+    return issuer;
+  };
+
+  /** IP subjects get their own policies and never a DNS challenge; see `ip-subjects.ts`. */
+  const takeIpSubjects = (subjects: string[]): string[] => {
+    const ipSubjects = subjects.filter(isIpSubject);
+    if (ipSubjects.length > 0) {
+      policies.push(...buildIpAutomationPolicies(ipSubjects, acmeIssuer, Boolean(customAcmeUrl)));
+    }
+    return subjects.filter((subject) => !isIpSubject(subject));
+  };
+
   /** One policy per delegation partition, since `override_domain` covers a whole policy. */
   const pushAcmePolicies = (subjects: string[], baseProvider: string | null) => {
     const partitions = partitionDnsChallenges(
@@ -2853,11 +2878,7 @@ export async function buildTlsAutomation(
       },
     );
     for (const partition of partitions) {
-      const issuer: Record<string, unknown> = { module: "acme" };
-      applyAcmeOverrides(issuer);
-      if (options.acmeEmail) {
-        issuer.email = options.acmeEmail;
-      }
+      const issuer = acmeIssuer();
       const credentials = partition.provider
         ? dnsProviderSettings?.providers[partition.provider]
         : undefined;
@@ -2879,7 +2900,7 @@ export async function buildTlsAutomation(
   // Add policy for auto-managed domains (certificateId = null)
   if (hasAutoManagedDomains) {
     for (const group of groupHostPatternsByPriority(Array.from(autoManagedDomains))) {
-      const subjects = takeTailscaleSubjects(group);
+      const subjects = takeIpSubjects(takeTailscaleSubjects(group));
       if (subjects.length === 0) continue;
 
       pushAcmePolicies(subjects, globalDnsProvider);
@@ -2902,7 +2923,7 @@ export async function buildTlsAutomation(
     }
 
     for (const group of groupHostPatternsByPriority(subjects)) {
-      const subjectGroup = takeTailscaleSubjects(group);
+      const subjectGroup = takeIpSubjects(takeTailscaleSubjects(group));
       if (subjectGroup.length === 0) continue;
       pushAcmePolicies(subjectGroup, effectiveProvider);
     }
