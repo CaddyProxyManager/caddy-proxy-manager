@@ -49,7 +49,7 @@ require (
 	github.com/darkweak/storages/redis/caddy v0.0.23
 	github.com/darkweak/storages/simplefs/caddy v0.0.23
 	github.com/fuomag9/caddy-blocker-plugin v0.0.0-20261108162404-6723383546a3
-	github.com/hslatman/caddy-crowdsec-bouncer v0.15.0
+	github.com/hslatman/caddy-crowdsec-bouncer v0.15.1
 	github.com/mholt/caddy-dynamicdns v0.0.0-20260805195708-67d107a42c02
 	github.com/mholt/caddy-l4 v0.1.3
 	github.com/mholt/caddy-ratelimit v0.1.1-0.20260612195517-5625512f24f6

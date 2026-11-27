@@ -38,9 +38,10 @@ describe('maplibre worker wiring', () => {
   });
 
   it('builds workers as ES modules, which maplibre requires', () => {
-    // maplibre spawns a module worker, which Vite's iife default would break.
+    // maplibre spawns a module worker, which Vite's iife default would break. The minified
+    // argument name changes between releases.
     const maplibre = readFileSync(require.resolve('maplibre-gl/dist/maplibre-gl.mjs'), 'utf8');
-    expect(maplibre.replace(/`/g, '"')).toContain('new Worker(e,{type:"module"})');
+    expect(maplibre.replace(/`/g, '"')).toMatch(/new Worker\(\w+,\{type:"module"\}\)/);
 
     const viteConfig = readFileSync(join(projectRoot, 'vite.config.ts'), 'utf8');
     expect(viteConfig.replace(/'/g, '"')).toMatch(/worker:\s*\{\s*format:\s*"es"/);
