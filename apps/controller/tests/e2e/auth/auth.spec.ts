@@ -37,7 +37,8 @@ test.describe('Authentication', () => {
 
     await submitUsername(page, `nobody-${Date.now()}`);
     await expect(page.getByRole('textbox', { name: /password/i })).toBeVisible();
-    await expect(page.getByRole('alert').first()).toBeHidden();
+    // The route announcer is an empty alert, visible since vinext 1.4.7.
+    await expect(page.getByRole('alert').filter({ hasText: /\S/ }).first()).toBeHidden();
   });
 
   test('/login with wrong password shows an error message', async ({ page }) => {

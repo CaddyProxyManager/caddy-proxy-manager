@@ -38,8 +38,10 @@ test.describe('Portal login page', () => {
 
     await signInWithCredentials(page, 'wronguser', 'wrongpass');
 
-    // .first(): the route announcer matches too.
-    await expect(page.getByRole('alert').first()).toBeVisible({ timeout: 10_000 });
+    // Non-empty: the route announcer is an alert too, and visible since vinext 1.4.7.
+    await expect(page.getByRole('alert').filter({ hasText: /\S/ }).first()).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   test('username and password fields are required', async ({ page }) => {
