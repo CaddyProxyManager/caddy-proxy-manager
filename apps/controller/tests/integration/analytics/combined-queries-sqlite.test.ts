@@ -56,13 +56,18 @@ describe('combined analytics queries in the SQLite store', () => {
     { from: NOW - 86400, to: NOW },
     { from: NOW - 2 * 86400, to: NOW - 3600 },
   ]) {
-    it(`answers as the separate queries do, ${window.to - window.from}s`, async () => {
-      for (const filters of comparisonFilters(ruleId)) {
-        for (const [name, combined, separate] of await compareCombinedQueries(window, filters)) {
-          expect({ name, value: combined }).toEqual({ name, value: separate });
+    // Hundreds of sequential scans: 2.7s for one day on a CI runner, past 5s for two.
+    it(
+      `answers as the separate queries do, ${window.to - window.from}s`,
+      async () => {
+        for (const filters of comparisonFilters(ruleId)) {
+          for (const [name, combined, separate] of await compareCombinedQueries(window, filters)) {
+            expect({ name, value: combined }).toEqual({ name, value: separate });
+          }
         }
-      }
-    });
+      },
+      { timeout: 30_000 },
+    );
   }
 
   it('gives the report every list the one-list query gives', async () => {
