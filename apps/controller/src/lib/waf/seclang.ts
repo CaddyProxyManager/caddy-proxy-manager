@@ -62,31 +62,36 @@ export function seclangDirectives(raw: string): SeclangDirective[] {
 // ---------------------------------------------------------------------------
 
 /** Looked up case-insensitively (variables.Parse upper-cases). */
-const VARIABLES = new Set(
+export const VARIABLES = new Set(
   "ARGS ARGS_COMBINED_SIZE ARGS_GET ARGS_GET_NAMES ARGS_NAMES ARGS_PATH ARGS_POST ARGS_POST_NAMES AUTH_TYPE DURATION ENV FILES FILES_COMBINED_SIZE FILES_NAMES FILES_SIZES FILES_TMP_CONTENT FILES_TMPNAMES FULL_REQUEST FULL_REQUEST_LENGTH GEO HIGHEST_SEVERITY INBOUND_DATA_ERROR IP JSON MATCHED_VAR MATCHED_VAR_NAME MATCHED_VARS MATCHED_VARS_NAMES MULTIPART_BOUNDARY_QUOTED MULTIPART_BOUNDARY_WHITESPACE MULTIPART_CRLF_LF_LINES MULTIPART_DATA_AFTER MULTIPART_DATA_BEFORE MULTIPART_FILE_LIMIT_EXCEEDED MULTIPART_FILENAME MULTIPART_HEADER_FOLDING MULTIPART_INVALID_HEADER_FOLDING MULTIPART_INVALID_PART MULTIPART_INVALID_QUOTING MULTIPART_LF_LINE MULTIPART_MISSING_SEMICOLON MULTIPART_NAME MULTIPART_PART_HEADERS MULTIPART_STRICT_ERROR MULTIPART_UNMATCHED_BOUNDARY OUTBOUND_DATA_ERROR PATH_INFO QUERY_STRING REMOTE_ADDR REMOTE_HOST REMOTE_PORT REQBODY_ERROR REQBODY_ERROR_MSG REQBODY_PROCESSOR REQBODY_PROCESSOR_ERROR REQBODY_PROCESSOR_ERROR_MSG REQUEST_BASENAME REQUEST_BODY REQUEST_BODY_LENGTH REQUEST_COOKIES REQUEST_COOKIES_NAMES REQUEST_FILENAME REQUEST_HEADERS REQUEST_HEADERS_NAMES REQUEST_LINE REQUEST_METHOD REQUEST_PROTOCOL REQUEST_URI REQUEST_URI_RAW REQUEST_XML RES_BODY_ERROR RES_BODY_ERROR_MSG RES_BODY_PROCESSOR RES_BODY_PROCESSOR_ERROR RES_BODY_PROCESSOR_ERROR_MSG RESPONSE_ARGS RESPONSE_BODY RESPONSE_CONTENT_LENGTH RESPONSE_CONTENT_TYPE RESPONSE_HEADERS RESPONSE_HEADERS_NAMES RESPONSE_PROTOCOL RESPONSE_STATUS RESPONSE_XML RULE SERVER_ADDR SERVER_NAME SERVER_PORT SESSIONID STATUS_LINE TIME TIME_DAY TIME_EPOCH TIME_HOUR TIME_MIN TIME_MON TIME_SEC TIME_WDAY TIME_YEAR TX UNIQUE_ID UNKNOWN URLENCODED_ERROR USERID XML".split(
     " ",
   ),
 );
 
 /** Collections that take a `:key` (RuleVariable.CanBeSelected). */
-const SELECTABLE_VARIABLES = new Set(
+export const SELECTABLE_VARIABLES = new Set(
   "ARGS ARGS_GET ARGS_GET_NAMES ARGS_NAMES ARGS_PATH ARGS_POST ARGS_POST_NAMES ENV FILES FILES_NAMES FILES_SIZES FILES_TMP_CONTENT FILES_TMPNAMES GEO JSON MATCHED_VARS MATCHED_VARS_NAMES MULTIPART_FILENAME MULTIPART_NAME MULTIPART_PART_HEADERS REQUEST_COOKIES REQUEST_COOKIES_NAMES REQUEST_HEADERS REQUEST_HEADERS_NAMES REQUEST_XML RESPONSE_ARGS RESPONSE_HEADERS RESPONSE_HEADERS_NAMES RESPONSE_XML RULE TX XML".split(
     " ",
   ),
 );
 
 /** Case-sensitive: operators.Get is a plain map lookup. */
-const OPERATORS = new Set(
+export const OPERATORS = new Set(
   "beginsWith contains detectSQLi detectXSS endsWith eq ge geoLookup gt inspectFile ipMatch ipMatchF ipMatchFromDataset ipMatchFromFile le lt noMatch pm pmf pmFromDataset pmFromFile rbl restpath rx streq strmatch unconditionalMatch validateByteRange validateNid validateSchema validateUrlEncoding validateUtf8Encoding within".split(
     " ",
   ),
 );
 
-type ActionKind = "disruptive" | "metadata" | "flow" | "data" | "nondisruptive";
-type ActionArgument = "none" | "required" | "optional";
+export type ActionKind = "disruptive" | "metadata" | "flow" | "data" | "nondisruptive";
+export type ActionArgument = "none" | "required" | "optional";
+
+/** A map indexed by user text: with no prototype, `constructor` or `__proto__` is no entry. */
+export function lookupTable<T>(entries: Record<string, T>): Record<string, T> {
+  return Object.assign(Object.create(null), entries);
+}
 
 /** Lower-cased, as actions.Register stores them. */
-const ACTIONS: Record<string, { kind: ActionKind; argument: ActionArgument }> = {
+export const ACTIONS: Record<string, { kind: ActionKind; argument: ActionArgument }> = lookupTable({
   allow: { kind: "disruptive", argument: "optional" },
   auditlog: { kind: "nondisruptive", argument: "none" },
   block: { kind: "disruptive", argument: "none" },
@@ -119,16 +124,16 @@ const ACTIONS: Record<string, { kind: ActionKind; argument: ActionArgument }> = 
   t: { kind: "nondisruptive", argument: "required" },
   tag: { kind: "metadata", argument: "required" },
   ver: { kind: "metadata", argument: "required" },
-};
+});
 
 /** Lower-cased, as transformations.Register stores them. `none` is special-cased by `t` itself. */
-const TRANSFORMATIONS = new Set(
+export const TRANSFORMATIONS = new Set(
   "base64decode base64decodeext base64encode cmdline compresswhitespace cssdecode escapeseqdecode hexdecode hexencode htmlentitydecode jsdecode length lowercase md5 none normalisepath normalisepathwin normalizepath normalizepathwin removecomments removecommentschar removenulls removewhitespace replacecomments replacenulls sha1 uppercase urldecode urldecodeuni urlencode utf8tounicode trim trimleft trimright".split(
     " ",
   ),
 );
 
-const SEVERITIES = new Set([
+export const SEVERITIES = new Set([
   "emergency",
   "alert",
   "critical",
@@ -189,7 +194,8 @@ export type SeclangLintOptions = {
   crsLoaded?: boolean;
 };
 
-type ParsedAction = { key: string; value: string };
+/** `key` lower-cased for lookup; `name` as written, for an editor to show back. */
+type ParsedAction = { key: string; name: string; value: string };
 
 /**
  * Splits an action list the way parseActions does: commas outside single quotes, `\` escaping,
@@ -203,9 +209,9 @@ export function parseActions(actions: string): { actions: ParsedAction[]; unclos
   const push = (end: number) => {
     const hasValue = afterKey !== -1;
     const keyEnd = hasValue ? afterKey : end;
-    const key = goTrimSpace(actions.slice(beforeKey + 1, keyEnd)).toLowerCase();
+    const name = goTrimSpace(actions.slice(beforeKey + 1, keyEnd));
     const value = hasValue ? stripQuotes(goTrimSpace(actions.slice(afterKey + 1, end))) : "";
-    out.push({ key, value });
+    out.push({ key: name.toLowerCase(), name, value });
   };
   // From 1, as Coraza does: a leading character can never close a key.
   for (let i = 1; i < actions.length; i++) {

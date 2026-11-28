@@ -225,6 +225,14 @@ Match a path on `REQUEST_FILENAME`, the decoded path, and refuse `..` in it: the
 `REQUEST_URI` of `/api/../admin` starts with `/api/`, and an upstream that resolves dot-segments
 serves `/admin`. The quick templates do both.
 
+The editor has two modes over the same text. **Text** suggests the next directive, variable,
+operator, action or transformation as you type (Ctrl+Space asks for them) and explains any term
+you hover. **Visual** lists the directives as blocks. Each rule shows its id, what it inspects and
+what it does, and opens into fields for its variables, operator, actions and chained rules, with a
+note on each choice. Drag a block or an action by its handle, or focus the handle and use the arrow
+keys, to change the order Coraza reads them in. A block the editor cannot show as fields stays
+editable as text, and rules you did not touch keep their exact formatting.
+
 Anything that would switch the engine off or rewrite rules - `SecRuleEngine`, `ctl:ruleEngine`,
 `SecRuleRemoveById` and the other `SecRule*` mutations, or `Include` - is refused when you save,
 with the offending lines named, and so are `setenv` and the operators that read the container's

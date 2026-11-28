@@ -246,6 +246,133 @@
     bottom: var(--spacing-3);
   }
 
+  /* CodeEditor's suggestions and hover help: manual popovers, so placed by script, not by the UA. */
+  .cpm-code-assist {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    padding: 0;
+    max-width: min(28rem, calc(100vw - var(--spacing-4)));
+    color: var(--color-text-primary);
+    background: var(--color-background-popover);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-element);
+    box-shadow: var(--shadow-high);
+    overflow: hidden;
+  }
+
+  .cpm-code-assist code {
+    font-family: var(--font-family-code);
+    font-size: var(--font-size-sm);
+  }
+
+  .cpm-code-assist-hover {
+    padding: var(--spacing-2) var(--spacing-3);
+    pointer-events: none;
+  }
+
+  .cpm-code-assist-list {
+    min-width: 16rem;
+    max-height: 14rem;
+    overflow-y: auto;
+    margin: 0;
+    padding: var(--spacing-1);
+    list-style: none;
+  }
+
+  .cpm-code-assist-option {
+    padding: var(--spacing-1) var(--spacing-2);
+    border-radius: var(--radius-element);
+    cursor: pointer;
+  }
+
+  .cpm-code-assist-option:hover {
+    background: var(--color-background-muted);
+  }
+
+  .cpm-code-assist-option[aria-selected="true"] {
+    background: var(--cpm-accent-surface);
+    outline: 1px solid var(--cpm-accent-border);
+    outline-offset: -1px;
+  }
+
+  .cpm-code-assist-detail {
+    padding: var(--spacing-2) var(--spacing-3);
+    border-top: 1px solid var(--color-border);
+  }
+
+  /* SeclangVisualEditor: a block's header row and its expanded fields. */
+  .cpm-seclang-block-row {
+    padding: var(--spacing-2) var(--spacing-3);
+    cursor: pointer;
+  }
+
+  .cpm-seclang-block-row:hover {
+    background: var(--color-background-muted);
+  }
+
+  .cpm-seclang-block-summary {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Visual editor rows: striped for scanning, edged and tinted in their kind's colour. */
+  .cpm-seclang-row {
+    padding: var(--spacing-2) var(--spacing-2) var(--spacing-2) var(--spacing-1);
+    border-left: 3px solid var(--cpm-seclang-kind, var(--color-border));
+    border-radius: var(--radius-element);
+    background: color-mix(in srgb, var(--cpm-seclang-kind, var(--color-border)) 5%, transparent);
+  }
+
+  .cpm-seclang-row:nth-child(even of .cpm-seclang-row) {
+    background: color-mix(in srgb, var(--cpm-seclang-kind, var(--color-border)) 14%, transparent);
+  }
+
+  .cpm-seclang-row[data-color="red"] {
+    --cpm-seclang-kind: var(--color-border-red);
+  }
+
+  .cpm-seclang-row[data-color="purple"] {
+    --cpm-seclang-kind: var(--color-border-purple);
+  }
+
+  .cpm-seclang-row[data-color="blue"] {
+    --cpm-seclang-kind: var(--color-border-blue);
+  }
+
+  .cpm-seclang-row[data-color="teal"] {
+    --cpm-seclang-kind: var(--color-border-teal);
+  }
+
+  .cpm-seclang-row[data-color="green"] {
+    --cpm-seclang-kind: var(--color-border-green);
+  }
+
+  .cpm-seclang-row[data-color="yellow"] {
+    --cpm-seclang-kind: var(--color-border-yellow);
+  }
+
+  .cpm-seclang-row[data-color="cyan"] {
+    --cpm-seclang-kind: var(--color-border-cyan);
+  }
+
+  .cpm-seclang-row[data-color="orange"] {
+    --cpm-seclang-kind: var(--color-border-orange);
+  }
+
+  .cpm-seclang-row[data-color="gray"] {
+    --cpm-seclang-kind: var(--color-border-gray);
+  }
+
+  /* Checkboxes in a row of inputs: one input tall, so they line up with the fields. */
+  .cpm-seclang-checks {
+    min-height: var(--size-element-md);
+  }
+
+  .cpm-seclang-block-body {
+    padding: var(--spacing-2) var(--spacing-3) var(--spacing-4);
+  }
+
   /* Unsaved fields (PageBlocks.tsx). Descendants too: Astryx draws label text in its own element. */
   label[data-unsaved="true"],
   label[data-unsaved="true"] * {

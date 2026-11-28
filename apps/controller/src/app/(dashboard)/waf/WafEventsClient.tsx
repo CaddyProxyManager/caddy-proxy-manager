@@ -26,7 +26,7 @@ import { Field } from "@astryxdesign/core/Field";
 import { TabList, Tab } from "@astryxdesign/core/TabList";
 import { proportional } from "@astryxdesign/core/Table";
 import { Text } from "@astryxdesign/core/Text";
-import { CodeEditor } from "@/components/ui/CodeEditor";
+import { SeclangEditor } from "@/components/seclang/SeclangEditor";
 import { useSeclangIssues } from "@/components/ui/seclang-issues";
 import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
 import { Tooltip } from "@astryxdesign/core/Tooltip";
@@ -1517,9 +1517,8 @@ export default function WafEventsClient({
                 description={t("pluginsGlobalHelp")}
                 isReadOnly={Boolean(wafModuleDisabledReason)}
               />
-              <CodeEditor
+              <SeclangEditor
                 label={tProxyHosts("customSeclangDirectives")}
-                language="seclang"
                 htmlName="wafCustomDirectives"
                 height="sm"
                 value={wafCustomDirectives}

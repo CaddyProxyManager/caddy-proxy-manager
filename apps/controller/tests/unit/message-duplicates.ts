@@ -676,7 +676,12 @@ export const SEPARATE_DUPLICATES: readonly {
   { reason: 'composed', keys: ['settings.health.metrics.name', 'settings.stagedLabels.metrics'] },
   {
     reason: 'composed',
-    keys: ['users.viewAs.roles.operator', 'users.roles.operator', 'signInOverview.roles.operator'],
+    keys: [
+      'users.viewAs.roles.operator',
+      'users.roles.operator',
+      'signInOverview.roles.operator',
+      'seclang.kinds.operators',
+    ],
   },
   {
     reason: 'composed',
@@ -1027,8 +1032,19 @@ export const SEPARATE_DUPLICATES: readonly {
       'security.kinds.cidr',
     ],
   },
-  { reason: 'sense', keys: ['accessLists.ipAction', 'auditLog.action', 'waf.action'] },
-  { reason: 'sense', keys: ['accessLists.ruleTarget', 'analytics.csv.key', 'proxyHosts.value'] },
+  {
+    reason: 'sense',
+    keys: ['accessLists.ipAction', 'auditLog.action', 'waf.action', 'seclang.kinds.actions'],
+  },
+  {
+    reason: 'sense',
+    keys: [
+      'accessLists.ruleTarget',
+      'analytics.csv.key',
+      'proxyHosts.value',
+      'seclang.kinds.values',
+    ],
+  },
   {
     reason: 'sense',
     keys: [
@@ -1045,7 +1061,12 @@ export const SEPARATE_DUPLICATES: readonly {
   { reason: 'sense', keys: ['analytics.uri', 'proxyHosts.uri', 'waf.uri'] },
   {
     reason: 'sense',
-    keys: ['analytics.rule', 'analytics.topColumn.wafRules', 'alerts.history.rule'],
+    keys: [
+      'analytics.rule',
+      'analytics.topColumn.wafRules',
+      'alerts.history.rule',
+      'seclang.visual.blockKinds.rule',
+    ],
   },
   {
     reason: 'sense',
@@ -1133,7 +1154,8 @@ export const SEPARATE_DUPLICATES: readonly {
       'overview.logSearchType',
     ],
   },
-  { reason: 'sense', keys: ['ui.codeEditor.plaintextLabel', 'waf.filterText'] },
+  { reason: 'sense', keys: ['waf.exclusionTarget', 'seclang.kinds.variables'] },
+  { reason: 'sense', keys: ['ui.codeEditor.plaintextLabel', 'waf.filterText', 'seclang.modeText'] },
   { reason: 'family', keys: ['analytics.total', 'analytics.groupNone'] },
   {
     reason: 'family',

@@ -28,8 +28,9 @@ import { ensureHighlightStyles } from "@astryxdesign/core/CodeBlock";
 import { Check, Copy } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { LANGUAGE_LABELS, tokenizeCode, type CodeEditorLanguage } from "./code-syntax";
+import { type CodeAssist, useCodeAssist } from "./code-assist";
 
-export type { CodeEditorLanguage };
+export type { CodeAssist, CodeEditorLanguage };
 
 export type CodeEditorIssue = {
   /** 1-based. */
@@ -87,6 +88,8 @@ type CodeEditorProps = {
   /** Floats over the editor's bottom corner, clear of the scrollbar: a Save button, say. */
   overlay?: ReactNode;
   issues?: readonly CodeEditorIssue[];
+  /** Suggestions at the caret and explanations on hover. */
+  assist?: CodeAssist;
 };
 
 /** Varies by platform (0 where scrollbars overlay); keeps `overlay` off the scrollbar. */
@@ -181,6 +184,7 @@ export function CodeEditor({
   isCopyable,
   overlay,
   issues = [],
+  assist,
 }: CodeEditorProps) {
   const t = useTranslations("ui");
   const tCommon = useTranslations("common");
@@ -213,6 +217,7 @@ export function CodeEditor({
   const pendingCaret = useRef<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const codeRef = useRef<HTMLElement | null>(null);
   const scrollbarWidth = useScrollbarWidth(scrollerRef);
   const { copy, isCopied } = useClipboard({ announce: tCommon("copied") });
   // No clipboard API over plain http; the text stays selectable there.
@@ -226,8 +231,21 @@ export function CodeEditor({
     textareaRef.current?.setSelectionRange(caret, caret);
   });
 
+  const codeAssist = useCodeAssist({
+    assist,
+    value,
+    onChange,
+    textareaRef,
+    codeRef,
+    setCaret: (caret) => {
+      pendingCaret.current = caret;
+    },
+    isEnabled: !readOnly && Boolean(onChange),
+  });
+
   /** Tab indents; Escape then Tab leaves, so the form stays keyboard-reachable. */
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (codeAssist.onKeyDown(event)) return;
     if (event.key !== "Tab" || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) {
       return;
     }
@@ -261,7 +279,7 @@ export function CodeEditor({
           ["--cpm-scrollbar-gutter" as string]: `${scrollbarWidth}px`,
         }}
       >
-        <div ref={scrollerRef} className="cpm-code-editor-scroller">
+        <div ref={scrollerRef} className="cpm-code-editor-scroller" onScroll={codeAssist.onScroll}>
           <div className="cpm-code-editor-content">
             {/* Content-tall, so it scrolls with the numbers; inline, as gutter geometry. */}
             <div
@@ -282,7 +300,7 @@ export function CodeEditor({
               translate="no"
               style={{ ...textLayer, color: "var(--color-text-primary)", pointerEvents: "none" }}
             >
-              <code>
+              <code ref={codeRef}>
                 {lines.map((line, index) => (
                   <Line
                     // biome-ignore lint/suspicious/noArrayIndexKey: a line is its position
@@ -304,7 +322,16 @@ export function CodeEditor({
               // A read-only field never takes Tab.
               aria-keyshortcuts={readOnly ? undefined : "Tab Escape"}
               value={value}
-              onChange={(event) => onChange?.(event.target.value)}
+              onChange={(event) => {
+                onChange?.(event.target.value);
+                const { inputType } = event.nativeEvent as InputEvent;
+                codeAssist.onInput(
+                  event.target.value,
+                  event.target.selectionStart,
+                  inputType ?? "",
+                );
+              }}
+              {...codeAssist.textareaProps}
               onKeyDown={readOnly ? undefined : handleKeyDown}
               readOnly={readOnly}
               disabled={isDisabled}
@@ -344,6 +371,7 @@ export function CodeEditor({
           </div>
         )}
         {overlay && <div className="cpm-code-editor-overlay">{overlay}</div>}
+        {codeAssist.popups}
       </div>
 
       {issues.length > 0 && (
@@ -375,6 +403,12 @@ export function CodeEditor({
         <HStack justify="between" gap={2}>
           <Text type="body" size="sm" color="secondary">
             {readOnly ? "" : t("codeEditor.keyboardHint")}
+            {codeAssist.isAvailable && assist?.hint && (
+              <>
+                <br />
+                {assist.hint}
+              </>
+            )}
           </Text>
           <Text type="body" size="sm" color="secondary">
             {language === "plaintext" ? t("codeEditor.plaintextLabel") : LANGUAGE_LABELS[language]}

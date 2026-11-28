@@ -16,7 +16,7 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { HStack, VStack } from "@astryxdesign/core/Stack";
 import { useTranslations } from "next-intl";
 import { AppDialog } from "@/components/ui/AppDialog";
-import { CodeEditor } from "@/components/ui/CodeEditor";
+import { SeclangEditor } from "@/components/seclang/SeclangEditor";
 import { useSeclangIssues } from "@/components/ui/seclang-issues";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { NATIVE_REQUIRED } from "@/components/ui/native-input-attrs";
@@ -276,9 +276,8 @@ function WafPresetDialog({
             value={description}
             onChange={setDescription}
           />
-          <CodeEditor
+          <SeclangEditor
             label={t("presetDirectives")}
-            language="seclang"
             htmlName="directives"
             height="md"
             value={directives}

@@ -197,6 +197,7 @@ export const RULES: readonly Rule[] = [
     match: [
       `${LIB}waf/`,
       `${SRC}components/proxy-hosts/waf/`,
+      `${SRC}components/seclang/`,
       `${DASH}waf/`,
       `${APP}api/waf-events/`,
       `${MODELS}waf-events.ts`,
@@ -504,6 +505,7 @@ export const NAMESPACES: Readonly<Record<string, Specs>> = {
   accessReviews: ["users/access-reviews"],
   changeApprovals: ["approvals"],
   scim: ["users/scim-provisioning"],
+  seclang: WAF,
   users: USERS,
   waf: WAF,
 };

@@ -70,6 +70,8 @@ describe('lintSeclang - refused by Coraza', () => {
     ['SecRule ARGS "(a)\\1" "id:1,deny"', 'seclangUnsupportedRegex'],
     ['SecRule ARGS "@rx a++" "id:1,deny"', 'seclangUnsupportedRegex'],
     ['SecRule ARGS "@rx a" "id:1,denied"', 'seclangUnknownAction'],
+    ['SecRule ARGS "@rx a" "id:1,deny,constructor"', 'seclangUnknownAction'],
+    ['SecRule ARGS "@rx a" "id:1,deny,__proto__"', 'seclangUnknownAction'],
     ['SecRule ARGS "@rx a" "id:1,deny:403"', 'seclangActionTakesNoArgument'],
     ['SecRule ARGS "@rx a" "id:1,deny,msg"', 'seclangActionNeedsArgument'],
     ['SecRule ARGS "@rx a" "id:0,deny"', 'seclangInvalidId'],

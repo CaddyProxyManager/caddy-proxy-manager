@@ -19,7 +19,7 @@ import { WafPluginPicker } from "./WafPluginPicker";
 import { WafQuickTemplates } from "./WafQuickTemplates";
 import { HOST_TEMPLATE_ID_OFFSET } from "@/lib/waf/templates";
 import { ModuleGated, useDisabledReason } from "@/components/caddy-modules/ModuleGate";
-import { CodeEditor } from "@/components/ui/CodeEditor";
+import { SeclangEditor } from "@/components/seclang/SeclangEditor";
 import { useSeclangIssues } from "@/components/ui/seclang-issues";
 import { useReportEditorIssues } from "@/components/host-review/editor-issues";
 import { useWafPolicy } from "./waf-policy";
@@ -241,9 +241,9 @@ export function WafFields({ value, showModeSelector = true }: Props) {
               }
             />
 
-            <CodeEditor
+            <SeclangEditor
               label={t("customSeclangDirectives")}
-              language="seclang"
+              idFloor={9000 + HOST_TEMPLATE_ID_OFFSET}
               placeholder={`SecRule REQUEST_URI "@contains /secret" "id:9001,deny,status:403,log,msg:'Blocked path'"`}
               value={customDirectives}
               issues={directiveIssues}
