@@ -832,7 +832,7 @@ export const typeDefs = /* GraphQL */ `
     total: Int!
   }
 
-  """A WAF rule switched off globally or on one host, optionally under a path or for one variable."""
+  """A WAF rule switched off globally or on one host, optionally under a path, for one variable or for one client range."""
   type WafExclusion {
     id: Int!
     ruleId: Int!
@@ -843,6 +843,8 @@ export const typeDefs = /* GraphQL */ `
     path: String
     """A variable the rule then skips, such as ARGS:content."""
     target: String
+    """An IPv4 or IPv6 address or CIDR range the client address must be in."""
+    clientIp: String
     reason: String!
     createdBy: String
     createdAt: DateTime!
@@ -854,6 +856,7 @@ export const typeDefs = /* GraphQL */ `
     proxyHostId: Int
     path: String
     target: String
+    clientIp: String
     reason: String
   }
 

@@ -31,6 +31,7 @@ const NEW_EXCLUSION: ExclusionDraft = {
   proxyHostId: null,
   path: "",
   target: "",
+  clientIp: "",
   reason: "",
 };
 
@@ -86,7 +87,7 @@ export function WafExclusionsPanel({
       id: "where",
       label: t("exclusionWhere"),
       render: (row) =>
-        row.path || row.target ? (
+        row.path || row.target || row.clientIp ? (
           <VStack gap={0}>
             {row.path && (
               <Text type="code" size="sm">
@@ -96,6 +97,11 @@ export function WafExclusionsPanel({
             {row.target && (
               <Text type="code" size="sm" color="secondary">
                 {row.target}
+              </Text>
+            )}
+            {row.clientIp && (
+              <Text type="code" size="sm" color="secondary">
+                {t("exclusionFromClient", { range: row.clientIp })}
               </Text>
             )}
           </VStack>
@@ -155,6 +161,7 @@ export function WafExclusionsPanel({
                     proxyHostId: row.proxyHostId,
                     path: row.path ?? "",
                     target: row.target ?? "",
+                    clientIp: row.clientIp ?? "",
                     reason: row.reason,
                   }),
               },

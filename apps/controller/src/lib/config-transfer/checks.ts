@@ -18,6 +18,7 @@ import type { WafSettings } from "../settings";
 import {
   ExclusionInputError,
   checkStoredExclusionPath,
+  normalizeExclusionClientIp,
   normalizeExclusionReason,
   normalizeExclusionTarget,
   validateExclusionRuleId,
@@ -99,6 +100,7 @@ export const IMPORT_CHECKS: Readonly<Record<string, RowCheck>> = {
       ruleId: validateExclusionRuleId(row.ruleId),
       path: checkStoredExclusionPath(row.path == null ? null : text(row.path)),
       target: normalizeExclusionTarget(row.target ?? null),
+      clientIp: normalizeExclusionClientIp(row.clientIp ?? null),
       reason: normalizeExclusionReason(row.reason),
     })),
 };

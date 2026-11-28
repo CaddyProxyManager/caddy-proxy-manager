@@ -252,6 +252,7 @@ export function WafEventInsight({
                 proxyHostId: suggestedExclusion.proxyHostId,
                 path: suggestedExclusion.path ?? "",
                 target: suggestedExclusion.target ?? "",
+                clientIp: "",
                 reason: "",
               })
             }

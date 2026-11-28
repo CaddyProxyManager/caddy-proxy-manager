@@ -351,6 +351,13 @@
       "when": 1793407200000,
       "tag": "0049_waf_override_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1793410800000,
+      "tag": "0050_waf_exclusion_client_ip",
+      "breakpoints": true
     }
   ]
 }

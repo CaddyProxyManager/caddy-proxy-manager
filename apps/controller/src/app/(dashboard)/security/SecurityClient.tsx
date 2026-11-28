@@ -427,6 +427,7 @@ export default function SecurityClient({
                   proxyHostId: null,
                   path: "",
                   target: "",
+                  clientIp: "",
                   reason: "",
                 })
               }

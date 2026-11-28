@@ -74,11 +74,18 @@ afterEach(() => {
 
 describe('WAF exclusions', () => {
   it('creates, lists, updates and deletes one', async () => {
-    const created = await ok<{ createWafExclusion: { id: number; path: string } }>(
-      `mutation($input: WafExclusionInput!) { createWafExclusion(input: $input) { id path } }`,
-      { input: { ruleId: 942100, path: '/upload/', reason: 'editor' } },
+    const created = await ok<{
+      createWafExclusion: { id: number; path: string; clientIp: string };
+    }>(
+      `mutation($input: WafExclusionInput!) { createWafExclusion(input: $input) { id path clientIp } }`,
+      {
+        input: { ruleId: 942100, path: '/upload/', clientIp: '198.51.100.0/24', reason: 'editor' },
+      },
     );
-    expect(created.createWafExclusion.path).toBe('/upload/');
+    expect(created.createWafExclusion).toMatchObject({
+      path: '/upload/',
+      clientIp: '198.51.100.0/24',
+    });
 
     const listed = await ok<{ wafExclusions: { ruleId: number; reason: string }[] }>(
       '{ wafExclusions { ruleId reason } }',

@@ -612,6 +612,8 @@ export const wafExclusions = sqliteTable(
     path: text("path"),
     /** A rule target such as `ARGS:content`, which the rule then skips. */
     target: text("target"),
+    /** An address or CIDR range REMOTE_ADDR must match; null is every client. */
+    clientIp: text("clientIp"),
     reason: text("reason").notNull().default(""),
     createdBy: integer("createdBy").references(() => users.id, { onDelete: "set null" }),
     createdAt: text("createdAt").notNull(),

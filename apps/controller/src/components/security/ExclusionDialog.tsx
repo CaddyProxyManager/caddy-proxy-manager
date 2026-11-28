@@ -9,7 +9,11 @@ import { VStack } from "@astryxdesign/core/Stack";
 import { useTranslations } from "next-intl";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { saveWafExclusionAction } from "@/src/app/(dashboard)/waf/actions";
-import { DASHBOARD_EXCLUSION_HOST_ID, PROTECTED_RULE_IDS } from "@/src/lib/waf/exclusions";
+import {
+  DASHBOARD_EXCLUSION_HOST_ID,
+  PROTECTED_RULE_IDS,
+  normalizeExclusionClientIp,
+} from "@/src/lib/waf/exclusions";
 
 /** What the dialog edits; `id` set edits a stored exclusion, unset creates one. */
 export type ExclusionDraft = {
@@ -18,12 +22,22 @@ export type ExclusionDraft = {
   proxyHostId: number | null;
   path: string;
   target: string;
+  clientIp: string;
   reason: string;
 };
 
 export type HostOption = { id: number; name: string };
 
 const ALL_HOSTS = "all";
+
+function isClientIpValid(value: string): boolean {
+  try {
+    normalizeExclusionClientIp(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
 const DASHBOARD = "dashboard";
 
 export function ExclusionDialog({
@@ -45,6 +59,7 @@ export function ExclusionDialog({
   const [scope, setScope] = useState(ALL_HOSTS);
   const [path, setPath] = useState("");
   const [target, setTarget] = useState("");
+  const [clientIp, setClientIp] = useState("");
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -61,11 +76,13 @@ export function ExclusionDialog({
     );
     setPath(draft.path);
     setTarget(draft.target);
+    setClientIp(draft.clientIp);
     setReason(draft.reason);
     setError(null);
   }, [draft]);
 
   const isProtected = ruleId !== null && PROTECTED_RULE_IDS.includes(ruleId);
+  const clientIpInvalid = !isClientIpValid(clientIp);
 
   async function submit() {
     if (ruleId === null) return;
@@ -81,6 +98,7 @@ export function ExclusionDialog({
             : Number(scope),
       path: path.trim() || null,
       target: target.trim() || null,
+      clientIp: clientIp.trim() || null,
       reason: reason.trim(),
     });
     setSubmitting(false);
@@ -100,7 +118,7 @@ export function ExclusionDialog({
       submitLabel={tCommon("save")}
       onSubmit={submit}
       isSubmitting={submitting}
-      isSubmitDisabled={ruleId === null || isProtected}
+      isSubmitDisabled={ruleId === null || isProtected || clientIpInvalid}
     >
       <VStack gap={4}>
         {error && <Banner role="alert" status="error" title={error} />}
@@ -140,6 +158,17 @@ export function ExclusionDialog({
           value={target}
           onChange={setTarget}
           isOptional
+        />
+        <TextInput
+          label={t("exclusionClientIp")}
+          description={t("exclusionClientIpHelp")}
+          placeholder="203.0.113.0/24"
+          value={clientIp}
+          onChange={setClientIp}
+          isOptional
+          status={
+            clientIpInvalid ? { type: "error", message: t("exclusionClientIpInvalid") } : undefined
+          }
         />
         <TextInput
           label={tCommon("reason")}

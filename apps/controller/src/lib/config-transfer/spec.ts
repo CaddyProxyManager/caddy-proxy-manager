@@ -180,7 +180,14 @@ export function naturalKey(table: string, row: Row, ref: RefKey): string | null 
       const host = row.proxyHostId == null ? "*" : ref("proxy_hosts", row.proxyHostId);
       return host === null
         ? null
-        : [text(row.ruleId), host, text(row.path), text(row.target)].join("|");
+        : // A client range is appended only when set, so keys from before it still match.
+          [
+            text(row.ruleId),
+            host,
+            text(row.path),
+            text(row.target),
+            ...(row.clientIp ? [text(row.clientIp)] : []),
+          ].join("|");
     }
     case "blocked_sources":
       return `${text(row.kind)}|${text(row.value)}`;
@@ -194,8 +201,8 @@ export function naturalKey(table: string, row: Row, ref: RefKey): string | null 
 /** What the preview calls a row. */
 export function itemLabel(table: string, key: string): string {
   if (table === "waf_exclusions") {
-    const [rule, host, path, target] = key.split("|");
-    return [rule, host === "*" ? "" : host, path, target].filter(Boolean).join(" ");
+    const [rule, host, path, target, clientIp] = key.split("|");
+    return [rule, host === "*" ? "" : host, path, target, clientIp].filter(Boolean).join(" ");
   }
   if (table === "blocked_sources") return key.replace("|", " ");
   return key;

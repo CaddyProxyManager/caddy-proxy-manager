@@ -891,6 +891,7 @@ function exclusionRecord(row: NonNullable<Awaited<ReturnType<typeof exclusionRow
     proxyHostId: row.proxyHostId,
     path: row.path,
     target: row.target,
+    clientIp: row.clientIp,
     reason: row.reason,
   } as Record<string, unknown>;
 }

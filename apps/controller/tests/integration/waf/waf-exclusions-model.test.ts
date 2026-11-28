@@ -143,6 +143,30 @@ describe('createWafExclusion', () => {
     );
   });
 
+  it('scopes to a client address or subnet, which tells it apart from the same rule unscoped', async () => {
+    await createWafExclusion({ ruleId: 942100, path: '/api' }, userId);
+    const created = await createWafExclusion(
+      { ruleId: 942100, path: '/api', clientIp: ' 2001:DB8::/32 ' },
+      userId,
+    );
+    expect(created.clientIp).toBe('2001:db8::/32');
+    expect(validated.some((config) => config.includes('@ipMatch 2001:db8::/32'))).toBe(true);
+    expect(
+      await codeOf(
+        createWafExclusion({ ruleId: 942100, path: '/api', clientIp: '2001:db8::/32' }, userId),
+      ),
+    ).toBe('wafExclusionDuplicate');
+    expect(
+      await codeOf(createWafExclusion({ ruleId: 942100, clientIp: '10.0.0.0/40' }, userId)),
+    ).toBe('wafExclusionClientIpInvalid');
+    const updated = await updateWafExclusion(
+      created.id,
+      { ruleId: 942100, path: '/api', clientIp: '203.0.113.9/32' },
+      userId,
+    );
+    expect(updated.clientIp).toBe('203.0.113.9');
+  });
+
   it('stores nothing when Coraza refuses the result', async () => {
     validator({
       status: 422,

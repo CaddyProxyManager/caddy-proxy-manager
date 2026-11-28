@@ -16,6 +16,7 @@ import {
   DASHBOARD_MANDATORY_EXCLUSIONS,
   ExclusionInputError,
   type WafExclusionRule,
+  normalizeExclusionClientIp,
   normalizeExclusionPath,
   normalizeExclusionReason,
   normalizeExclusionTarget,
@@ -39,6 +40,7 @@ export type WafExclusionInput = {
   proxyHostId?: number | null;
   path?: string | null;
   target?: string | null;
+  clientIp?: string | null;
   reason?: string | null;
 };
 
@@ -51,6 +53,7 @@ function toRule(row: Row): WafExclusionRule {
     proxyHostId: row.dashboard ? DASHBOARD_EXCLUSION_HOST_ID : (row.proxyHostId ?? null),
     path: row.path ?? null,
     target: row.target ?? null,
+    clientIp: row.clientIp ?? null,
   };
 }
 
@@ -117,6 +120,7 @@ async function normalizeInput(input: WafExclusionInput): Promise<Normalized> {
       proxyHostId: input.proxyHostId ?? null,
       path: normalizeExclusionPath(input.path),
       target: normalizeExclusionTarget(input.target),
+      clientIp: normalizeExclusionClientIp(input.clientIp),
       reason: normalizeExclusionReason(input.reason),
     };
   } catch (error) {
@@ -139,7 +143,8 @@ function sameScope(a: Omit<WafExclusionRule, "id">, b: Omit<WafExclusionRule, "i
     a.ruleId === b.ruleId &&
     a.proxyHostId === b.proxyHostId &&
     a.path === b.path &&
-    a.target === b.target
+    a.target === b.target &&
+    a.clientIp === b.clientIp
   );
 }
 
@@ -279,7 +284,9 @@ export async function migrateLegacyWafSuppressions(): Promise<number> {
   const { getWafSettings, saveWafSettingsUnchecked } = await import("../settings");
   const existing = await listWafExclusionRules();
   const has = (ruleId: number, proxyHostId: number | null) =>
-    existing.some((rule) => sameScope(rule, { ruleId, proxyHostId, path: null, target: null }));
+    existing.some((rule) =>
+      sameScope(rule, { ruleId, proxyHostId, path: null, target: null, clientIp: null }),
+    );
   const now = nowIso();
   let created = 0;
   const insert = async (ruleId: number, proxyHostId: number | null) => {
@@ -294,7 +301,7 @@ export async function migrateLegacyWafSuppressions(): Promise<number> {
       createdAt: now,
       updatedAt: now,
     });
-    existing.push({ id: -1, ruleId, proxyHostId, path: null, target: null });
+    existing.push({ id: -1, ruleId, proxyHostId, path: null, target: null, clientIp: null });
     created++;
   };
 

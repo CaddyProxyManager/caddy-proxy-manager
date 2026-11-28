@@ -8,6 +8,7 @@ import {
   type WafExclusionRule,
   exclusionDirectives,
   exclusionsFor,
+  normalizeExclusionClientIp,
   normalizeExclusionPath,
   normalizeExclusionTarget,
   validateExclusionRuleId,
@@ -30,6 +31,7 @@ const rule = (overrides: Partial<WafExclusionRule>): WafExclusionRule => ({
   proxyHostId: null,
   path: null,
   target: null,
+  clientIp: null,
   ...overrides,
 });
 
@@ -92,6 +94,56 @@ describe('exclusion targets', () => {
   });
 });
 
+describe('exclusion client addresses', () => {
+  it('accepts one IPv4 or IPv6 address', () => {
+    expect(normalizeExclusionClientIp(' 203.0.113.7 ')).toBe('203.0.113.7');
+    expect(normalizeExclusionClientIp('2001:DB8::1')).toBe('2001:db8::1');
+    expect(normalizeExclusionClientIp('::')).toBe('::');
+    expect(normalizeExclusionClientIp('::ffff:192.0.2.1')).toBe('::ffff:192.0.2.1');
+    expect(normalizeExclusionClientIp('2001:db8:0:0:0:0:0:1')).toBe('2001:db8:0:0:0:0:0:1');
+  });
+
+  it('accepts a subnet of either, collapsing a full-length prefix to the address', () => {
+    expect(normalizeExclusionClientIp('203.0.113.0/24')).toBe('203.0.113.0/24');
+    expect(normalizeExclusionClientIp('10.0.0.0/08')).toBe('10.0.0.0/8');
+    expect(normalizeExclusionClientIp('0.0.0.0/0')).toBe('0.0.0.0/0');
+    expect(normalizeExclusionClientIp('2001:db8::/32')).toBe('2001:db8::/32');
+    expect(normalizeExclusionClientIp('203.0.113.7/32')).toBe('203.0.113.7');
+    expect(normalizeExclusionClientIp('2001:db8::1/128')).toBe('2001:db8::1');
+  });
+
+  it('treats blank as every client', () => {
+    expect(normalizeExclusionClientIp('  ')).toBeNull();
+    expect(normalizeExclusionClientIp(null)).toBeNull();
+    expect(normalizeExclusionClientIp(undefined)).toBeNull();
+  });
+
+  it('refuses anything that is not one address or range', () => {
+    for (const value of [
+      'example.com',
+      '256.1.1.1',
+      '1.2.3',
+      '01.2.3.4',
+      '1.2.3.4/33',
+      '2001:db8::/129',
+      '1.2.3.4/',
+      '1.2.3.4/24/1',
+      '1.2.3.4,5.6.7.8',
+      '1.2.3.4 5.6.7.8',
+      '1:2:3:4:5:6:7:8:9',
+      '1::2::3',
+      ':1::',
+      '12345::',
+      'fe80::1%eth0',
+      '::ffff:1.2.3',
+      '1.2.3.4"',
+      42,
+    ]) {
+      expect(code(() => normalizeExclusionClientIp(value))).toBe('wafExclusionClientIpInvalid');
+    }
+  });
+});
+
 describe('exclusionsFor', () => {
   const all = [rule({ id: 1 }), rule({ id: 2, proxyHostId: 7 }), rule({ id: 3, proxyHostId: 8 })];
 
@@ -147,6 +199,41 @@ describe('exclusionDirectives', () => {
     expect(rules[1]).toContain('ctl:ruleRemoveTargetById=942100;ARGS:q');
   });
 
+  it('keeps a rule for one client at runtime, matched on REMOTE_ADDR', () => {
+    const id = WAF_EXCLUSION_RULE_ID_BASE + 1;
+    expect(exclusionDirectives([rule({ clientIp: '203.0.113.0/24' })])).toEqual({
+      removeIds: [],
+      rules: [
+        `SecRule REMOTE_ADDR "@ipMatch 203.0.113.0/24" "id:${id},phase:1,pass,t:none,nolog,ctl:ruleRemoveById=942100"`,
+      ],
+    });
+    expect(
+      exclusionDirectives([rule({ clientIp: '2001:db8::1', target: 'ARGS:q' })]).rules,
+    ).toEqual([
+      `SecRule REMOTE_ADDR "@ipMatch 2001:db8::1" "id:${id},phase:1,pass,t:none,nolog,ctl:ruleRemoveTargetById=942100;ARGS:q"`,
+    ]);
+  });
+
+  it('chains the client match with the path, the ctl in the last link', () => {
+    const id = WAF_EXCLUSION_RULE_ID_BASE + 3;
+    const { rules } = exclusionDirectives([
+      rule({ id: 3, clientIp: '10.0.0.0/8', path: '/api/*', target: 'ARGS:body' }),
+    ]);
+    expect(rules).toEqual([
+      [
+        `SecRule REMOTE_ADDR "@ipMatch 10.0.0.0/8" "id:${id},phase:1,pass,t:none,nolog,chain"`,
+        `  SecRule REQUEST_FILENAME "@beginsWith /api/" "t:none,t:normalisePath,ctl:ruleRemoveTargetById=942100;ARGS:body"`,
+      ].join('\n'),
+    ]);
+  });
+
+  it('skips a stored row whose client range would inject SecLang', () => {
+    expect(exclusionDirectives([rule({ clientIp: '1.2.3.4" "id:1,phase:1,deny' })])).toEqual({
+      removeIds: [],
+      rules: [],
+    });
+  });
+
   it('never emits a protected rule, even from a stored row', () => {
     expect(exclusionDirectives([rule({ ruleId: 949110 })])).toEqual({ removeIds: [], rules: [] });
   });
@@ -188,6 +275,7 @@ describe('dashboard exclusions', () => {
     proxyHostId,
     path: null,
     target: null,
+    clientIp: null,
   });
 
   it('always carry 920420, even when it overrides the global WAF', () => {

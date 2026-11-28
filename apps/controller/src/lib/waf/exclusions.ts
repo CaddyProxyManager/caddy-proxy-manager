@@ -1,6 +1,6 @@
 /**
- * Scoped WAF exclusions: a rule switched off everywhere, on one host, under one path, or for one
- * variable. Client safe: the form normalises a path the way the save does.
+ * Scoped WAF exclusions: a rule switched off everywhere, on one host, under one path, for one
+ * variable, or for one client range. Client safe: the form normalises a path the way the save does.
  */
 
 /** The anomaly-score decisions: excluding one turns the CRS's blocking off altogether. */
@@ -24,6 +24,7 @@ export const DASHBOARD_MANDATORY_EXCLUSIONS: readonly WafExclusionRule[] = [
     proxyHostId: DASHBOARD_EXCLUSION_HOST_ID,
     path: null,
     target: null,
+    clientIp: null,
   },
 ];
 
@@ -49,6 +50,8 @@ export type WafExclusionRule = {
   proxyHostId: number | null;
   path: string | null;
   target: string | null;
+  /** An address or CIDR range REMOTE_ADDR must match. */
+  clientIp: string | null;
 };
 
 type ExclusionErrorCode =
@@ -56,6 +59,7 @@ type ExclusionErrorCode =
   | "wafExclusionRuleProtected"
   | "wafExclusionPathInvalid"
   | "wafExclusionTargetInvalid"
+  | "wafExclusionClientIpInvalid"
   | "wafExclusionReasonTooLong";
 
 export class ExclusionInputError extends Error {
@@ -171,6 +175,45 @@ export function normalizeExclusionTarget(raw: unknown): string | null {
   return match[2] ? `${collection}:${match[2]}` : (collection as string);
 }
 
+const IPV4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
+const IPV6_GROUP = /^[0-9a-f]{1,4}$/;
+
+/** Without node:net, which the form's bundle has no polyfill for; zone ids are refused. */
+function isIpv6(text: string): boolean {
+  if (!text.includes(":") || !/^[0-9a-f:.]+$/.test(text)) return false;
+  let body = text;
+  const tail = text.slice(text.lastIndexOf(":") + 1);
+  if (tail.includes(".")) {
+    if (!IPV4.test(tail)) return false;
+    body = `${text.slice(0, text.length - tail.length)}0:0`;
+  }
+  const halves = body.split("::");
+  if (halves.length > 2) return false;
+  const groups = halves.map((half) => (half === "" ? [] : half.split(":")));
+  if (!groups.flat().every((group) => IPV6_GROUP.test(group))) return false;
+  const count = groups.flat().length;
+  return halves.length === 1 ? count === 8 : count <= 7;
+}
+
+/**
+ * One IPv4 or IPv6 address, or a CIDR range of either; a full-length prefix is the bare address.
+ * Only hex digits, dots, colons and a slash survive, so it never leaves the quoted operator.
+ */
+export function normalizeExclusionClientIp(raw: unknown): string | null {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw !== "string") throw new ExclusionInputError("wafExclusionClientIpInvalid");
+  const value = raw.trim().toLowerCase();
+  if (!value) return null;
+  const [address, prefix, ...rest] = value.split("/");
+  const bits = IPV4.test(address) ? 32 : isIpv6(address) ? 128 : 0;
+  if (bits === 0 || rest.length > 0) throw new ExclusionInputError("wafExclusionClientIpInvalid");
+  if (prefix === undefined) return address;
+  if (!/^\d{1,3}$/.test(prefix) || Number(prefix) > bits) {
+    throw new ExclusionInputError("wafExclusionClientIpInvalid");
+  }
+  return Number(prefix) === bits ? address : `${address}/${Number(prefix)}`;
+}
+
 export function normalizeExclusionReason(raw: unknown): string {
   const value = typeof raw === "string" ? raw.trim() : "";
   if (value.length > MAX_EXCLUSION_REASON) {
@@ -215,6 +258,7 @@ export function exclusionDirectives(exclusions: readonly WafExclusionRule[]): {
         ruleId: validateExclusionRuleId(stored.ruleId),
         path: checkStoredExclusionPath(stored.path),
         target: normalizeExclusionTarget(stored.target),
+        clientIp: normalizeExclusionClientIp(stored.clientIp),
       };
     } catch {
       console.warn(`[waf] skipped exclusion ${stored.id}: it is not a valid exclusion`);
@@ -223,17 +267,26 @@ export function exclusionDirectives(exclusions: readonly WafExclusionRule[]): {
     const ctl = exclusion.target
       ? `ctl:ruleRemoveTargetById=${exclusion.ruleId};${exclusion.target}`
       : `ctl:ruleRemoveById=${exclusion.ruleId}`;
-    const actions = `id:${WAF_EXCLUSION_RULE_ID_BASE + exclusion.id},phase:1,pass,t:none,nolog,${ctl}`;
-    if (exclusion.path) {
-      const prefix = exclusion.path.endsWith("*");
-      const operator = prefix
-        ? `@beginsWith ${exclusion.path.slice(0, -1)}`
-        : `@streq ${exclusion.path}`;
+    const meta = `id:${WAF_EXCLUSION_RULE_ID_BASE + exclusion.id},phase:1,pass,t:none,nolog`;
+    const pathOperator = exclusion.path?.endsWith("*")
+      ? `@beginsWith ${exclusion.path.slice(0, -1)}`
+      : exclusion.path
+        ? `@streq ${exclusion.path}`
+        : null;
+    const pathRule = (actions: string) =>
+      `SecRule REQUEST_FILENAME "${pathOperator}" "${actions.replace("t:none", "t:none,t:normalisePath")}"`;
+    if (exclusion.clientIp) {
+      // The ctl sits in the last link, so it runs only once the whole chain has matched.
+      const ipRule = `SecRule REMOTE_ADDR "@ipMatch ${exclusion.clientIp}"`;
       rules.push(
-        `SecRule REQUEST_FILENAME "${operator}" "${actions.replace("t:none", "t:none,t:normalisePath")}"`,
+        pathOperator
+          ? [`${ipRule} "${meta},chain"`, `  ${pathRule(`t:none,${ctl}`)}`].join("\n")
+          : `${ipRule} "${meta},${ctl}"`,
       );
+    } else if (pathOperator) {
+      rules.push(pathRule(`${meta},${ctl}`));
     } else if (exclusion.target) {
-      rules.push(`SecAction "${actions}"`);
+      rules.push(`SecAction "${meta},${ctl}"`);
     } else {
       removeIds.push(exclusion.ruleId);
     }
