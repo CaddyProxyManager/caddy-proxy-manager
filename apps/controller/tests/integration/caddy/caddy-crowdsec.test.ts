@@ -389,7 +389,7 @@ describe('L4 hosts', () => {
     await insertL4Host(null, true);
     const routes = await l4Routes();
     expect(routes).toHaveLength(1);
-    expect(routes[0].handle[0]).toEqual({ handler: 'proxy_protocol' });
+    expect(routes[0].handle[0]).toEqual({ handler: 'proxy_protocol', fallback_policy: 'USE' });
     const inner = routes[0].handle[1].routes as Route[];
     expect(inner[0]).toEqual({
       match: [{ not: [{ crowdsec: {} }] }],

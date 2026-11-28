@@ -121,7 +121,7 @@ describe('L4 geo blocking', () => {
     const routes = await l4Routes();
     expect(routes).toHaveLength(1);
     const [first, subroute] = routes[0].handle;
-    expect(first).toEqual({ handler: 'proxy_protocol' });
+    expect(first).toEqual({ handler: 'proxy_protocol', fallback_policy: 'USE' });
     expect(subroute.handler).toBe('subroute');
     const inner = subroute.routes as Route[];
     expect(inner).toHaveLength(2);
@@ -222,7 +222,7 @@ describe('L4 access lists', () => {
     });
     const routes = await l4Routes();
     expect(routes).toHaveLength(1);
-    expect(routes[0].handle[0]).toEqual({ handler: 'proxy_protocol' });
+    expect(routes[0].handle[0]).toEqual({ handler: 'proxy_protocol', fallback_policy: 'USE' });
     const inner = routes[0].handle[1].routes as Route[];
     expect(inner[0]).toEqual({
       match: [{ remote_ip: { ranges: ['192.0.2.0/24'] } }],
@@ -375,7 +375,7 @@ describe('L4 port ranges', () => {
     });
     const routes = await l4Routes();
     expect(routes[0].match).toEqual([{ tls: { sni: ['game.example.com'] }, vars_regexp: LPORT }]);
-    expect(routes[0].handle[0]).toEqual({ handler: 'proxy_protocol' });
+    expect(routes[0].handle[0]).toEqual({ handler: 'proxy_protocol', fallback_policy: 'USE' });
   });
 
   it('leaves out an active health check a same-mode host still has stored', async () => {

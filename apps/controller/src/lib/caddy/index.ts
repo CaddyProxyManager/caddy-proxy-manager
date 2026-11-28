@@ -2969,6 +2969,8 @@ function l4HostRoutes(
   proxyProtocolReceive: boolean,
 ): Record<string, unknown>[] {
   const close = [{ handler: "close" }];
+  // caddy-l4 0.1.3 applies fallback_policy, which defaults to IGNORE: the header's address unused.
+  const receive = { handler: "proxy_protocol", fallback_policy: "USE" };
   const matchHost = hostMatch ? { match: [hostMatch] } : {};
   // No sets means every connection. Not `match: [{}]`: caddy-l4 never matches an empty set.
   const guard = (sets: Record<string, unknown>[], host: Record<string, unknown> | undefined) => {
@@ -2985,11 +2987,8 @@ function l4HostRoutes(
   const inner = guards.map((sets) => guard(sets, undefined));
   const handle =
     inner.length === 0
-      ? [{ handler: "proxy_protocol" }, ...proxyHandlers]
-      : [
-          { handler: "proxy_protocol" },
-          { handler: "subroute", routes: [...inner, { handle: proxyHandlers }] },
-        ];
+      ? [receive, ...proxyHandlers]
+      : [receive, { handler: "subroute", routes: [...inner, { handle: proxyHandlers }] }];
   return [{ ...matchHost, handle }];
 }
 

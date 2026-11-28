@@ -71,7 +71,8 @@ function buildExpectedL4Config(rows: (typeof l4ProxyHosts.$inferSelect)[]) {
       }
 
       const handlers: Record<string, unknown>[] = [];
-      if (host.proxyProtocolReceive) handlers.push({ handler: 'proxy_protocol' });
+      if (host.proxyProtocolReceive)
+        handlers.push({ handler: 'proxy_protocol', fallback_policy: 'USE' });
       if (host.tlsTermination) handlers.push({ handler: 'tls' });
 
       const upstreams = JSON.parse(host.upstreams) as string[];
@@ -218,7 +219,7 @@ describe('L4 Caddy config generation', () => {
         routes: [
           {
             handle: [
-              { handler: 'proxy_protocol' },
+              { handler: 'proxy_protocol', fallback_policy: 'USE' },
               { handler: 'tls' },
               {
                 handler: 'proxy',
